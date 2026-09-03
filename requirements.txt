@@ -1,0 +1,9 @@
+streamlit
+playwright
+pandas
+openpyxl
+XlsxWriter
+xlrd
+requests
+python-dotenv
+pytest

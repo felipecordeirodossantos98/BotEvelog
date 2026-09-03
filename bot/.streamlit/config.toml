@@ -1,0 +1,9 @@
+[server]
+folderWatchBlacklist = [
+    "resultados",
+    "automacoes/baixar_danfes/perfil_real",
+    "automacoes/gerar_tickets_zendesk/perfil_zendesk",
+    "automacoes/gerar_ordens_de_coleta/perfil_jadlog"
+]
+
+runOnSave = false
