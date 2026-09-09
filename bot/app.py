@@ -23,6 +23,20 @@ from elementos_visuais.visual_gerar_tickets_zendesk import (
 from utils.arquivos import identificar_fluxo_automacao_sac
 from utils.interface import LARGURA_UPLOAD, error, warning
 
+import streamlit.components.v1 as components
+
+components.html(
+    """
+    <script>
+        window.parent.addEventListener("beforeunload", function (event) {
+            event.preventDefault();
+            event.returnValue = "";
+        });
+    </script>
+    """,
+    height=0,
+)
+
 
 BASE_DIR = Path(__file__).resolve().parent
 PAGE_ICON = BASE_DIR / "images" / "evelog-favicon.svg"
