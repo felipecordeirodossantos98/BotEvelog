@@ -507,7 +507,13 @@ def preparar_dataframe(df_entrada: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def login_zendesk(page: Page, usuario: str, senha: str, solicitar_token, log) -> None:
+def login_zendesk(
+    page: Page,
+    usuario: str,
+    senha: str,
+    solicitar_token,
+    log,
+) -> None:
     log("Abrindo Zendesk...")
 
     page.goto(
@@ -516,53 +522,107 @@ def login_zendesk(page: Page, usuario: str, senha: str, solicitar_token, log) ->
         timeout=120_000,
     )
 
+    botao_pesquisa = page.locator(
+        '[data-test-id="header-toolbar-search-button"]'
+    )
+
+    # Primeiro dá mais tempo para o perfil persistente restaurar a sessão.
     try:
-        page.locator(
-            '[data-test-id="header-toolbar-search-button"]'
-        ).wait_for(
+        botao_pesquisa.wait_for(
             state="visible",
-            timeout=8_000,
+            timeout=30_000,
         )
 
-        log("Sessão Zendesk reutilizada. MFA não foi necessário.")
+        log(
+            "Sessão Zendesk reutilizada. "
+            "MFA não foi necessário."
+        )
         return
 
     except PlaywrightTimeoutError:
         pass
 
-    log("Sessão expirada ou inexistente. Fazendo login...")
+    log(
+        "Sessão expirada ou inexistente. "
+        "Fazendo login..."
+    )
 
-    page.get_by_test_id("email-input").wait_for(
+    campo_email = page.get_by_test_id(
+        "email-input"
+    )
+
+    campo_email.wait_for(
         state="visible",
         timeout=30_000,
     )
 
-    page.get_by_test_id("email-input").fill(usuario)
-    page.get_by_test_id("password-input").fill(senha)
-    page.get_by_test_id("submit-button").click()
-
-    campo_token = page.get_by_test_id("mfa-challenge-input")
-    campo_token.wait_for(
-        state="visible",
-        timeout=60_000,
+    campo_email.fill(
+        usuario
     )
 
-    token = solicitar_token().strip()
-
-    if not token:
-        raise ValueError("Token MFA não informado.")
-
-    campo_token.fill(token)
-    page.get_by_test_id("mfa-challenge-submit").click()
-
-    page.locator(
-        '[data-test-id="header-toolbar-search-button"]'
-    ).wait_for(
-        state="visible",
-        timeout=120_000,
+    page.get_by_test_id(
+        "password-input"
+    ).fill(
+        senha
     )
 
-    log("Login concluído. Sessão persistente salva.")
+    page.get_by_test_id(
+        "submit-button"
+    ).click()
+
+    campo_token = page.get_by_test_id(
+        "mfa-challenge-input"
+    )
+
+    # Depois de usuário/senha, o Zendesk pode:
+    # 1. pedir MFA;
+    # 2. entrar direto no Agent.
+    for _ in range(120):
+        if botao_pesquisa.is_visible():
+            log(
+                "Login concluído sem nova solicitação de MFA."
+            )
+            return
+
+        if campo_token.is_visible():
+            log(
+                "Zendesk solicitou MFA."
+            )
+
+            token = solicitar_token().strip()
+
+            if not token:
+                raise ValueError(
+                    "Token MFA não informado."
+                )
+
+            campo_token.fill(
+                token
+            )
+
+            page.get_by_test_id(
+                "mfa-challenge-submit"
+            ).click()
+
+            botao_pesquisa.wait_for(
+                state="visible",
+                timeout=120_000,
+            )
+
+            log(
+                "Login concluído. "
+                "Sessão persistente salva."
+            )
+            return
+
+        page.wait_for_timeout(
+            500
+        )
+
+    raise RuntimeError(
+        "Zendesk não apresentou a tela do Agent "
+        "nem a solicitação de MFA após o login."
+    )
 
 
 
@@ -684,7 +744,9 @@ def pesquisar_ticket(page: Page, pedido: str, log=None) -> bool:
 def preencher_assunto(page: Page, pedido: str, descricao: str) -> None:
     desc = normalizar_texto(descricao)
     assunto = f"{MAPEAMENTO_STATUS_ASSUNTO[desc]} | {pedido}"
-    campo = page.locator('[data-test-id="omni-header-subject"]')
+    campo = page.locator(
+        '[data-test-id="omni-header-subject"]'
+    ).last
     campo.wait_for(state="visible", timeout=30_000)
     tag = campo.evaluate("(el) => el.tagName.toLowerCase()")
     if tag in ("input", "textarea"):
@@ -696,14 +758,71 @@ def preencher_assunto(page: Page, pedido: str, descricao: str) -> None:
 
 
 def preencher_solicitante(page: Page) -> None:
-    container = page.locator('[data-test-id="ticket-system-field-requester-select"]')
-    container.wait_for(state="visible", timeout=30_000)
-    container.click()
-    campo = container.locator("input").first
-    campo.wait_for(state="visible", timeout=30_000)
-    campo.fill("jadlog")
-    page.wait_for_timeout(600)
-    page.get_by_text("Jadlog atendimento4@evelog.", exact=False).click()
+    """
+    Preenche o solicitante no ticket mais recente.
+
+    O Zendesk às vezes demora para devolver a opção do autocomplete.
+    Nesse caso, fecha a lista e tenta o campo mais uma vez antes de
+    considerar a operação como erro.
+    """
+    ultimo_erro = None
+
+    for tentativa in range(1, 3):
+        container = page.locator(
+            '[data-test-id="ticket-system-field-requester-select"]'
+        ).last
+
+        container.wait_for(
+            state="visible",
+            timeout=30_000,
+        )
+
+        container.click()
+
+        campo = container.locator(
+            "input"
+        ).first
+
+        campo.wait_for(
+            state="visible",
+            timeout=30_000,
+        )
+
+        campo.fill("jadlog")
+
+        # Delay original preservado.
+        page.wait_for_timeout(600)
+
+        opcao = page.get_by_text(
+            "Jadlog atendimento4@evelog.",
+            exact=False,
+        ).last
+
+        try:
+            opcao.wait_for(
+                state="visible",
+                timeout=30_000,
+            )
+            opcao.click(
+                timeout=30_000,
+            )
+            return
+
+        except PlaywrightTimeoutError as erro:
+            ultimo_erro = erro
+
+            if tentativa >= 2:
+                raise
+
+            try:
+                page.keyboard.press("Escape")
+            except Exception:
+                pass
+
+            page.wait_for_timeout(800)
+
+    if ultimo_erro is not None:
+        raise ultimo_erro
 
 
 def preencher_ticket(page: Page, pedido: str, status_planilha: str, descricao: str, log) -> None:
@@ -713,8 +832,11 @@ def preencher_ticket(page: Page, pedido: str, status_planilha: str, descricao: s
     page.wait_for_timeout(400)
     page.locator('[data-test-id="header-toolbar-add-menu-new-ticket"]').click()
 
-    page.locator('[data-test-id="ticket-system-field-requester-select"]').wait_for(
-        state="visible", timeout=60_000
+    page.locator(
+        '[data-test-id="ticket-system-field-requester-select"]'
+    ).last.wait_for(
+        state="visible",
+        timeout=60_000,
     )
 
     preencher_assunto(page, pedido, descricao)
@@ -723,27 +845,37 @@ def preencher_ticket(page: Page, pedido: str, status_planilha: str, descricao: s
     page.locator(
         '[data-test-id="ticket-form-field-dropdown-field-29872094462107"] '
         '[data-test-id="ticket-form-field-dropdown-button"]'
-    ).click()
-    page.get_by_role("option", name="Transportadoras", exact=True).click()
+    ).last.click()
+    page.get_by_role(
+        "option",
+        name="Transportadoras",
+        exact=True,
+    ).last.click()
 
     page.locator(
         '[data-test-id="ticket-form-field-dropdown-field-29900641482651"] '
         '[data-test-id="ticket-form-field-dropdown-button"]'
-    ).click()
-    page.get_by_role("option", name="Insucesso na entrega", exact=True).click()
+    ).last.click()
+    page.get_by_role(
+        "option",
+        name="Insucesso na entrega",
+        exact=True,
+    ).last.click()
 
     page.locator(
         '[data-test-id="ticket-form-field-dropdown-field-29873874671003"] '
         '[data-test-id="ticket-form-field-dropdown-button"]'
-    ).click()
+    ).last.click()
     page.get_by_role(
-        "option", name=MAPEAMENTO_STATUS_ZENDESK[desc], exact=True
-    ).click()
+        "option",
+        name=MAPEAMENTO_STATUS_ZENDESK[desc],
+        exact=True,
+    ).last.click()
 
     page.locator(
         '[data-test-id="ticket-form-field-multiline-field-29873683570203"] '
         '[data-test-id="ticket-fields-multiline-field"]'
-    ).fill(pedido)
+    ).last.fill(pedido)
 
     # Por enquanto, o comentário recebe a Descricao, com a mesma escrita
     # corrigida usada no assunto. Ex.: NUMERO NAO LOCALIZADO ->
@@ -754,7 +886,7 @@ def preencher_ticket(page: Page, pedido: str, status_planilha: str, descricao: s
 
     editor = page.locator(
         '[data-test-id="omnicomposer-rich-text-ckeditor"]'
-    )
+    ).last
 
     editor.wait_for(
         state="visible",
@@ -767,7 +899,7 @@ def preencher_ticket(page: Page, pedido: str, status_planilha: str, descricao: s
     # VERSÃO FINAL: cria o ticket.
     botao_criar = page.locator(
         '[data-test-id="submit_button-button"]'
-    )
+    ).last
 
     botao_criar.wait_for(
         state="visible",
@@ -799,6 +931,143 @@ def fechar_ticket_atual(page: Page, log: Callable[[str], None]) -> None:
 
     log("Aba do ticket fechada.")
 
+
+
+def recuperar_zendesk_apos_erro(
+    playwright,
+    context,
+    page,
+    usuario: str,
+    senha: str,
+    solicitar_token,
+    log: Callable[[str], None],
+):
+    """
+    Recupera a interface do Zendesk depois de erro em um pedido.
+
+    Ordem:
+      1. tenta refresh da página atual;
+      2. se a página tiver crashado, abre nova página no mesmo contexto;
+      3. se o contexto/Chromium também tiver falhado, recria o contexto
+         persistente usando o mesmo perfil.
+
+    O objetivo é impedir que um erro deixe formulários internos antigos
+    abertos e cause falhas em cascata nos pedidos seguintes.
+    """
+    seletor_pesquisa = (
+        '[data-test-id="header-toolbar-search-button"]'
+    )
+
+    # 1) Refresh da página atual.
+    try:
+        if page is not None and not page.is_closed():
+            log(
+                "Recuperando Zendesk com refresh antes do próximo pedido..."
+            )
+
+            try:
+                page.keyboard.press("Escape")
+            except Exception:
+                pass
+
+            page.reload(
+                wait_until="domcontentloaded",
+                timeout=120_000,
+            )
+
+            page.locator(
+                seletor_pesquisa
+            ).wait_for(
+                state="visible",
+                timeout=120_000,
+            )
+
+            page.wait_for_timeout(1_500)
+
+            log(
+                "Zendesk recuperado após refresh."
+            )
+
+            return context, page
+
+    except Exception as erro_refresh:
+        log(
+            "Refresh não recuperou o Zendesk: "
+            f"{type(erro_refresh).__name__}: {erro_refresh}"
+        )
+
+    # 2) Nova página no mesmo contexto.
+    try:
+        if context is not None:
+            log(
+                "Abrindo nova página no contexto atual do Zendesk..."
+            )
+
+            nova_page = context.new_page()
+
+            login_zendesk(
+                nova_page,
+                usuario,
+                senha,
+                solicitar_token,
+                log,
+            )
+
+            try:
+                if page is not None and not page.is_closed():
+                    page.close()
+            except Exception:
+                pass
+
+            log(
+                "Zendesk recuperado em uma nova página."
+            )
+
+            return context, nova_page
+
+    except Exception as erro_pagina:
+        log(
+            "Nova página não recuperou o Zendesk: "
+            f"{type(erro_pagina).__name__}: {erro_pagina}"
+        )
+
+    # 3) Recria completamente o Chromium persistente.
+    fechar_recurso_playwright_seguro(
+        context,
+        log,
+    )
+
+    log(
+        "Reabrindo Chromium persistente do Zendesk..."
+    )
+
+    novo_context = playwright.chromium.launch_persistent_context(
+        user_data_dir=str(PERFIL_ZENDESK),
+        headless=HEADLESS,
+        slow_mo=500,
+        no_viewport=True,
+        args=["--start-maximized"],
+    )
+
+    nova_page = (
+        novo_context.pages[0]
+        if novo_context.pages
+        else novo_context.new_page()
+    )
+
+    login_zendesk(
+        nova_page,
+        usuario,
+        senha,
+        solicitar_token,
+        log,
+    )
+
+    log(
+        "Zendesk recuperado após reiniciar o Chromium."
+    )
+
+    return novo_context, nova_page
 
 
 def preencher_observacao_fraction_com_retentativas(
@@ -1228,6 +1497,64 @@ def executar_automacao(
                     log(
                         f"Erro no pedido {pedido}: {erro}"
                     )
+
+                    # Um ticket incompleto pode continuar aberto internamente
+                    # no Zendesk e fazer os seletores do pedido seguinte
+                    # encontrarem 2, 3, 4... formulários. Recupera a interface
+                    # antes de seguir para evitar esse efeito cascata.
+                    try:
+                        cz, pz = recuperar_zendesk_apos_erro(
+                            p,
+                            cz,
+                            pz,
+                            uz,
+                            sz,
+                            solicitar_token,
+                            log,
+                        )
+
+                    except Exception as erro_recuperacao:
+                        mensagem_recuperacao = (
+                            "Não foi possível recuperar o Zendesk após o erro: "
+                            f"{type(erro_recuperacao).__name__}: "
+                            f"{erro_recuperacao}"
+                        )
+
+                        log(
+                            mensagem_recuperacao
+                        )
+
+                        # Se nem refresh, nova página e novo Chromium
+                        # recuperarem o Zendesk, não insiste nos próximos
+                        # pedidos com uma sessão quebrada.
+                        for indice_restante in fila[pos:]:
+                            df.at[
+                                indice_restante,
+                                "Ticket_Criado",
+                            ] = "NAO - ERRO"
+
+                            df.at[
+                                indice_restante,
+                                "Observacao_Fraction",
+                            ] = "NAO EXECUTADO"
+
+                            _acrescentar_erro(
+                                df,
+                                indice_restante,
+                                (
+                                    "Zendesk indisponível após falha "
+                                    "de recuperação. "
+                                    + mensagem_recuperacao
+                                ),
+                            )
+
+                        atualizar_checkpoint(
+                            df,
+                            caminho,
+                            log,
+                        )
+
+                        break
 
                 finally:
                     # Depois de cada pedido, a planilha em disco reflete
