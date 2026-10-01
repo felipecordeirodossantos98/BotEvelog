@@ -20,6 +20,9 @@ from elementos_visuais.visual_gerar_ordens_de_coleta import (
 from elementos_visuais.visual_gerar_tickets_zendesk import (
     renderizar_gerar_tickets_zendesk,
 )
+from elementos_visuais.visual_mega_cartela_lsm import (
+    renderizar_mega_cartela_lsm,
+)
 from utils.arquivos import identificar_fluxo_automacao_sac
 from utils.interface import LARGURA_UPLOAD, error, warning
 
@@ -91,10 +94,11 @@ def renderizar_automacao_sac(
 def main() -> None:
     st.title("Bot Evelog")
 
-    tab_sac, tab_analitico = st.tabs(
+    tab_sac, tab_analitico, tab_mega_cartela = st.tabs(
         [
             "Automações SAC",
             "Relatório Analítico",
+            "Mega Cartela LSM",
         ],
         width="stretch",
     )
@@ -116,6 +120,9 @@ def main() -> None:
 
     with tab_analitico:
         renderizar_baixar_relatorios_analitico()
+
+    with tab_mega_cartela:
+        renderizar_mega_cartela_lsm()
 
 
 if __name__ == "__main__":

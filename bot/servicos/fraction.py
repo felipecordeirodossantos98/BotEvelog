@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import os
+import re
 import time
 import unicodedata
+from datetime import date, datetime, timedelta
+from pathlib import Path
 from typing import Callable
 
 from playwright.sync_api import (
@@ -17,6 +21,44 @@ def validar_url_fraction() -> None:
         raise RuntimeError(
             "URL_FRACTION não foi informada no arquivo .env."
         )
+
+
+def login_fraction_mega_cartela(
+    page: Page,
+    log: Callable[[str], None],
+) -> None:
+    """
+    Login do Fraction usado especificamente pela Mega Cartela LSM.
+
+    Mantém o login genérico intacto e apenas centraliza a escolha
+    das credenciais FRACTION_USER_MEGA_CARTELA / PASSWORD.
+    """
+    usuario = os.getenv(
+        "FRACTION_USER_MEGA_CARTELA",
+        "",
+    ).strip()
+
+    senha = os.getenv(
+        "FRACTION_PASSWORD_MEGA_CARTELA",
+        "",
+    )
+
+    if not usuario:
+        raise RuntimeError(
+            "FRACTION_USER_MEGA_CARTELA não foi informado no .env."
+        )
+
+    if not senha:
+        raise RuntimeError(
+            "FRACTION_PASSWORD_MEGA_CARTELA não foi informado no .env."
+        )
+
+    login_fraction(
+        page,
+        usuario,
+        senha,
+        log,
+    )
 
 
 def login_fraction(
@@ -112,6 +154,105 @@ def pesquisar_cte_fraction(
     ).click()
 
     log(f"Código {codigo}: pesquisa enviada.")
+
+
+def capturar_peso_taxado_fraction(
+    page: Page,
+    log: Callable[[str], None],
+) -> float | None:
+    """Captura o valor exibido ao lado de ``Peso Taxado:``.
+
+    O Fraction pode estruturar o rótulo e o valor em elementos diferentes.
+    Por isso subimos alguns níveis no DOM e procuramos o valor no texto
+    combinado do bloco.
+    """
+    marcador = page.get_by_text(
+        "Peso Taxado:",
+        exact=False,
+    ).first
+
+    try:
+        marcador.wait_for(
+            state="visible",
+            timeout=30_000,
+        )
+    except PlaywrightTimeoutError:
+        log("Peso Taxado não foi localizado no resultado do CTE.")
+        return None
+
+    textos = []
+
+    for nivel in range(0, 6):
+        if nivel == 0:
+            elemento = marcador
+        else:
+            elemento = marcador.locator(
+                "xpath=" + "/.." * nivel
+            )
+
+        try:
+            texto = elemento.inner_text().strip()
+        except Exception:
+            continue
+
+        if texto and texto not in textos:
+            textos.append(texto)
+
+        if re.search(
+            r"Peso\s+Taxado\s*:\s*([0-9]+(?:[.,][0-9]+)?)",
+            texto,
+            flags=re.IGNORECASE,
+        ):
+            break
+
+    padrao = re.compile(
+        r"Peso\s+Taxado\s*:\s*([0-9]+(?:[.,][0-9]+)?)",
+        flags=re.IGNORECASE,
+    )
+
+    for texto in textos:
+        encontrado = padrao.search(texto)
+        if not encontrado:
+            continue
+
+        valor_texto = encontrado.group(1).replace(
+            ".",
+            ".",
+        ).replace(
+            ",",
+            ".",
+        )
+
+        try:
+            valor = float(valor_texto)
+        except ValueError:
+            continue
+
+        log(
+            f"Peso Taxado encontrado: {valor:.2f}."
+        )
+        return valor
+
+    log("Peso Taxado não pôde ser extraído do resultado do CTE.")
+    return None
+
+
+def pesquisar_e_capturar_peso_taxado_fraction(
+    page: Page,
+    codigo: str,
+    log: Callable[[str], None],
+) -> float | None:
+    """Pesquisa um CTE e retorna o Peso Taxado do pedido encontrado."""
+    pesquisar_cte_fraction(
+        page,
+        codigo,
+        log,
+    )
+
+    return capturar_peso_taxado_fraction(
+        page,
+        log,
+    )
 
 
 def _normalizar_operacao_historico(valor: str) -> str:
@@ -642,3 +783,552 @@ def testar_conexao_fraction_isolada(
             time.sleep(intervalo_segundos)
 
     return False, ultimo_erro
+
+# ==========================================================
+# FOLHA DE APOIO - RELATÓRIO DESCRITIVO POR CORRENTISTA
+# ==========================================================
+
+MESES_PT_BR = {
+    1: "janeiro",
+    2: "fevereiro",
+    3: "marco",
+    4: "abril",
+    5: "maio",
+    6: "junho",
+    7: "julho",
+    8: "agosto",
+    9: "setembro",
+    10: "outubro",
+    11: "novembro",
+    12: "dezembro",
+}
+
+
+def abrir_relatorio_descritivo_correntista_fraction(
+    page: Page,
+    log: Callable[[str], None],
+    *,
+    codigo_correntista: str = "014995",
+    nome_correntista: str = "ARCOS DOURADOS COMERCIO DE",
+) -> None:
+    log("Abrindo Folha de apoio do Fraction...")
+
+    menu_financeiro = page.get_by_role(
+        "link",
+        name="Financeiro",
+    )
+
+    menu_financeiro.wait_for(
+        state="visible",
+        timeout=30_000,
+    )
+
+    # O submenu do PrimeFaces pode permanecer oculto após o clique
+    # se o menu ainda estiver em animação. O hover sobre o item pai
+    # força a abertura visual do submenu antes do clique.
+    menu_financeiro.click()
+    page.wait_for_timeout(500)
+    menu_financeiro.hover()
+
+    folha_apoio = page.get_by_role(
+        "link",
+        name="Folha de apoio",
+    )
+
+    folha_apoio.wait_for(
+        state="visible",
+        timeout=30_000,
+    )
+
+    folha_apoio.click()
+
+    page.locator(
+        "#j_idt357_content"
+    ).get_by_text(
+        "Correntista"
+    ).click()
+
+    page.get_by_text(
+        "Relatório descritivo"
+    ).click()
+
+    page.get_by_role(
+        "button",
+        name="Adicionar",
+    ).click()
+
+    campo_busca = page.get_by_role(
+        "textbox",
+        name="Busca por razão social",
+    )
+
+    campo_busca.wait_for(
+        state="visible",
+        timeout=30_000,
+    )
+
+    campo_busca.fill(
+        codigo_correntista
+    )
+
+    page.get_by_role(
+        "button",
+        name="Buscar",
+    ).click()
+
+    link_correntista = page.get_by_role(
+        "link",
+        name=nome_correntista,
+    )
+
+    link_correntista.wait_for(
+        state="visible",
+        timeout=30_000,
+    )
+
+    link_correntista.click()
+
+    page.locator(
+        "#j_idt369_input"
+    ).wait_for(
+        state="visible",
+        timeout=30_000,
+    )
+
+    log(
+        "Relatório descritivo aberto para o correntista "
+        f"{codigo_correntista}."
+    )
+
+
+def _nome_periodo_folha_apoio(
+    inicio: int,
+    fim: int,
+    mes: int,
+    ano: int,
+) -> str:
+    nome_mes = MESES_PT_BR.get(
+        mes,
+        f"mes_{mes:02d}",
+    )
+
+    return (
+        f"{inicio:02d}_a_{fim:02d}_"
+        f"{nome_mes}_{ano}.xlsx"
+    )
+
+
+def _selecionar_mes_ano_relatorio_descritivo_fraction(
+    page: Page,
+    mes: int,
+    ano: int,
+    log: Callable[[str], None],
+) -> None:
+    """
+    Ajusta o calendário do relatório para o mês/ano solicitado.
+
+    No calendário atual do Fraction, ``select month`` e ``select year``
+    podem ser elementos ``span`` (e não ``select`` HTML). Por isso, não
+    usamos ``select_option``. A navegação é feita pelos botões
+    ``Anterior``/``Próximo`` e validada pelo texto exibido no calendário.
+    """
+    seletor_mes = page.get_by_label(
+        "select month"
+    )
+
+    seletor_ano = page.get_by_label(
+        "select year"
+    )
+
+    seletor_mes.wait_for(
+        state="visible",
+        timeout=30_000,
+    )
+
+    seletor_ano.wait_for(
+        state="visible",
+        timeout=30_000,
+    )
+
+    nomes_mes = {
+        nome.lower(): numero
+        for numero, nome in MESES_PT_BR.items()
+    }
+
+    # O Fraction pode exibir março com ou sem acento dependendo da tela.
+    nomes_mes["março"] = 3
+
+    def obter_mes_ano_exibidos() -> tuple[int, int]:
+        texto_mes = seletor_mes.inner_text().strip().lower()
+        texto_ano = seletor_ano.inner_text().strip()
+
+        mes_atual = nomes_mes.get(texto_mes)
+        if mes_atual is None:
+            raise RuntimeError(
+                "Não foi possível identificar o mês exibido no calendário "
+                f"do Fraction: {texto_mes!r}."
+            )
+
+        try:
+            ano_atual = int(texto_ano)
+        except ValueError as exc:
+            raise RuntimeError(
+                "Não foi possível identificar o ano exibido no calendário "
+                f"do Fraction: {texto_ano!r}."
+            ) from exc
+
+        return mes_atual, ano_atual
+
+    alvo = ano * 12 + mes
+
+    for _ in range(120):
+        mes_atual, ano_atual = obter_mes_ano_exibidos()
+        atual = ano_atual * 12 + mes_atual
+
+        if atual == alvo:
+            log(
+                "Calendário ajustado para "
+                f"{mes:02d}/{ano}."
+            )
+            return
+
+        if atual > alvo:
+            botao_anterior = page.get_by_title(
+                "Anterior"
+            )
+            botao_anterior.wait_for(
+                state="visible",
+                timeout=30_000,
+            )
+            botao_anterior.click()
+        else:
+            botao_proximo = page.get_by_title(
+                "Próximo"
+            )
+            botao_proximo.wait_for(
+                state="visible",
+                timeout=30_000,
+            )
+            botao_proximo.click()
+
+        page.wait_for_timeout(150)
+
+    raise RuntimeError(
+        "Não foi possível posicionar o calendário do Fraction em "
+        f"{mes:02d}/{ano}."
+    )
+
+
+def _selecionar_dia_relatorio_descritivo_fraction(
+    page: Page,
+    dia: int,
+    log: Callable[[str], None],
+    *,
+    mes: int | None = None,
+    ano: int | None = None,
+) -> None:
+    campo_data = page.locator(
+        "#j_idt369_input"
+    )
+
+    campo_data.click()
+
+    seletor_mes = page.get_by_label(
+        "select month"
+    )
+
+    seletor_mes.wait_for(
+        state="visible",
+        timeout=30_000,
+    )
+
+    if mes is not None and ano is not None:
+        _selecionar_mes_ano_relatorio_descritivo_fraction(
+            page,
+            mes,
+            ano,
+            log,
+        )
+    else:
+        try:
+            mes_visivel = seletor_mes.input_value()
+            log(
+                "Calendário aberto. "
+                f"Mês identificado: {mes_visivel}."
+            )
+        except Exception:
+            log("Calendário aberto.")
+
+    link_dia = page.get_by_role(
+        "link",
+        name=str(dia),
+        exact=True,
+    )
+
+    link_dia.wait_for(
+        state="visible",
+        timeout=30_000,
+    )
+
+    link_dia.click()
+
+    log(
+        f"Dia {dia} selecionado no relatório descritivo."
+    )
+
+
+def baixar_periodo_relatorio_descritivo_fraction(
+    page: Page,
+    pasta_destino: Path | str,
+    *,
+    dia: int,
+    inicio_periodo: int,
+    fim_periodo: int,
+    mes: int,
+    ano: int,
+    log: Callable[[str], None],
+) -> Path:
+    pasta_destino = Path(
+        pasta_destino
+    )
+
+    pasta_destino.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    _selecionar_dia_relatorio_descritivo_fraction(
+        page,
+        dia,
+        log,
+        mes=mes,
+        ano=ano,
+    )
+
+    exportador = page.locator(
+        "#id_exportar_excel"
+    )
+
+    exportador.wait_for(
+        state="visible",
+        timeout=120_000,
+    )
+
+    nome_arquivo = _nome_periodo_folha_apoio(
+        inicio_periodo,
+        fim_periodo,
+        mes,
+        ano,
+    )
+
+    caminho = (
+        pasta_destino
+        / nome_arquivo
+    )
+
+    with page.expect_download(
+        timeout=240_000
+    ) as download_info:
+        exportador.click()
+
+    download = download_info.value
+
+    download.save_as(
+        caminho
+    )
+
+    log(
+        "Relatório descritivo baixado: "
+        f"{caminho.name}"
+    )
+
+    return caminho
+
+
+def baixar_relatorios_descritivos_correntista_fraction(
+    page: Page,
+    pasta_destino: Path | str,
+    log: Callable[[str], None],
+    *,
+    mes: int | None = None,
+    ano: int | None = None,
+    codigo_correntista: str = "014995",
+    nome_correntista: str = "ARCOS DOURADOS COMERCIO DE",
+) -> list[Path]:
+    """
+    Baixa dois relatórios quinzenais:
+      - 01 a 15
+      - 16 a 30
+
+    Nesta primeira versão não troca de mês no calendário.
+    Isso será acrescentado depois, conforme a regra de negócio.
+    """
+    agora = datetime.now()
+
+    if mes is None:
+        mes = agora.month
+
+    if ano is None:
+        ano = agora.year
+
+    if not 1 <= mes <= 12:
+        raise ValueError(
+            f"Mês inválido: {mes}."
+        )
+
+    abrir_relatorio_descritivo_correntista_fraction(
+        page,
+        log,
+        codigo_correntista=codigo_correntista,
+        nome_correntista=nome_correntista,
+    )
+
+    arquivos = []
+
+    arquivos.append(
+        baixar_periodo_relatorio_descritivo_fraction(
+            page,
+            pasta_destino,
+            dia=15,
+            inicio_periodo=1,
+            fim_periodo=15,
+            mes=mes,
+            ano=ano,
+            log=log,
+        )
+    )
+
+    arquivos.append(
+        baixar_periodo_relatorio_descritivo_fraction(
+            page,
+            pasta_destino,
+            dia=30,
+            inicio_periodo=16,
+            fim_periodo=30,
+            mes=mes,
+            ano=ano,
+            log=log,
+        )
+    )
+
+    log(
+        "Download dos relatórios descritivos concluído. "
+        f"{len(arquivos)} arquivo(s) salvo(s)."
+    )
+
+    return arquivos
+
+
+
+def baixar_relatorios_descritivos_correntista_ate_data_fraction(
+    page: Page,
+    pasta_destino: Path | str,
+    log: Callable[[str], None],
+    *,
+    data_limite: date | datetime | None = None,
+    codigo_correntista: str = "014995",
+    nome_correntista: str = "ARCOS DOURADOS COMERCIO DE",
+) -> list[Path]:
+    """
+    Baixa as Folhas de apoio em quinzenas, do período mais recente
+    até o mês/quinzena que alcança ``data_limite``.
+
+    Exemplo em 30/09 com uma aba vazia de agosto:
+        16 a 30/09, 01 a 15/09, 16 a 31/08, 01 a 15/08.
+
+    A ordem dos arquivos retornados é a mesma ordem de busca:
+    mais recente -> mais antiga.
+    """
+    referencia = (
+        data_limite.date()
+        if isinstance(data_limite, datetime)
+        else data_limite
+    )
+
+    if referencia is None:
+        referencia = datetime.now().date()
+
+    inicio_mes_atual = datetime.now().date().replace(
+        day=1
+    )
+    inicio_mes_limite = referencia.replace(
+        day=1
+    )
+
+    if inicio_mes_limite > inicio_mes_atual:
+        raise ValueError(
+            "A data limite da Folha de apoio não pode estar no futuro."
+        )
+
+    abrir_relatorio_descritivo_correntista_fraction(
+        page,
+        log,
+        codigo_correntista=codigo_correntista,
+        nome_correntista=nome_correntista,
+    )
+
+    arquivos: list[Path] = []
+    cursor = inicio_mes_atual
+
+    while cursor >= inicio_mes_limite:
+        ultimo_dia = (
+            cursor.replace(
+                day=28
+            )
+            + timedelta(
+                days=4
+            )
+        ).replace(
+            day=1
+        ) - timedelta(days=1)
+
+        mes = cursor.month
+        ano = cursor.year
+
+        # Sempre começamos pela segunda quinzena, pois a procura dos
+        # CTEs também precisa respeitar a ordem mais recente -> antiga.
+        arquivos.append(
+            baixar_periodo_relatorio_descritivo_fraction(
+                page,
+                pasta_destino,
+                dia=ultimo_dia.day,
+                inicio_periodo=16,
+                fim_periodo=ultimo_dia.day,
+                mes=mes,
+                ano=ano,
+                log=log,
+            )
+        )
+
+        arquivos.append(
+            baixar_periodo_relatorio_descritivo_fraction(
+                page,
+                pasta_destino,
+                dia=15,
+                inicio_periodo=1,
+                fim_periodo=15,
+                mes=mes,
+                ano=ano,
+                log=log,
+            )
+        )
+
+        if mes == 1:
+            cursor = cursor.replace(
+                year=ano - 1,
+                month=12,
+                day=1,
+            )
+        else:
+            cursor = cursor.replace(
+                month=mes - 1,
+                day=1,
+            )
+
+    log(
+        "Download das Folhas de apoio concluído. "
+        f"{len(arquivos)} arquivo(s) salvo(s), "
+        "do período mais recente ao mais antigo."
+    )
+
+    return arquivos
