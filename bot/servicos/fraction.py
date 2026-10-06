@@ -1198,18 +1198,27 @@ def baixar_relatorios_descritivos_correntista_fraction(
         )
     )
 
-    arquivos.append(
-        baixar_periodo_relatorio_descritivo_fraction(
-            page,
-            pasta_destino,
-            dia=30,
-            inicio_periodo=16,
-            fim_periodo=30,
-            mes=mes,
-            ano=ano,
-            log=log,
+    if not (
+        mes == agora.month
+        and ano == agora.year
+        and agora.day <= 15
+    ):
+        ultimo_dia_mes = (
+            date(ano, mes, 1) + timedelta(days=32)
+        ).replace(day=1) - timedelta(days=1)
+
+        arquivos.append(
+            baixar_periodo_relatorio_descritivo_fraction(
+                page,
+                pasta_destino,
+                dia=ultimo_dia_mes.day,
+                inicio_periodo=16,
+                fim_periodo=ultimo_dia_mes.day,
+                mes=mes,
+                ano=ano,
+                log=log,
+            )
         )
-    )
 
     log(
         "Download dos relatórios descritivos concluído. "
@@ -1285,20 +1294,27 @@ def baixar_relatorios_descritivos_correntista_ate_data_fraction(
         mes = cursor.month
         ano = cursor.year
 
-        # Sempre começamos pela segunda quinzena, pois a procura dos
-        # CTEs também precisa respeitar a ordem mais recente -> antiga.
-        arquivos.append(
-            baixar_periodo_relatorio_descritivo_fraction(
-                page,
-                pasta_destino,
-                dia=ultimo_dia.day,
-                inicio_periodo=16,
-                fim_periodo=ultimo_dia.day,
-                mes=mes,
-                ano=ano,
-                log=log,
-            )
+        # No mês atual, antes do dia 16, ainda não existe segunda quinzena.
+        # Nos meses anteriores (ou após o dia 15 do mês atual), mantemos
+        # a ordem mais recente -> antiga.
+        baixar_segunda_quinzena = (
+            cursor != inicio_mes_atual
+            or datetime.now().day > 15
         )
+
+        if baixar_segunda_quinzena:
+            arquivos.append(
+                baixar_periodo_relatorio_descritivo_fraction(
+                    page,
+                    pasta_destino,
+                    dia=ultimo_dia.day,
+                    inicio_periodo=16,
+                    fim_periodo=ultimo_dia.day,
+                    mes=mes,
+                    ano=ano,
+                    log=log,
+                )
+            )
 
         arquivos.append(
             baixar_periodo_relatorio_descritivo_fraction(

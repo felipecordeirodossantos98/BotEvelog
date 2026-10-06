@@ -117,8 +117,6 @@ CONVERSAO_DIVISAO_FOLHA_APOIO = {
     "CAFE_26": "CAFE",
     "SAND_APP": "SANDUICHES",
     "DRIVE_APP": "DRIVE",
-    "Drive_24H": "DRIVE",
-    "DRIVE_24H": "DRIVE",
     "MULTI_APP": "MULTI-APP",
 }
 
@@ -1247,6 +1245,9 @@ def _preencher_tabela(
 
             if nome_coluna == "QTD MIL":
                 valor = "-"
+
+            if nome_coluna == "status":
+                valor = "EM PRODUÇÃO"
 
             worksheet.cell(
                 row=linha_destino,
@@ -3275,6 +3276,31 @@ def adicionar_aba_solicitacao(
         linha_cabecalho,
         dados,
     )
+
+    # Pedidos recém-adicionados entram inicialmente como EM PRODUÇÃO.
+    # Atualiza também o contador correspondente na tabela de status.
+    quantidade_em_producao = len(dados)
+
+    for linha in range(
+        1,
+        linha_cabecalho,
+    ):
+        valor_status = normalizar_texto(
+            worksheet_nova.cell(
+                row=linha,
+                column=2,
+            ).value
+        )
+
+        if valor_status == normalizar_texto(
+            "EM PRODUÇÃO"
+        ):
+            worksheet_nova.cell(
+                row=linha,
+                column=3,
+                value=quantidade_em_producao,
+            )
+            break
 
     pasta_backups = (
         PASTA_RESULTADOS

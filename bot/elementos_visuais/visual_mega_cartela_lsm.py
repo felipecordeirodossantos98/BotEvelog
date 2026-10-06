@@ -149,38 +149,6 @@ def renderizar_mega_cartela_lsm() -> None:
                     width=LARGURA_UPLOAD,
                 )
 
-    caminho_resultado = (
-        st.session_state.get(
-            CHAVE_RESULTADO
-        )
-    )
-
-    if caminho_resultado:
-        caminho_resultado = Path(
-            caminho_resultado
-        )
-
-        if caminho_resultado.exists():
-            st.download_button(
-                "Baixar Mega Cartela atualizada",
-                data=(
-                    caminho_resultado
-                    .read_bytes()
-                ),
-                file_name=(
-                    "mega_cartela_lsm.xlsx"
-                ),
-                mime=(
-                    "application/vnd.openxmlformats-officedocument."
-                    "spreadsheetml.sheet"
-                ),
-                key=(
-                    "mega_cartela_lsm_"
-                    "download"
-                ),
-                width=LARGURA_BOTAO,
-            )
-
     st.divider()
 
     st.markdown(
@@ -376,4 +344,22 @@ def renderizar_mega_cartela_lsm() -> None:
                 ),
                 width=LARGURA_UPLOAD,
             )
+
+    # Exportação fixa: sempre lê a versão mais atual da cartela,
+    # incluindo abas recém-adicionadas e dados atualizados.
+    caminho_exportacao = localizar_mega_cartela()
+
+    if caminho_exportacao.exists():
+        st.divider()
+        st.download_button(
+            "Baixar Mega Cartela atualizada",
+            data=caminho_exportacao.read_bytes(),
+            file_name="mega_cartela_lsm.xlsx",
+            mime=(
+                "application/vnd.openxmlformats-officedocument."
+                "spreadsheetml.sheet"
+            ),
+            key="mega_cartela_lsm_download_fixo",
+            width=LARGURA_BOTAO,
+        )
 
