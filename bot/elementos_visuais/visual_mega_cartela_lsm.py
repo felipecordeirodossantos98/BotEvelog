@@ -347,7 +347,11 @@ def renderizar_mega_cartela_lsm() -> None:
 
     # Exportação fixa: sempre lê a versão mais atual da cartela,
     # incluindo abas recém-adicionadas e dados atualizados.
-    caminho_exportacao = localizar_mega_cartela()
+    caminho_exportacao = (
+        Path("resultados")
+        / "mega_cartela_lsm"
+        / "mega_cartela_lsm.xlsx"
+    )
 
     if caminho_exportacao.exists():
         st.divider()
