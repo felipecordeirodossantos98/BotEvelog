@@ -63,13 +63,6 @@ def renderizar_mega_cartela_lsm() -> None:
         "#### Importador de abas"
     )
 
-    st.caption(
-        "Adiciona uma nova solicitação como uma nova aba "
-        "na Mega Cartela. Nesta primeira etapa são inseridos "
-        "somente os cabeçalhos e os valores da planilha importada, "
-        "sem adicionar fórmulas."
-    )
-
     arquivo = st.file_uploader(
         "Importe a planilha da nova solicitação",
         type=["xlsx"],
@@ -153,13 +146,6 @@ def renderizar_mega_cartela_lsm() -> None:
 
     st.markdown(
         "#### Atualizador de dados"
-    )
-
-    st.caption(
-        "Primeiro localiza os CTEs das células B vazias, da aba mais "
-        "recente para a mais antiga, validando Data de emissão e Peso Taxado. "
-        "Depois atualiza todos os Rastreios não finalizados, em lotes de "
-        "até 1000 CTEs."
     )
 
     if CHAVE_LOGS_UPDATE not in st.session_state:
