@@ -9,7 +9,7 @@ from typing import Callable
 import pandas as pd
 from pypdf import PdfReader
 
-from bot.automacoes.gerar_ordens_de_coleta_malotes import (
+from automacoes.gerar_ordens_de_coleta_malotes import (
     abrir_solicitacao_coleta,
     capturar_unidade_coletora,
     colar_sem_tab,

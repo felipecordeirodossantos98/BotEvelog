@@ -1,6 +1,6 @@
 import streamlit as st
 
-from bot.automacoes.gerar_ordens_de_coleta_malotes import (
+from automacoes.gerar_ordens_de_coleta_malotes import (
     executar_automacao,
     preparar_arquivo_ordens,
     validar_arquivos_fixos,

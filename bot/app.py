@@ -14,7 +14,7 @@ from elementos_visuais.visual_baixar_relatorios_performance import (
 from elementos_visuais.visual_buscar_tdes import (
     renderizar_buscar_tdes,
 )
-from bot.elementos_visuais.visual_gerar_ordens_de_coleta_malotes import (
+from elementos_visuais.visual_gerar_ordens_de_coleta_malotes import (
     renderizar_gerar_ordens_de_coleta,
 )
 from elementos_visuais.visual_gerar_ordens_de_coleta_equipamentos import (
