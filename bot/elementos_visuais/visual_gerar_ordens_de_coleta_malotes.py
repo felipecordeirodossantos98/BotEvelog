@@ -1,6 +1,6 @@
 import streamlit as st
 
-from automacoes.gerar_ordens_de_coleta import (
+from bot.automacoes.gerar_ordens_de_coleta_malotes import (
     executar_automacao,
     preparar_arquivo_ordens,
     validar_arquivos_fixos,
@@ -102,7 +102,6 @@ def renderizar_gerar_ordens_de_coleta(
             resultado = executar_automacao(
                 execucoes=execucoes,
                 headless=HEADLESS,
-                modo_teste=False,
                 continuar_em_erro=True,
                 log=log,
             )

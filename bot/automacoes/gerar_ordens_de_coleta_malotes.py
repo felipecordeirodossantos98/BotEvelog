@@ -1264,7 +1264,6 @@ def recuperar_home(
 def executar_automacao(
     execucoes: list[dict],
     headless: bool,
-    modo_teste: bool,
     continuar_em_erro: bool,
     log: Callable[[str], None],
 ) -> dict:
@@ -1491,35 +1490,6 @@ def executar_automacao(
                                 "AVISO: E-mail não encontrado "
                                 f"para {unidade_coletora}"
                             )
-
-                        # -----------------------------------------
-                        # MODO TESTE
-                        # -----------------------------------------
-
-                        if modo_teste:
-                            sucessos += 1
-
-                            detalhes.append(
-                                {
-                                    "SIGLA": sigla,
-                                    "ORDEM": "",
-                                    "SITUAÇÃO": (
-                                        "TESTE CONCLUÍDO"
-                                    ),
-                                    "MENSAGEM": (
-                                        "Formulário preenchido "
-                                        "sem gerar coleta."
-                                    ),
-                                }
-                            )
-
-                            log(
-                                "Modo teste: "
-                                "formulário preenchido."
-                            )
-
-                            sucesso_item = True
-                            break
 
                         # -----------------------------------------
                         # GERAÇÃO DA ORDEM
