@@ -99,7 +99,10 @@ PASTA_PERFIS = PASTA_RAIZ / "perfis"
 PASTA_DADOS = PASTA_BOT / "dados"
 
 RESULTADOS_DANFES = PASTA_RESULTADOS / "danfes"
-RESULTADOS_ORDENS = PASTA_RESULTADOS / "ordens_de_coleta"
+RESULTADOS_ORDENS_MALOTES = PASTA_RESULTADOS / "ordens_de_coleta_malotes"
+RESULTADOS_ORDENS_EQUIPAMENTOS = PASTA_RESULTADOS / "ordens_de_coleta_equipamentos"
+# Alias legado: a automação de ordens existente usa RESULTADOS_ORDENS.
+RESULTADOS_ORDENS = RESULTADOS_ORDENS_MALOTES
 RESULTADOS_TICKETS_ZENDESK = PASTA_RESULTADOS / "tickets_zendesk"
 RESULTADOS_PERFORMANCE = PASTA_RESULTADOS / "relatorios_performance"
 RESULTADOS_TDES = PASTA_RESULTADOS / "tdes"
@@ -136,6 +139,16 @@ ARQUIVO_EMAILS_UNIDADES = DADOS_ORDENS / "emails_unidades.json"
 
 VARIAVEIS_POR_FLUXO: dict[str, tuple[str, ...]] = {
     "gerar_ordens_de_coleta": (
+        "URL_FRACTION",
+        "FRACTION_USER",
+        "FRACTION_PASSWORD",
+    ),
+    "gerar_ordens_de_coleta_malotes": (
+        "URL_FRACTION",
+        "FRACTION_USER",
+        "FRACTION_PASSWORD",
+    ),
+    "gerar_ordens_de_coleta_equipamentos": (
         "URL_FRACTION",
         "FRACTION_USER",
         "FRACTION_PASSWORD",

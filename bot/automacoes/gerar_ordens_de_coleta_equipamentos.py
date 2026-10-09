@@ -26,6 +26,7 @@ from utils.config import (
     ARQUIVO_EMAILS_UNIDADES,
     FRACTION_PASSWORD,
     FRACTION_USER,
+    RESULTADOS_ORDENS_EQUIPAMENTOS,
     URL_FRACTION,
 )
 
@@ -39,7 +40,7 @@ PESO = "1,00"
 VALOR_COLETA = "0,00"
 MODALIDADE = "ECONOMICO"
 
-PASTA_RESULTADOS = Path(__file__).resolve().parents[1].parent / "resultados" / "ordens_de_coleta_equipamentos"
+PASTA_RESULTADOS = RESULTADOS_ORDENS_EQUIPAMENTOS
 
 
 class NotaFiscalInvalida(ValueError):
@@ -334,27 +335,126 @@ def selecionar_modalidade_economico(page):
 
 
 def preencher_formulario_equipamento(page, item: dict) -> None:
-    digitar(page.get_by_role("textbox", name="Conta Corrente", exact=True), CONTA_CORRENTE)
-    digitar(page.locator('[id="form_emissao:observacaoArea"]'), OBSERVACAO)
-    digitar(page.locator('[id="form_emissao:conteudoArea"]'), item["CONTEUDO"])
-    digitar(page.get_by_role("textbox", name="ALT+7", exact=True), PESO)
-    digitar(page.get_by_role("textbox", name="ALT+8", exact=True), VALOR_COLETA)
-    digitar(page.get_by_role("textbox", name="ALT+9", exact=True), item["NUMERO_NOTA"])
+    # A ordem dos campos e os seletores comuns seguem a automação original
+    # de Ordens de Coleta. Apenas os valores específicos de Equipamentos
+    # (pedido pelo nome do PDF e modalidade ECONOMICO) são adicionados.
+    digitar(
+        page.get_by_role(
+            "textbox",
+            name="Conta Corrente",
+            exact=True,
+        ),
+        CONTA_CORRENTE,
+    )
 
-    digitar(page.locator('[id="form_emissao:quantidadeVolume_input"]'), VOLUMES)
-    digitar(page.locator('[id="form_emissao:bonfs:0:nota_serie"]'), item["SERIE"])
-    digitar(page.locator('[id="form_emissao:bonfs:0:nota_valor"]'), item["VALOR_NOTA"])
-    digitar(page.locator('[id="form_emissao:bonfs:0:nota_numPedido"]'), item["NUMERO_PEDIDO"])
+    digitar(
+        page.locator(
+            '[id="form_emissao:observacaoArea"]'
+        ),
+        OBSERVACAO,
+    )
 
-    colar_sem_tab(page, localizar_remetente(page), item["CNPJ_REMETENTE"])
-    colar_sem_tab(page, localizar_destinatario(page), item["CNPJ_DESTINATARIO"])
+    digitar(
+        page.locator(
+            '[id="form_emissao:conteudoArea"]'
+        ),
+        item["CONTEUDO"],
+    )
 
+    # Seletores de Peso, Valor da Coleta e Número da NF iguais aos validados
+    # na automação original.
+    digitar(
+        page.get_by_role(
+            "textbox",
+            name="ALT+7",
+            exact=True,
+        ),
+        PESO,
+    )
+
+    digitar(
+        page.get_by_role(
+            "textbox",
+            name="ALT+8",
+            exact=True,
+        ),
+        VALOR_COLETA,
+    )
+
+    digitar(
+        page.get_by_role(
+            "textbox",
+            name="ALT+9",
+            exact=True,
+        ),
+        item["NUMERO_NOTA"],
+    )
+
+    # Reproduz exatamente o tratamento da automação original: Volume e Série
+    # são reforçados somente quando seus IDs estão presentes no formulário.
+    campo_volume = page.locator(
+        '[id="form_emissao:quantidadeVolume_input"]'
+    )
+
+    if campo_volume.count() > 0:
+        digitar(
+            campo_volume,
+            VOLUMES,
+        )
+
+    campo_serie = page.locator(
+        '[id="form_emissao:bonfs:0:nota_serie"]'
+    )
+
+    if campo_serie.count() > 0:
+        digitar(
+            campo_serie,
+            item["SERIE"],
+        )
+
+    digitar(
+        page.locator(
+            '[id="form_emissao:bonfs:0:nota_valor"]'
+        ),
+        item["VALOR_NOTA"],
+    )
+
+    # Campo específico da variação Equipamentos: nome do arquivo PDF, sem
+    # extensão, como Número do Pedido.
+    digitar(
+        page.locator(
+            '[id="form_emissao:bonfs:0:nota_numPedido"]'
+        ),
+        item["NUMERO_PEDIDO"],
+    )
+
+    # Reutiliza as mesmas funções e a mesma ordem de preenchimento dos CNPJs.
+    colar_sem_tab(
+        page,
+        localizar_remetente(page),
+        item["CNPJ_REMETENTE"],
+    )
+
+    colar_sem_tab(
+        page,
+        localizar_destinatario(page),
+        item["CNPJ_DESTINATARIO"],
+    )
+
+    # Modalidade é selecionada por último, tal como no fluxo original, para
+    # permitir que o Fraction atualize os dados vinculados aos CNPJs.
     selecionar_modalidade_economico(page)
+
     page.wait_for_timeout(4_000)
 
-    exibida = page.locator('[id="form_emissao:modalidadeSelect_label"]').inner_text().strip().upper()
-    if exibida != MODALIDADE:
-        raise RuntimeError(f"Modalidade inesperada: {exibida}")
+    modalidade_exibida = page.locator(
+        '[id="form_emissao:modalidadeSelect_label"]'
+    ).inner_text()
+
+    if modalidade_exibida.strip().upper() != MODALIDADE:
+        raise RuntimeError(
+            f"Modalidade inesperada: {modalidade_exibida}"
+        )
 
 
 def reiniciar_sessao(page, usuario: str, senha: str, log: Callable[[str], None]) -> None:

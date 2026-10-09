@@ -95,7 +95,12 @@ def renderizar_gerar_ordens_de_coleta_equipamentos(arquivos) -> None:
         return
 
     feedback, log_visual = criar_painel_execucao(CHAVE_LOGS)
-    log, _ = criar_logger_execucao("gerar_ordens_de_coleta_equipamentos", log_visual)
+    log, caminho_log = criar_logger_execucao(
+        "gerar_ordens_de_coleta_equipamentos",
+        log_visual,
+        rotulo="execucao",
+    )
+    st.caption(f"Log desta execução: {caminho_log}")
 
     try:
         with st.spinner("Gerando ordens de coleta..."):

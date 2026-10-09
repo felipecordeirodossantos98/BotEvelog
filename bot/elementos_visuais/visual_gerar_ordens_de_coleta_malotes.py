@@ -91,9 +91,11 @@ def renderizar_gerar_ordens_de_coleta(
     )
 
     log, caminho_log = criar_logger_execucao(
-        "gerar_ordens_de_coleta",
+        "gerar_ordens_de_coleta_malotes",
         log_visual,
+        rotulo="execucao",
     )
+    st.caption(f"Log desta execução: {caminho_log}")
 
     try:
         with st.spinner(

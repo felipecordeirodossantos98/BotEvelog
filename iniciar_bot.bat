@@ -246,8 +246,12 @@ echo.
 
 if not exist "%RAIZ%\resultados" mkdir "%RAIZ%\resultados"
 
-if not exist "%RAIZ%\resultados\ordens_de_coleta" (
-    mkdir "%RAIZ%\resultados\ordens_de_coleta"
+if not exist "%RAIZ%\resultados\ordens_de_coleta_equipamentos" (
+    mkdir "%RAIZ%\resultados\ordens_de_coleta_equipamentos"
+)
+
+if not exist "%RAIZ%\resultados\ordens_de_coleta_malotes" (
+    mkdir "%RAIZ%\resultados\ordens_de_coleta_malotes"
 )
 
 if not exist "%RAIZ%\resultados\danfes" (
@@ -296,7 +300,8 @@ if not exist "%RAIZ%\logs\baixar_danfes" mkdir "%RAIZ%\logs\baixar_danfes"
 if not exist "%RAIZ%\logs\baixar_relatorios_analitico" mkdir "%RAIZ%\logs\baixar_relatorios_analitico"
 if not exist "%RAIZ%\logs\baixar_relatorios_performance" mkdir "%RAIZ%\logs\baixar_relatorios_performance"
 if not exist "%RAIZ%\logs\buscar_tdes" mkdir "%RAIZ%\logs\buscar_tdes"
-if not exist "%RAIZ%\logs\gerar_ordens_de_coleta" mkdir "%RAIZ%\logs\gerar_ordens_de_coleta"
+if not exist "%RAIZ%\logs\gerar_ordens_de_coleta_equipamentos" mkdir "%RAIZ%\logs\gerar_ordens_de_coleta_equipamentos"
+if not exist "%RAIZ%\logs\gerar_ordens_de_coleta_malotes" mkdir "%RAIZ%\logs\gerar_ordens_de_coleta_malotes"
 if not exist "%RAIZ%\logs\gerar_tickets_zendesk" mkdir "%RAIZ%\logs\gerar_tickets_zendesk"
 
 echo Pastas de logs verificadas.
@@ -350,7 +355,8 @@ call :EXIGIR_ARQUIVO "%BOT_DIR%\app.py" "bot\app.py"
 call :EXIGIR_ARQUIVO "%BOT_DIR%\.env" "bot\.env"
 
 rem ----- Estrutura V2: automações -----
-call :EXIGIR_ARQUIVO "%BOT_DIR%\automacoes\gerar_ordens_de_coleta.py" "bot\automacoes\gerar_ordens_de_coleta.py"
+call :EXIGIR_ARQUIVO "%BOT_DIR%\automacoes\gerar_ordens_de_coleta_equipamentos.py" "bot\automacoes\gerar_ordens_de_coleta_equipamentos.py"
+call :EXIGIR_ARQUIVO "%BOT_DIR%\automacoes\gerar_ordens_de_coleta_malotes.py" "bot\automacoes\gerar_ordens_de_coleta_malotes.py"
 call :EXIGIR_ARQUIVO "%BOT_DIR%\automacoes\gerar_tickets_zendesk.py" "bot\automacoes\gerar_tickets_zendesk.py"
 call :EXIGIR_ARQUIVO "%BOT_DIR%\automacoes\baixar_danfes.py" "bot\automacoes\baixar_danfes.py"
 call :EXIGIR_ARQUIVO "%BOT_DIR%\automacoes\baixar_relatorios_performance.py" "bot\automacoes\baixar_relatorios_performance.py"
@@ -358,7 +364,8 @@ call :EXIGIR_ARQUIVO "%BOT_DIR%\automacoes\buscar_tdes.py" "bot\automacoes\busca
 call :EXIGIR_ARQUIVO "%BOT_DIR%\automacoes\baixar_relatorios_analitico.py" "bot\automacoes\baixar_relatorios_analitico.py"
 
 rem ----- Estrutura V2: elementos visuais -----
-call :EXIGIR_ARQUIVO "%BOT_DIR%\elementos_visuais\visual_gerar_ordens_de_coleta.py" "bot\elementos_visuais\visual_gerar_ordens_de_coleta.py"
+call :EXIGIR_ARQUIVO "%BOT_DIR%\elementos_visuais\visual_gerar_ordens_de_coleta_equipamentos.py" "bot\elementos_visuais\visual_gerar_ordens_de_coleta_equipamentos.py"
+call :EXIGIR_ARQUIVO "%BOT_DIR%\elementos_visuais\visual_gerar_ordens_de_coleta_malotes.py" "bot\elementos_visuais\visual_gerar_ordens_de_coleta_malotes.py"
 call :EXIGIR_ARQUIVO "%BOT_DIR%\elementos_visuais\visual_gerar_tickets_zendesk.py" "bot\elementos_visuais\visual_gerar_tickets_zendesk.py"
 call :EXIGIR_ARQUIVO "%BOT_DIR%\elementos_visuais\visual_baixar_danfes.py" "bot\elementos_visuais\visual_baixar_danfes.py"
 call :EXIGIR_ARQUIVO "%BOT_DIR%\elementos_visuais\visual_baixar_relatorios_performance.py" "bot\elementos_visuais\visual_baixar_relatorios_performance.py"
