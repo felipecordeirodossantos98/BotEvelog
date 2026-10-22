@@ -2,9 +2,6 @@ from pathlib import Path
 
 import streamlit as st
 
-from elementos_visuais.visual_baixar_relatorios_analitico import (
-    renderizar_baixar_relatorios_analitico,
-)
 from elementos_visuais.visual_baixar_danfes import (
     renderizar_baixar_danfes,
 )
@@ -22,6 +19,9 @@ from elementos_visuais.visual_gerar_ordens_de_coleta_equipamentos import (
 )
 from elementos_visuais.visual_gerar_tickets_zendesk import (
     renderizar_gerar_tickets_zendesk,
+)
+from elementos_visuais.visual_gerar_romaneios import (
+    renderizar_menu_automacoes_operacao,
 )
 from elementos_visuais.visual_mega_cartela_lsm import (
     renderizar_mega_cartela_lsm,
@@ -63,7 +63,6 @@ RENDERIZADORES = {
     "buscar_tdes": renderizar_buscar_tdes,
     "baixar_relatorios_performance": renderizar_baixar_relatorios_performance,
 }
-
 
 def renderizar_automacao_sac(arquivos) -> None:
     if not isinstance(arquivos, list):
@@ -121,21 +120,12 @@ def renderizar_automacao_sac(arquivos) -> None:
     renderizador(arquivo)
 
 
-def main() -> None:
-    st.title("Bot Evelog")
-
-    tab_sac, tab_analitico, tab_mega_cartela = st.tabs(
-        [
-            "Automações SAC",
-            "Relatório Analítico",
-            "Mega Cartela LSM",
-        ],
-        width="stretch",
+def renderizar_menu_automacoes_sac() -> None:
+    tab_importar, tab_mega_cartela = st.tabs(
+        ["Importar planilha", "Mega Cartela LSM"]
     )
 
-    with tab_sac:
-        st.subheader("Automações SAC")
-
+    with tab_importar:
         arquivo_sac = st.file_uploader(
             "Importe o arquivo",
             type=["xlsx", "xls", "pdf"],
@@ -143,16 +133,36 @@ def main() -> None:
             key="arquivo_automacoes_sac",
             width=LARGURA_UPLOAD,
         )
-
         if arquivo_sac:
             renderizar_automacao_sac(arquivo_sac)
-
-    with tab_analitico:
-        renderizar_baixar_relatorios_analitico()
 
     with tab_mega_cartela:
         renderizar_mega_cartela_lsm()
 
+
+def main() -> None:
+    st.title("Bot Evelog")
+
+    tab_sac, tab_operacao, tab_financeiro = st.tabs(
+        [
+            "Automações SAC",
+            "Automações Operação",
+            "Automações Financeiro",
+        ],
+        width="stretch",
+    )
+
+    with tab_sac:
+        st.subheader("Automações SAC")
+        renderizar_menu_automacoes_sac()
+
+    with tab_operacao:
+        st.subheader("Automações Operação")
+        renderizar_menu_automacoes_operacao()
+
+    with tab_financeiro:
+        st.subheader("Automações Financeiro")
+        warning("Em desenvolvimento")
 
 if __name__ == "__main__":
     main()

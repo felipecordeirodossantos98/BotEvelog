@@ -106,6 +106,9 @@ RESULTADOS_ORDENS = RESULTADOS_ORDENS_MALOTES
 RESULTADOS_TICKETS_ZENDESK = PASTA_RESULTADOS / "tickets_zendesk"
 RESULTADOS_PERFORMANCE = PASTA_RESULTADOS / "relatorios_performance"
 RESULTADOS_TDES = PASTA_RESULTADOS / "tdes"
+RESULTADOS_ROMANEIOS = PASTA_RESULTADOS / "romaneios"
+BASES_ROMANEIOS = RESULTADOS_ROMANEIOS / "bases"
+TEMPORARIOS_ROMANEIOS = RESULTADOS_ROMANEIOS / ".temporarios"
 
 RESULTADOS_ANALITICO = _caminho_configuravel(
     "RESULTADOS_PATH",
@@ -131,6 +134,10 @@ ARQUIVO_PEDIDOS_COM_TICKET = (
 DADOS_ORDENS = PASTA_DADOS / "gerar_ordens_de_coleta"
 ARQUIVO_BASE_CNPJS = DADOS_ORDENS / "base_cnpjs.json"
 ARQUIVO_EMAILS_UNIDADES = DADOS_ORDENS / "emails_unidades.json"
+ARQUIVO_ROTAS_ROMANEIOS = PASTA_DADOS / "gerar_romaneios" / "rotas.json"
+ARQUIVO_DESTINOS_FRACTION = (
+    PASTA_DADOS / "gerar_romaneios" / "destinos_fraction.json"
+)
 
 
 # -----------------------------------------------------------------------------
@@ -178,6 +185,11 @@ VARIAVEIS_POR_FLUXO: dict[str, tuple[str, ...]] = {
         "URL_FRACTION",
         "FRACTION_USER_ANALYTIC",
         "FRACTION_PASSWORD_ANALYTIC",
+    ),
+    "gerar_romaneios": (
+        "URL_FRACTION",
+        "FRACTION_USER",
+        "FRACTION_PASSWORD",
     ),
 }
 
