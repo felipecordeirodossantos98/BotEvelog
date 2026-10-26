@@ -14,7 +14,7 @@ from elementos_visuais.visual_dar_entrada_pedidos import (
     renderizar_dar_entrada_pedidos,
 )
 from servicos.fraction import CredenciaisFractionInvalidasError
-from utils.config import RESULTADOS_ENTRADA_PEDIDOS
+from utils.config import RESULTADOS_ENTRADA_PEDIDOS, RESULTADOS_ROMANEIOS
 from utils.interface import (
     LARGURA_BOTAO,
     avisar_variaveis_faltantes,
@@ -204,7 +204,9 @@ def _renderizar_tabela_destinos() -> None:
         mensagem = (
             f"Romaneios enviados: {resultado['grupos_manifesto']} grupo(s), "
             f"{resultado['ctes_manifesto']} CTE(s) em "
-            f"{resultado['lotes_manifesto']} lote(s)."
+            f"{resultado['lotes_manifesto']} lote(s). "
+            f"PDFs salvos: {len(resultado['arquivos_pdf'])} em "
+            f"{RESULTADOS_ROMANEIOS}."
         )
         log(mensagem)
         success(mensagem)

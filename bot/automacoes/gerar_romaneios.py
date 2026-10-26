@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+from datetime import datetime
 import json
 from io import BytesIO
 from pathlib import Path
@@ -7,6 +9,7 @@ import re
 import time
 import traceback
 import unicodedata
+from urllib.parse import unquote_to_bytes
 
 import pandas as pd
 from playwright.sync_api import TimeoutError, sync_playwright
@@ -18,6 +21,7 @@ from utils.config import (
     FRACTION_PASSWORD,
     FRACTION_USER,
     HEADLESS,
+    RESULTADOS_ROMANEIOS,
     SLOW_MO_MS,
     URL_FRACTION,
 )
@@ -176,6 +180,67 @@ def aguardar_carregamento_manifesto(page, *, log=None) -> None:
     _log(log, "Spinner 'Carregando' desapareceu; atualização concluída.")
 
 
+def _capturar_resposta_pdf(response, arquivos_pdf: list[tuple[str, bytes]], *, log=None) -> None:
+    cabecalhos = response.headers
+    tipo = cabecalhos.get("content-type", "").lower()
+    disposicao = cabecalhos.get("content-disposition", "").lower()
+    url = response.url
+    if "pdf" not in tipo and ".pdf" not in url.lower() and ".pdf" not in disposicao:
+        return
+    try:
+        conteudo = response.body()
+    except Exception as erro:
+        _log(log, f"Não foi possível ler a resposta PDF de {url}: {erro}")
+        return
+    if conteudo.startswith(b"%PDF"):
+        arquivos_pdf.append((url, conteudo))
+        _log(log, f"PDF capturado do Fraction ({len(conteudo)} bytes).")
+
+
+def _salvar_pdf_romaneio(
+    popup,
+    arquivos_pdf: list[tuple[str, bytes]],
+    unidade: str,
+    *,
+    log=None,
+) -> Path:
+    conteudo = arquivos_pdf[-1][1] if arquivos_pdf else b""
+    if not conteudo and popup.url.startswith("data:application/pdf"):
+        cabecalho, _, payload = popup.url.partition(",")
+        conteudo = (
+            base64.b64decode(payload)
+            if ";base64" in cabecalho.lower()
+            else unquote_to_bytes(payload)
+        )
+    if not conteudo and popup.url.startswith("blob:"):
+        payload = popup.evaluate(
+            """async () => {
+                const resposta = await fetch(location.href);
+                const bytes = new Uint8Array(await resposta.arrayBuffer());
+                let binario = "";
+                for (let inicio = 0; inicio < bytes.length; inicio += 0x8000) {
+                    binario += String.fromCharCode(...bytes.subarray(inicio, inicio + 0x8000));
+                }
+                return btoa(binario);
+            }"""
+        )
+        conteudo = base64.b64decode(payload)
+    if not conteudo.startswith(b"%PDF"):
+        raise RuntimeError(
+            "O Fraction abriu uma nova guia, mas não foi possível capturar o PDF "
+            f"do romaneio da unidade '{unidade}'. URL da guia: {popup.url}"
+        )
+
+    nome_unidade = re.sub(r"[^A-Za-z0-9._-]+", "_", unidade).strip("_.") or "unidade"
+    RESULTADOS_ROMANEIOS.mkdir(parents=True, exist_ok=True)
+    caminho = RESULTADOS_ROMANEIOS / (
+        f"Romaneio_{nome_unidade}_{datetime.now():%Y-%m-%d_%H-%M-%S-%f}.pdf"
+    )
+    caminho.write_bytes(conteudo)
+    _log(log, f"Romaneio salvo em {caminho} ({len(conteudo)} bytes).")
+    return caminho
+
+
 def associar_destinos_fraction(
     grupos: list[dict],
     destinos: list[dict[str, str]],
@@ -293,7 +358,7 @@ def processar_manifestos(
     grupos: list[dict],
     *,
     log=None,
-) -> int:
+) -> dict[str, object]:
     destinos, pendentes = associar_destinos_fraction(
         grupos,
         carregar_destinos_fraction(),
@@ -312,6 +377,7 @@ def processar_manifestos(
     abrir_envio_remessa()
 
     total_lotes = 0
+    arquivos_romaneios: list[str] = []
     for indice_grupo, grupo in enumerate(destinos):
         if indice_grupo:
             _log(
@@ -366,13 +432,42 @@ def processar_manifestos(
             aguardar_carregamento_manifesto(page, log=log)
 
         _log(log, f"Finalizando a remessa da unidade {rota_unidade}.")
-        page.get_by_role("button", name="Processar lista").click()
-        aguardar_carregamento_manifesto(page, log=log)
-        _log(log, f"Remessa da unidade {rota_unidade} processada.")
+        arquivos_pdf: list[tuple[str, bytes]] = []
+        capturar_pdf = lambda resposta: _capturar_resposta_pdf(
+            resposta,
+            arquivos_pdf,
+            log=log,
+        )
+        contexto = page.context
+        contexto.on("response", capturar_pdf)
+        popup = None
+        try:
+            with page.expect_popup(timeout=600_000) as popup_info:
+                page.get_by_role("button", name="Processar lista").click(
+                    timeout=120_000
+                )
+            popup = popup_info.value
+            _log(log, "Nova guia do romaneio aberta pelo Fraction.")
+            try:
+                popup.wait_for_load_state("load", timeout=120_000)
+            except TimeoutError:
+                _log(log, "A guia do PDF não sinalizou load; usando a resposta capturada.")
+            caminho_pdf = _salvar_pdf_romaneio(
+                popup,
+                arquivos_pdf,
+                rota_unidade,
+                log=log,
+            )
+            arquivos_romaneios.append(str(caminho_pdf))
+            _log(log, f"Remessa da unidade {rota_unidade} processada e PDF salvo.")
+        finally:
+            contexto.remove_listener("response", capturar_pdf)
+            if popup is not None and not popup.is_closed():
+                popup.close()
 
     _log(log, "Todas as unidades roteadas foram processadas no Fraction.")
 
-    return total_lotes
+    return {"lotes": total_lotes, "arquivos_pdf": arquivos_romaneios}
 
 
 def executar_gerar_romaneios(
@@ -474,7 +569,7 @@ def executar_manifestos_romaneios(
                     lambda mensagem: _log(log, mensagem),
                 )
                 _log(log, f"Login concluído; página atual: {page.url}.")
-                lotes = processar_manifestos(page, grupos, log=log)
+                processamento = processar_manifestos(page, grupos, log=log)
             finally:
                 _log(log, "Encerrando navegador da etapa de Manifesto.")
                 context.close()
@@ -487,11 +582,13 @@ def executar_manifestos_romaneios(
         "arquivo_final": str(caminho),
         "grupos_manifesto": len(grupos),
         "ctes_manifesto": total_ctes,
-        "lotes_manifesto": lotes,
+        "lotes_manifesto": processamento["lotes"],
+        "arquivos_pdf": processamento["arquivos_pdf"],
     }
     _log(
         log,
-        f"Etapa de Manifesto concluída: {lotes} lote(s), {total_ctes} CTE(s), "
+        f"Etapa de Manifesto concluída: {processamento['lotes']} lote(s), "
+        f"{len(processamento['arquivos_pdf'])} PDF(s) salvo(s), {total_ctes} CTE(s), "
         f"{time.perf_counter() - inicio_execucao:.1f}s.",
     )
     return resultado
