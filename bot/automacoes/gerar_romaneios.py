@@ -1,49 +1,27 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
 import json
+from io import BytesIO
 from pathlib import Path
 import re
-import shutil
 import time
 import traceback
 import unicodedata
 
 import pandas as pd
-import xlsxwriter
 from playwright.sync_api import TimeoutError, sync_playwright
 
-from automacoes.baixar_relatorios_analitico import (
-    MAX_TENTATIVAS_EXTRACAO_DIA,
-    abrir_relatorio,
-    preencher_data,
-    processar,
-    recuperar_pagina_analitico,
-)
 from servicos.fraction import login_fraction
 from utils.config import (
-    BASES_ROMANEIOS,
-    ARQUIVO_DESTINOS_FRACTION,
+    ARQUIVO_UNIDADES_FRACTION,
     ARQUIVO_ROTAS_ROMANEIOS,
     FRACTION_PASSWORD,
     FRACTION_USER,
     HEADLESS,
     SLOW_MO_MS,
-    TEMPORARIOS_ROMANEIOS,
     URL_FRACTION,
 )
 
-REGIAO_POR_UF = {
-    "AC": "Norte", "AP": "Norte", "AM": "Norte", "PA": "Norte",
-    "RO": "Norte", "RR": "Norte", "TO": "Norte",
-    "AL": "Nordeste", "BA": "Nordeste", "CE": "Nordeste",
-    "MA": "Nordeste", "PB": "Nordeste", "PE": "Nordeste",
-    "PI": "Nordeste", "RN": "Nordeste", "SE": "Nordeste",
-    "DF": "Centro-Oeste", "GO": "Centro-Oeste", "MT": "Centro-Oeste",
-    "MS": "Centro-Oeste",
-    "ES": "Sudeste", "MG": "Sudeste", "RJ": "Sudeste", "SP": "Sudeste",
-    "PR": "Sul", "RS": "Sul", "SC": "Sul",
-}
 ID_DESTINO_LABEL = '[id="form_envio_remessa:selectDestino_label"]'
 ID_DESTINO_FILTRO = '[id="form_envio_remessa:selectDestino_filter"]'
 ID_DESTINO_BUSCAR = ".ui-selectonemenu-filter-container > .ui-icon"
@@ -60,163 +38,15 @@ def _log(log, mensagem: str) -> None:
         log(mensagem)
 
 
-def _valor_excel(valor):
-    if pd.isna(valor):
-        return None
-    if isinstance(valor, pd.Timestamp):
-        return valor.to_pydatetime()
-    return valor
-
-
-def _unificar_romaneios(
-    arquivos: list[Path],
-    data_inicial: date,
-    data_final: date,
-    log=None,
-) -> dict:
-    if not arquivos:
-        raise ValueError("Nenhuma extração foi gerada para o período selecionado.")
-
-    BASES_ROMANEIOS.mkdir(parents=True, exist_ok=True)
-    agora = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    nome = (
-        f"Gerar_Romaneios_{data_inicial:%d-%m-%Y}_a_"
-        f"{data_final:%d-%m-%Y}_{agora}.xlsx"
-    )
-    destino = BASES_ROMANEIOS / nome
-    temporario = BASES_ROMANEIOS / f".{nome}.tmp.xlsx"
-    workbook = None
-    colunas_referencia = None
-    linha_atual = 0
-    total_linhas = 0
-    linhas_emissao = 0
-
-    try:
-        workbook = xlsxwriter.Workbook(temporario, {"constant_memory": True})
-        worksheet = workbook.add_worksheet("Romaneios")
-
-        for caminho in arquivos:
-            _log(log, f"Unificando {caminho.name}...")
-            dataframe = pd.read_excel(caminho, engine="openpyxl")
-            linhas_arquivo = len(dataframe)
-            colunas = list(dataframe.columns)
-            mapa_colunas = {str(coluna).strip().upper(): coluna for coluna in colunas}
-            coluna_status = mapa_colunas.get("STATUS")
-            if coluna_status is None:
-                raise ValueError(f"A coluna STATUS não foi encontrada em '{caminho.name}'.")
-
-            if colunas_referencia is None:
-                colunas_referencia = colunas
-                for indice, coluna in enumerate(colunas):
-                    worksheet.write(linha_atual, indice, coluna)
-                linha_atual += 1
-            elif colunas != colunas_referencia:
-                raise ValueError(
-                    f"O layout da base '{caminho.name}' é diferente do primeiro arquivo."
-                )
-
-            status = (
-                dataframe[coluna_status]
-                .fillna("")
-                .astype(str)
-                .str.strip()
-                .str.upper()
-            )
-            dataframe = dataframe.loc[status.eq("EMISSAO")]
-            linhas_emissao += len(dataframe)
-            total_linhas += linhas_arquivo
-            _log(
-                log,
-                f"{caminho.name}: {linhas_arquivo} linha(s) lida(s), "
-                f"{len(dataframe)} com STATUS=EMISSAO; "
-                f"{linhas_arquivo - len(dataframe)} descartada(s).",
-            )
-
-            for valores in dataframe.itertuples(index=False, name=None):
-                for indice, valor in enumerate(valores):
-                    worksheet.write(linha_atual, indice, _valor_excel(valor))
-                linha_atual += 1
-
-            del dataframe
-
-        workbook.close()
-        workbook = None
-        temporario.replace(destino)
-    except Exception:
-        if workbook is not None:
-            try:
-                workbook.close()
-            except Exception:
-                pass
-        temporario.unlink(missing_ok=True)
-        raise
-
-    return {
-        "arquivo_final": str(destino),
-        "linhas_consultadas": total_linhas,
-        "linhas_emissao": linhas_emissao,
-        "arquivos_unificados": len(arquivos),
-        "tamanho_arquivo_bytes": destino.stat().st_size,
-    }
-
-
-def agrupar_ctes_por_destino(arquivo: str | Path) -> pd.DataFrame:
-    dataframe = pd.read_excel(
-        arquivo,
-        engine="openpyxl",
-        dtype={"CTE": "string"},
-    )
-    colunas = {str(coluna).strip().upper(): coluna for coluna in dataframe.columns}
-    faltantes = [nome for nome in ("CTE", "CIDADE_DEST", "UF.1") if nome not in colunas]
-    if faltantes:
-        raise ValueError(
-            "Coluna(s) obrigatória(s) não encontrada(s) no arquivo unificado: "
-            + ", ".join(faltantes)
-        )
-
-    dados = pd.DataFrame(
-        {
-            "CTE": dataframe[colunas["CTE"]].fillna("").astype(str).str.strip(),
-            "CIDADE_DEST": dataframe[colunas["CIDADE_DEST"]].fillna("").astype(str).str.strip(),
-            "UF": dataframe[colunas["UF.1"]].fillna("").astype(str).str.strip().str.upper(),
-        }
-    )
-    dados["CTE"] = dados["CTE"].str.replace(r"\.0$", "", regex=True)
-    dados = dados.loc[dados["CTE"].ne("")].copy()
-    dados["REGIAO"] = dados["UF"].map(REGIAO_POR_UF).fillna("Não identificada")
-    dados["_CIDADE_CHAVE"] = dados["CIDADE_DEST"].map(_normalizar_rota)
-
-    grupos = (
-        dados.groupby(
-            ["REGIAO", "UF", "_CIDADE_CHAVE"],
-            dropna=False,
-            sort=True,
-        )["CTE"]
-        .agg(list)
-        .reset_index()
-    )
-    cidades = (
-        dados.groupby(
-            ["REGIAO", "UF", "_CIDADE_CHAVE"],
-            dropna=False,
-            sort=True,
-        )["CIDADE_DEST"]
-        .first()
-        .reset_index(drop=True)
-    )
-    grupos["CIDADE_DEST"] = cidades
-    grupos["TOTAL_CTES"] = grupos["CTE"].map(len)
-    grupos["CTES"] = grupos["CTE"].map(lambda ctes: ", ".join(ctes))
-    return grupos[["REGIAO", "UF", "CIDADE_DEST", "TOTAL_CTES", "CTES"]]
-
-
 def _normalizar_rota(valor: object) -> str:
     texto = unicodedata.normalize("NFKD", str(valor).strip())
     texto = "".join(caractere for caractere in texto if not unicodedata.combining(caractere))
     return " ".join(texto.upper().split())
 
 
-def carregar_mapa_rotas(caminho: Path = ARQUIVO_ROTAS_ROMANEIOS) -> dict[str, str]:
+def carregar_rotas_destino_origem(
+    caminho: Path = ARQUIVO_ROTAS_ROMANEIOS,
+) -> tuple[dict[str, str], set[str]]:
     if not caminho.exists():
         raise FileNotFoundError(
             "Base de rotas não encontrada. Coloque o JSON em "
@@ -226,134 +56,52 @@ def carregar_mapa_rotas(caminho: Path = ARQUIVO_ROTAS_ROMANEIOS) -> dict[str, st
     with caminho.open("r", encoding="utf-8-sig") as arquivo:
         dados = json.load(arquivo)
 
-    mapa: dict[str, str] = {}
+    registros = dados.get("rotas") if isinstance(dados, dict) else None
+    if not isinstance(registros, list):
+        raise ValueError("A base de rotas precisa conter uma lista 'rotas'.")
 
-    def campo(registro: dict, *nomes: str):
-        campos = {
-            str(chave).strip().casefold(): valor
-            for chave, valor in registro.items()
-        }
-        for nome in nomes:
-            valor = campos.get(nome.casefold())
-            if valor not in (None, ""):
-                return valor
-        return None
+    origens_por_destino: dict[str, set[str]] = {}
+    for registro in registros:
+        if not isinstance(registro, dict):
+            raise ValueError("Cada rota precisa conter 'origem' e 'destino'.")
+        origem = str(registro.get("origem") or "").strip()
+        destino = str(registro.get("destino") or "").strip()
+        if not origem or not destino:
+            continue
+        origens_por_destino.setdefault(_normalizar_rota(destino), set()).add(origem)
 
-    def adicionar(cidade: object, rota: object, uf: object = "") -> None:
-        if not cidade or not rota:
-            raise ValueError("Cada item da base de rotas precisa informar cidade e rota.")
-        cidade_normalizada = _normalizar_rota(cidade)
-        uf_normalizada = _normalizar_rota(uf) if uf else ""
-        chave = f"{uf_normalizada}|{cidade_normalizada}" if uf_normalizada else cidade_normalizada
-        valor_rota = str(rota).strip()
-        if chave in mapa and mapa[chave] != valor_rota:
-            raise ValueError(f"Há mais de uma rota configurada para '{cidade}' ({uf}).")
-        mapa[chave] = valor_rota
+    mapa = {
+        destino: next(iter(origens))
+        for destino, origens in origens_por_destino.items()
+        if len(origens) == 1
+    }
+    ambiguos = {
+        destino for destino, origens in origens_por_destino.items() if len(origens) > 1
+    }
+    return mapa, ambiguos
 
-    if isinstance(dados, dict):
-        registros = campo(dados, "rotas", "filiais")
-        if isinstance(registros, list):
-            dados = registros
-        elif (
-            campo(dados, "cidade", "cidade_dest", "cidade_destino")
-            and campo(dados, "rota")
-        ):
-            adicionar(
-                campo(dados, "cidade", "cidade_dest", "cidade_destino"),
-                campo(dados, "rota"),
-                campo(dados, "uf"),
-            )
-            return mapa
-        else:
-            for chave, valor in dados.items():
-                if isinstance(valor, dict):
-                    adicionar(
-                        campo(valor, "cidade", "cidade_dest", "cidade_destino"),
-                        campo(valor, "rota"),
-                        campo(valor, "uf"),
-                    )
-                elif isinstance(chave, str) and "|" in chave:
-                    uf, cidade = chave.split("|", 1)
-                    adicionar(cidade, valor, uf)
-                else:
-                    adicionar(chave, valor)
-            return mapa
 
-    if isinstance(dados, list):
-        for item in dados:
-            if not isinstance(item, dict):
-                raise ValueError("A lista de rotas precisa conter objetos JSON.")
-            filial = campo(item, "filial")
-            cidades = campo(item, "cidades")
-            if filial and isinstance(cidades, list):
-                uf = campo(item, "uf")
-                for cidade in cidades:
-                    adicionar(cidade, filial, uf)
-                continue
-            adicionar(
-                campo(item, "cidade", "cidade_dest", "cidade_destino"),
-                campo(item, "rota", "filial"),
-                campo(item, "uf"),
-            )
-        return mapa
-
-    raise ValueError(
-        "Formato de JSON inválido. Use um objeto cidade: rota ou uma lista "
-        "de objetos com cidade e rota (UF opcional)."
-    )
+def carregar_mapa_rotas(caminho: Path = ARQUIVO_ROTAS_ROMANEIOS) -> dict[str, str]:
+    """Retorna destino final → origem, omitindo destinos com mais de uma origem."""
+    return carregar_rotas_destino_origem(caminho)[0]
 
 
 def carregar_destinos_fraction(
-    caminho: Path = ARQUIVO_ROTAS_ROMANEIOS,
+    caminho: Path = ARQUIVO_UNIDADES_FRACTION,
 ) -> list[dict[str, str]]:
     if not caminho.exists():
-        raise FileNotFoundError(f"Arquivo de rotas e unidades não encontrado: '{caminho}'.")
+        raise FileNotFoundError(f"Arquivo de unidades Fraction não encontrado: '{caminho}'.")
     with caminho.open("r", encoding="utf-8-sig") as arquivo:
         dados = json.load(arquivo)
     destinos = dados.get("unidades") if isinstance(dados, dict) else None
-    if not isinstance(destinos, list) and ARQUIVO_DESTINOS_FRACTION.exists():
-        with ARQUIVO_DESTINOS_FRACTION.open("r", encoding="utf-8-sig") as arquivo:
-            catalogo = json.load(arquivo)
-        destinos = catalogo.get("destinos") if isinstance(catalogo, dict) else None
     if not isinstance(destinos, list):
-        raise ValueError("O catálogo de destinos precisa conter uma lista 'destinos'.")
+        raise ValueError("O catálogo de unidades precisa conter uma lista 'unidades'.")
     resultado = []
     for destino in destinos:
-        if not isinstance(destino, dict) or not destino.get("nome") or not destino.get("codigo"):
-            raise ValueError("Cada destino precisa ter 'nome' e 'codigo'.")
-        resultado.append({"nome": str(destino["nome"]).strip(), "codigo": str(destino["codigo"]).strip()})
+        if not isinstance(destino, dict) or not destino.get("unidade") or not destino.get("codigo"):
+            raise ValueError("Cada unidade precisa ter 'unidade' e 'codigo'.")
+        resultado.append({"nome": str(destino["unidade"]).strip(), "codigo": str(destino["codigo"]).strip()})
     return resultado
-
-
-def carregar_codigos_filiais(
-    caminho: Path = ARQUIVO_ROTAS_ROMANEIOS,
-) -> dict[str, list[str]]:
-    """Lê códigos de destino incorporados aos registros de filial do rotas.json."""
-    with caminho.open("r", encoding="utf-8-sig") as arquivo:
-        dados = json.load(arquivo)
-    filiais = dados.get("filiais") if isinstance(dados, dict) else None
-    if not isinstance(filiais, list):
-        raise ValueError("O JSON de rotas precisa conter uma lista 'filiais'.")
-    codigos: dict[str, list[str]] = {}
-    for filial in filiais:
-        if not isinstance(filial, dict) or not filial.get("filial"):
-            raise ValueError("Cada registro de filial precisa informar 'filial'.")
-        codigos_configurados = filial.get("codigos_destino") or []
-        if isinstance(codigos_configurados, str):
-            codigos_configurados = [codigos_configurados]
-        codigo_prioritario = str(filial.get("codigo_destino") or "").strip()
-        codigos_configurados = [
-            str(codigo).strip() for codigo in codigos_configurados if str(codigo).strip()
-        ]
-        if codigo_prioritario and codigo_prioritario not in codigos_configurados:
-            codigos_configurados.insert(0, codigo_prioritario)
-        if not codigos_configurados:
-            continue
-        chave = _normalizar_rota(filial["filial"])
-        if chave in codigos and codigos[chave] != codigos_configurados:
-            raise ValueError(f"Há códigos de destino conflitantes para '{filial['filial']}'.")
-        codigos[chave] = codigos_configurados
-    return codigos
 
 
 def selecionar_rota_manifesto(page, *, log=None) -> str:
@@ -431,35 +179,19 @@ def aguardar_carregamento_manifesto(page, *, log=None) -> None:
 def associar_destinos_fraction(
     grupos: list[dict],
     destinos: list[dict[str, str]],
-    codigos_filiais: dict[str, list[str]] | None = None,
 ) -> tuple[list[dict], list[str]]:
-    """Liga cada filial ao destino pelo código configurado, ou nome único legado."""
+    """Liga cada origem de rota a uma unidade Fraction pelo nome exato."""
     por_nome: dict[str, list[dict[str, str]]] = {}
-    por_codigo: dict[str, list[dict[str, str]]] = {}
     for destino in destinos:
         por_nome.setdefault(_normalizar_rota(destino["nome"]), []).append(destino)
-        por_codigo.setdefault(destino["codigo"], []).append(destino)
-    codigos_filiais = codigos_filiais or {}
     associados = []
     pendentes = []
     for grupo in grupos:
-        codigos_configurados = codigos_filiais.get(_normalizar_rota(grupo["ROTA"]), [])
-        if codigos_configurados:
-            codigo_selecionado = next(
-                (
-                    codigo
-                    for codigo in codigos_configurados
-                    if len(por_codigo.get(codigo, [])) == 1
-                ),
-                None,
-            )
-            correspondencias = por_codigo.get(codigo_selecionado, []) if codigo_selecionado else []
-        else:
-            correspondencias = por_nome.get(_normalizar_rota(grupo["ROTA"]), [])
-        contexto = f"{grupo['CIDADE_DEST']}/{grupo['UF']} (filial '{grupo['ROTA']}')"
+        correspondencias = por_nome.get(_normalizar_rota(grupo["ROTA"]), [])
+        contexto = f"unidade '{grupo['ROTA']}'"
         if len(correspondencias) != 1:
             detalhe = "não encontrada" if not correspondencias else "ambígua"
-            pendentes.append(f"{contexto}: unidade {detalhe} no catálogo")
+            pendentes.append(f"{contexto} {detalhe} no catálogo")
             continue
         destino = correspondencias[0]
         item = dict(grupo)
@@ -469,108 +201,91 @@ def associar_destinos_fraction(
     return associados, pendentes
 
 
-def adicionar_rotas_a_previa(tabela_destinos: pd.DataFrame, *, log=None) -> pd.DataFrame:
-    """Acrescenta filial e código de destino à tabela exibida para conferência."""
-    tabela = tabela_destinos.copy()
-    tabela["ROTA"] = "Sem rota"
-    tabela["CODIGO_ROTA"] = "Sem código"
-    try:
-        mapa_rotas = carregar_mapa_rotas()
-        destinos = carregar_destinos_fraction()
-        codigos_filiais = carregar_codigos_filiais()
-    except (FileNotFoundError, ValueError, json.JSONDecodeError) as erro:
-        _log(log, f"Não foi possível carregar rotas/códigos para a prévia: {erro}")
-        return tabela
-
-    destinos_por_codigo: dict[str, list[dict[str, str]]] = {}
-    destinos_por_nome: dict[str, list[dict[str, str]]] = {}
-    for destino in destinos:
-        destinos_por_codigo.setdefault(destino["codigo"], []).append(destino)
-        destinos_por_nome.setdefault(_normalizar_rota(destino["nome"]), []).append(destino)
-
-    rotas_encontradas = 0
-    codigos_encontrados = 0
-    for indice, registro in tabela.iterrows():
-        rota = _rota_do_grupo(
-            mapa_rotas,
-            str(registro["UF"]),
-            str(registro["CIDADE_DEST"]),
-        )
-        if rota is None:
-            continue
-        tabela.at[indice, "ROTA"] = rota
-        rotas_encontradas += 1
-
-        codigos = codigos_filiais.get(_normalizar_rota(rota), [])
-        if codigos:
-            destino = next(
-                (
-                    destinos_por_codigo[codigo][0]
-                    for codigo in codigos
-                    if len(destinos_por_codigo.get(codigo, [])) == 1
-                ),
-                None,
-            )
-        else:
-            opcoes = destinos_por_nome.get(_normalizar_rota(rota), [])
-            destino = opcoes[0] if len(opcoes) == 1 else None
-        if destino is not None:
-            tabela.at[indice, "CODIGO_ROTA"] = destino["codigo"]
-            codigos_encontrados += 1
-
-    _log(
-        log,
-        f"Prévia de rotas: {rotas_encontradas}/{len(tabela)} rota(s) e "
-        f"{codigos_encontrados}/{len(tabela)} código(s) identificados.",
+def adicionar_rotas_a_previa(tabela_base: pd.DataFrame, *, log=None) -> pd.DataFrame:
+    """Acrescenta a origem de rota correspondente à coluna Destino da base."""
+    tabela = tabela_base.copy()
+    coluna_destino = next(
+        (coluna for coluna in tabela if _normalizar_rota(coluna) == "DESTINO"),
+        None,
     )
+    if coluna_destino is None:
+        raise ValueError("A base de entrada não contém a coluna 'Destino'.")
+
+    try:
+        mapa_rotas, destinos_ambiguos = carregar_rotas_destino_origem()
+        unidades = carregar_destinos_fraction()
+    except (FileNotFoundError, ValueError, json.JSONDecodeError) as erro:
+        raise ValueError(f"Não foi possível carregar a base de rotas: {erro}") from erro
+
+    def resolver(destino):
+        chave = _normalizar_rota(destino) if pd.notna(destino) else ""
+        if chave in destinos_ambiguos:
+            return "Rota ambígua"
+        return mapa_rotas.get(chave, "Sem rota")
+
+    tabela["Rota"] = tabela[coluna_destino].map(resolver)
+    unidades_por_nome: dict[str, list[dict[str, str]]] = {}
+    for unidade in unidades:
+        unidades_por_nome.setdefault(_normalizar_rota(unidade["nome"]), []).append(unidade)
+    tabela["Código da rota"] = tabela["Rota"].map(
+        lambda rota: (
+            unidades_por_nome[_normalizar_rota(rota)][0]["codigo"]
+            if len(unidades_por_nome.get(_normalizar_rota(rota), [])) == 1
+            else "Sem código"
+        )
+    )
+    encontradas = int((~tabela["Rota"].isin(["Sem rota", "Rota ambígua"])).sum())
+    ambiguas = int(tabela["Rota"].eq("Rota ambígua").sum())
+    _log(log, f"Prévia de rotas: {encontradas}/{len(tabela)} destino(s) com origem única; {ambiguas} ambíguo(s).")
     return tabela
 
 
-def _rota_do_grupo(mapa: dict[str, str], uf: str, cidade: str) -> str | None:
-    cidade_normalizada = _normalizar_rota(cidade)
-    uf_normalizada = _normalizar_rota(uf)
-    return mapa.get(f"{uf_normalizada}|{cidade_normalizada}") or mapa.get(
-        cidade_normalizada
-    )
-
-
 def mapear_rotas_para_grupos(
-    tabela_destinos: pd.DataFrame,
-    mapa_rotas: dict[str, str],
+    tabela_base: pd.DataFrame,
 ) -> tuple[list[dict], list[str]]:
-    grupos = []
-    faltantes = []
-    for registro in tabela_destinos.to_dict("records"):
-        rota = _rota_do_grupo(
-            mapa_rotas,
-            str(registro["UF"]),
-            str(registro["CIDADE_DEST"]),
-        )
-        if rota is None:
-            faltantes.append(
-                f"{registro['CIDADE_DEST']}/{registro['UF']}"
-            )
-            continue
-        registro["ROTA"] = rota
-        registro["LISTA_CTES"] = str(registro["CTES"]).split(", ")
-        grupos.append(registro)
-
-    return grupos, faltantes
-
-
-def validar_rotas_para_grupos(
-    tabela_destinos: pd.DataFrame,
-    mapa_rotas: dict[str, str],
-) -> list[dict]:
-    grupos, faltantes = mapear_rotas_para_grupos(
-        tabela_destinos,
-        mapa_rotas,
+    coluna_cte = next(
+        (coluna for coluna in tabela_base if _normalizar_rota(coluna) == "CTE"),
+        None,
     )
-    if faltantes:
-        raise ValueError(
-            "Não há rota cadastrada para: " + ", ".join(faltantes)
+    if coluna_cte is None or "Rota" not in tabela_base:
+        raise ValueError("A base precisa conter as colunas CTE, Destino e Rota.")
+    coluna_ctes_entrada = next(
+        (
+            coluna
+            for coluna in tabela_base
+            if _normalizar_rota(coluna) == "CTES PARA DAR ENTRADA"
+        ),
+        None,
+    )
+    grupos_por_rota: dict[str, list[str]] = {}
+    ignorados: list[str] = []
+    for _, linha in tabela_base.iterrows():
+        rota = str(linha["Rota"]).strip()
+        valor_ctes = (
+            linha[coluna_ctes_entrada]
+            if coluna_ctes_entrada is not None
+            else linha[coluna_cte]
         )
-    return grupos
+        texto_ctes = "" if pd.isna(valor_ctes) else str(valor_ctes)
+        ctes_linha = [
+            re.sub(r"\.0$", "", cte.strip())
+            for cte in texto_ctes.splitlines()
+            if cte.strip() and cte.strip().lower() != "nan"
+        ]
+        if not ctes_linha:
+            continue
+        if rota in {"Sem rota", "Rota ambígua", ""}:
+            ignorados.append(f"CTE(s) {', '.join(ctes_linha)}: {rota or 'sem rota'}")
+            continue
+        grupos_por_rota.setdefault(rota, [])
+        for cte in ctes_linha:
+            if cte not in grupos_por_rota[rota]:
+                grupos_por_rota[rota].append(cte)
+    grupos = [
+        {"ROTA": rota, "LISTA_CTES": ctes}
+        for rota, ctes in sorted(grupos_por_rota.items())
+    ]
+    return grupos, ignorados
 
 
 def processar_manifestos(
@@ -582,28 +297,41 @@ def processar_manifestos(
     destinos, pendentes = associar_destinos_fraction(
         grupos,
         carregar_destinos_fraction(),
-        carregar_codigos_filiais(),
     )
     if pendentes:
         raise ValueError(
             "Manifestos não iniciados; revise os destinos no catálogo: "
             + "; ".join(pendentes)
         )
+    def abrir_envio_remessa() -> None:
+        page.get_by_role("link", name="Operacional").click()
+        page.get_by_role("link", name="Manifesto", exact=True).click()
+        page.get_by_role("link", name="Envio de remessa").click()
+
     _log(log, "Acessando Manifesto no Fraction...")
-    page.get_by_role("link", name="Operacional").click()
-    page.get_by_role("link", name="Manifesto", exact=True).click()
-    page.get_by_role("link", name="Envio de remessa").click()
+    abrir_envio_remessa()
 
     total_lotes = 0
-    for grupo in destinos:
-        cidade = grupo["CIDADE_DEST"]
-        uf = grupo["UF"]
+    for indice_grupo, grupo in enumerate(destinos):
+        if indice_grupo:
+            _log(
+                log,
+                "Recarregando Envio de remessa para limpar a lista anterior "
+                "antes de selecionar a próxima unidade.",
+            )
+            page.reload(wait_until="domcontentloaded", timeout=120_000)
+            page.get_by_role("link", name="Operacional").wait_for(
+                state="visible",
+                timeout=120_000,
+            )
+            abrir_envio_remessa()
+        rota_unidade = grupo["ROTA"]
         rota = grupo["NOME_DESTINO"]
         codigo_destino = grupo["CODIGO_DESTINO"]
         ctes = grupo["LISTA_CTES"]
         _log(
             log,
-            f"Destino {cidade}/{uf}: {len(ctes)} CTE(s), unidade "
+            f"Unidade {rota_unidade}: {len(ctes)} CTE(s), destino Fraction "
             f"'{rota}', código selecionado {codigo_destino}.",
         )
         _log(log, "Abrindo seletor de unidade do Manifesto.")
@@ -628,7 +356,7 @@ def processar_manifestos(
             _log(
                 log,
                 f"Lote {numero_lote}: preenchidos {len(lote)} CTE(s) "
-                f"para {cidade}/{uf} (unidade {codigo_destino}).",
+                f"para {rota_unidade} (unidade {codigo_destino}).",
             )
             page.get_by_role(
                 "button",
@@ -637,189 +365,81 @@ def processar_manifestos(
             _log(log, f"Lote {numero_lote} adicionado ao Manifesto.")
             aguardar_carregamento_manifesto(page, log=log)
 
-    _log(log, "Todos os lotes foram adicionados; finalizando com Processar lista.")
-    page.get_by_role("button", name="Processar lista").click()
-    _log(log, "Botão Processar lista acionado no Fraction.")
+        _log(log, f"Finalizando a remessa da unidade {rota_unidade}.")
+        page.get_by_role("button", name="Processar lista").click()
+        aguardar_carregamento_manifesto(page, log=log)
+        _log(log, f"Remessa da unidade {rota_unidade} processada.")
+
+    _log(log, "Todas as unidades roteadas foram processadas no Fraction.")
 
     return total_lotes
 
 
 def executar_gerar_romaneios(
-    data_inicial: date,
-    data_final: date,
+    arquivo_base: str | Path | bytes,
     *,
-    callback=None,
+    nome_arquivo: str | None = None,
     log=None,
 ) -> dict:
-    if not URL_FRACTION or not FRACTION_USER or not FRACTION_PASSWORD:
-        raise ValueError("URL_FRACTION, FRACTION_USER e FRACTION_PASSWORD precisam estar configurados.")
-    if data_final < data_inicial:
-        raise ValueError("A data final precisa ser igual ou posterior à data inicial.")
-
-    pasta_temporaria = TEMPORARIOS_ROMANEIOS / "gerar_romaneios"
-    if pasta_temporaria.exists():
-        shutil.rmtree(pasta_temporaria)
-    pasta_temporaria.mkdir(parents=True, exist_ok=True)
-
-    arquivos: list[Path] = []
-    total_dias = (data_final - data_inicial).days + 1
-    inicio_execucao = time.perf_counter()
-    _log(
-        log,
-        f"Configuração: {total_dias} dia(s), navegador "
-        f"{'headless' if HEADLESS else 'visível'}, até "
-        f"{MAX_TENTATIVAS_EXTRACAO_DIA} tentativa(s) por dia, "
-        f"lotes máximos de {TAMANHO_LOTE_CTES} CTE(s).",
-    )
-    _log(log, f"Temporários da execução: {pasta_temporaria}.")
+    conteudo_upload = arquivo_base if isinstance(arquivo_base, bytes) else None
+    caminho = None if conteudo_upload is not None else Path(arquivo_base)
+    rotulo_arquivo = nome_arquivo or (caminho.name if caminho else "planilha importada")
+    if caminho is not None and not caminho.is_file():
+        raise FileNotFoundError(f"Base de entrada não encontrada: '{caminho}'.")
+    tamanho = len(conteudo_upload) if conteudo_upload is not None else caminho.stat().st_size
+    _log(log, f"Importando base de entrada: {rotulo_arquivo} ({tamanho} bytes).")
     try:
-        with sync_playwright() as playwright:
-            browser = playwright.chromium.launch(headless=HEADLESS, slow_mo=SLOW_MO_MS)
-            context = browser.new_context(accept_downloads=True)
-            page = context.new_page()
-            page.on(
-                "pageerror",
-                lambda erro: _log(log, f"Erro JavaScript na página: {erro}"),
-            )
-            try:
-                _log(log, "Realizando login no Fraction com usuário operacional...")
-                login_fraction(page, FRACTION_USER, FRACTION_PASSWORD, lambda msg: _log(log, msg))
-                _log(log, f"Login concluído; página atual: {page.url}.")
-
-                data = data_inicial
-                contador = 1
-                while data <= data_final:
-                    if callback:
-                        callback(contador, total_dias, data)
-                    _log(log, f"Iniciando extração de {data:%d/%m/%Y} ({contador}/{total_dias}).")
-                    tentativa = 1
-                    while tentativa <= MAX_TENTATIVAS_EXTRACAO_DIA:
-                        inicio_tentativa = time.perf_counter()
-                        try:
-                            _log(log, f"Tentativa {tentativa}: abrindo relatório analítico.")
-                            abrir_relatorio(page, log=log)
-                            _log(log, f"Tentativa {tentativa}: preenchendo data do relatório.")
-                            preencher_data(page, data, log=log)
-                            _log(log, f"Tentativa {tentativa}: solicitando extração.")
-                            processar(page, log=log)
-
-                            caminho = pasta_temporaria / f"Romaneios_{data:%d-%m-%Y}.xlsx"
-                            _log(log, f"Aguardando exportação Excel para {caminho.name}.")
-                            with page.expect_download(timeout=600000) as download_info:
-                                page.get_by_role(
-                                    "button", name=" Exportar para Excel"
-                                ).click(force=True, no_wait_after=True)
-                            download_info.value.save_as(caminho)
-                            arquivos.append(caminho)
-                            _log(
-                                log,
-                                f"Extração de {data:%d/%m/%Y} concluída: "
-                                f"{caminho.stat().st_size} bytes em "
-                                f"{time.perf_counter() - inicio_tentativa:.1f}s.",
-                            )
-                            break
-                        except TimeoutError as erro:
-                            _log(
-                                log,
-                                f"Timeout em {data:%d/%m/%Y}, tentativa "
-                                f"{tentativa}/{MAX_TENTATIVAS_EXTRACAO_DIA}; "
-                                f"URL atual: {page.url}; erro: {erro}",
-                            )
-                            if tentativa >= MAX_TENTATIVAS_EXTRACAO_DIA:
-                                raise RuntimeError(
-                                    f"Falha ao extrair {data:%d/%m/%Y} após "
-                                    f"{MAX_TENTATIVAS_EXTRACAO_DIA} tentativas: {erro}"
-                                ) from erro
-                            recuperar_pagina_analitico(page, log=log)
-                            tentativa += 1
-
-                    page.wait_for_timeout(1000)
-                    data += timedelta(days=1)
-                    contador += 1
-
-                _log(log, "Unificando extrações e mantendo somente STATUS = EMISSAO...")
-                resultado = _unificar_romaneios(
-                    arquivos,
-                    data_inicial,
-                    data_final,
-                    log=log,
-                )
-                _log(log, "Agrupando CTEs por região, UF e cidade de destino...")
-                resultado["tabela_destinos"] = agrupar_ctes_por_destino(
-                    resultado["arquivo_final"]
-                )
-                resultado["tabela_destinos"] = adicionar_rotas_a_previa(
-                    resultado["tabela_destinos"],
-                    log=log,
-                )
-                resultado["total_ctes_agrupados"] = int(
-                    resultado["tabela_destinos"]["TOTAL_CTES"].sum()
-                )
-                _log(
-                    log,
-                    f"Agrupamento concluído: {len(resultado['tabela_destinos'])} "
-                    f"grupo(s) de região/UF/cidade e "
-                    f"{resultado['total_ctes_agrupados']} CTE(s).",
-                )
-                _log(
-                    log,
-                    f"Arquivo final salvo em: {resultado['arquivo_final']} "
-                    f"({resultado['tamanho_arquivo_bytes']} bytes; "
-                    f"{resultado['linhas_consultadas']} linha(s) consultada(s), "
-                    f"{resultado['linhas_emissao']} EMISSAO).",
-                )
-                _log(
-                    log,
-                    "Prévia pronta para conferência. Os manifestos não foram "
-                    "iniciados nesta etapa.",
-                )
-            finally:
-                _log(log, "Encerrando navegador do Fraction...")
-                context.close()
-                browser.close()
-        _log(
-            log,
-            f"Execução concluída em {time.perf_counter() - inicio_execucao:.1f}s; "
-            f"{len(arquivos)} arquivo(s) diário(s) extraído(s).",
-        )
-        return resultado
+        origem = BytesIO(conteudo_upload) if conteudo_upload is not None else caminho
+        tabela = pd.read_excel(origem, engine="openpyxl", dtype={"CTE": "string"})
+        tabela = adicionar_rotas_a_previa(tabela, log=log)
+        if not any(_normalizar_rota(coluna) == "CTE" for coluna in tabela.columns):
+            raise ValueError("A planilha não contém a coluna obrigatória 'CTE'.")
+        _log(log, f"Prévia importada: {len(tabela)} linha(s), {len(tabela.columns)} coluna(s).")
+        return {
+            "arquivo_final": rotulo_arquivo if conteudo_upload is not None else str(caminho),
+            "tabela_destinos": tabela,
+            "linhas_importadas": len(tabela),
+        }
     except Exception:
-        _log(log, "Falha geral na automação:\n" + traceback.format_exc())
+        _log(log, "Falha ao importar a base de entrada:\n" + traceback.format_exc())
         raise
-    finally:
-        shutil.rmtree(pasta_temporaria, ignore_errors=True)
-        TEMPORARIOS_ROMANEIOS.mkdir(parents=True, exist_ok=True)
 
 
 def executar_manifestos_romaneios(
     arquivo_base: str | Path,
     *,
+    tabela_previa: pd.DataFrame | None = None,
     log=None,
 ) -> dict:
     """Envia os grupos de uma base já conferida ao fluxo de Manifesto."""
     caminho = Path(arquivo_base)
-    if not caminho.is_file():
+    if tabela_previa is None and not caminho.is_file():
         raise FileNotFoundError(f"Base de romaneios não encontrada: '{caminho}'.")
     if not URL_FRACTION or not FRACTION_USER or not FRACTION_PASSWORD:
         raise ValueError("URL_FRACTION, FRACTION_USER e FRACTION_PASSWORD precisam estar configurados.")
 
     inicio_execucao = time.perf_counter()
-    _log(log, f"Iniciando segunda etapa com a base revisada: {caminho}.")
-    _log(log, f"Base selecionada: {caminho.stat().st_size} bytes.")
-    _log(log, "Lendo CTEs agrupados da base final e validando rotas/unidades.")
-    tabela = agrupar_ctes_por_destino(caminho)
-    mapa_rotas = carregar_mapa_rotas()
-    grupos, rotas_ausentes = mapear_rotas_para_grupos(tabela, mapa_rotas)
+    _log(log, f"Iniciando segunda etapa com a base revisada: {arquivo_base}.")
+    if caminho.is_file():
+        _log(log, f"Base selecionada: {caminho.stat().st_size} bytes.")
+    _log(log, "Lendo CTEs e rotas da base salva após Dar entrada.")
+    tabela = (
+        tabela_previa.copy()
+        if tabela_previa is not None
+        else pd.read_excel(caminho, engine="openpyxl", dtype={"CTE": "string"})
+    )
+    if "Rota" not in tabela:
+        tabela = adicionar_rotas_a_previa(tabela, log=log)
+    grupos, rotas_ausentes = mapear_rotas_para_grupos(tabela)
     if rotas_ausentes:
         _log(
             log,
-            f"Ignorando {len(rotas_ausentes)} grupo(s) sem rota cadastrada: "
+            f"Ignorando {len(rotas_ausentes)} CTE(s) sem rota única: "
             + "; ".join(rotas_ausentes),
         )
     grupos, destinos_pendentes = associar_destinos_fraction(
         grupos,
         carregar_destinos_fraction(),
-        carregar_codigos_filiais(),
     )
     if destinos_pendentes:
         _log(
@@ -829,14 +449,14 @@ def executar_manifestos_romaneios(
         )
     if not grupos:
         raise ValueError(
-            "Nenhum grupo tem rota e código de unidade configurados. "
-            "Confira a tabela de prévia e o rotas.json."
+            "Nenhum grupo tem uma rota única e código de unidade configurados. "
+            "Confira Destino, rotas.json e unidades.json."
         )
 
     total_ctes = sum(len(grupo["LISTA_CTES"]) for grupo in grupos)
     _log(
         log,
-        f"Pré-validação concluída: {len(grupos)} grupo(s), {total_ctes} CTE(s), "
+        f"Pré-validação concluída: {len(grupos)} unidade(s), {total_ctes} CTE(s), "
         f"até {TAMANHO_LOTE_CTES} por lote.",
     )
     try:

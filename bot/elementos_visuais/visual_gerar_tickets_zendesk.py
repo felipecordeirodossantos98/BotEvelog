@@ -7,6 +7,7 @@ from automacoes.gerar_tickets_zendesk import (
     carregar_planilha_zendesk,
     executar_automacao,
 )
+from servicos.fraction import CredenciaisFractionInvalidasError
 from utils.interface import (
     LARGURA_BOTAO,
     avisar_variaveis_faltantes,
@@ -104,6 +105,9 @@ def worker(
             else "CONCLUIDO"
         )
 
+    except CredenciaisFractionInvalidasError as erro_credenciais:
+        estado["erro"] = str(erro_credenciais)
+        estado["fase"] = "AVISO"
     except Exception as erro:
         mensagem = (
             f"{type(erro).__name__}: {erro}"
@@ -126,6 +130,10 @@ def painel_gerar_tickets_zendesk() -> None:
         return
 
     fase = estado["fase"]
+    credenciais_recusadas = any(
+        "Warning: O Fraction informou 'Login ou senha inválidos.'" in str(linha)
+        for linha in estado.get("logs", [])
+    )
 
     if fase == "AGUARDANDO_MFA":
         with st.form(
@@ -153,6 +161,13 @@ def painel_gerar_tickets_zendesk() -> None:
                 )
                 success("Token enviado.")
 
+    if fase == "AVISO":
+        warning(estado["erro"])
+    elif credenciais_recusadas:
+        warning(
+            "O Fraction recusou o login. Confira o usuário e a senha em bot/.env."
+        )
+
     if fase == "ERRO":
         error(estado["erro"])
 
@@ -162,7 +177,7 @@ def painel_gerar_tickets_zendesk() -> None:
             f"Resultado salvo em: {estado['caminho']}"
         )
 
-    if fase == "CONCLUIDO_COM_ALERTA":
+    if fase == "CONCLUIDO_COM_ALERTA" and not credenciais_recusadas:
         warning(
             "Tickets processados e planilha gerada, "
             "mas a etapa do Fraction ficou pendente. "

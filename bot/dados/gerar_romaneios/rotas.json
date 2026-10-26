@@ -1,4232 +1,2756 @@
 {
-  "filiais": [
+  "rotas": [
     {
-      "filial": "FL RIO DE JANEIRO",
-      "codigo_destino": "000000007",
-      "cidades": [
-        "Rio de janeiro",
-        "Minas Gerais",
-        "Vitoria"
-      ]
+      "origem": "CO ARACAJU 02 FL",
+      "destino": "FL SALVADOR"
     },
     {
-      "filial": "FL Salvador",
-      "codigo_destino": "000000008",
-      "cidades": [
-        "Salvador",
-        "Recife",
-        "Fortaleza"
-      ],
-      "codigos_destino": [
-        "000000008",
-        "000002656"
-      ]
+      "origem": "LM/CB/TL SALVADOR 01",
+      "destino": "CO ARACAJU 02 FL"
     },
     {
-      "filial": "FL Porto Alegre",
-      "codigo_destino": "000002341",
-      "cidades": [
-        "Porto alegre",
-        "Criciuma",
-        "Ararangua",
-        "Tubarao"
-      ]
+      "origem": "CO ARACAJU 02 FL",
+      "destino": "FL SALVADOR"
     },
     {
-      "filial": "FL BELEM",
-      "codigo_destino": "000000002",
-      "cidades": [
-        "Santarem 01",
-        "Altamira 01",
-        "Novo Progresso",
-        "Maraba",
-        "co maraba",
-        "Redenção",
-        "Parauapebas",
-        "Oiapoque",
-        "Tartarugalzinho",
-        "Macapa",
-        "Santa Barbara",
-        "benevides"
-      ]
+      "origem": "FL SALVADOR",
+      "destino": "CO ARACAJU 02 FL"
     },
     {
-      "filial": "FL Manaus JAD",
-      "codigo_destino": "000000005",
-      "cidades": [
-        "Manaus",
-        "Boa Vista"
-      ]
-    }
-  ],
-  "unidades": [
-    {
-      "nome": "CB / TL BELEM 11",
-      "codigo": "000001675"
-    },
-    {
-      "nome": "CB / TL CAMPO GRANDE 02",
-      "codigo": "000001270"
-    },
-    {
-      "nome": "CB / TL CAMPO GRANDE 10",
-      "codigo": "000001537"
-    },
-    {
-      "nome": "CB / TL CAMPO MAIOR 01",
-      "codigo": "000001620"
-    },
-    {
-      "nome": "CB / TL CUIABA 01",
-      "codigo": "000001046"
-    },
-    {
-      "nome": "CB / TL CURITIBA",
-      "codigo": "000000835"
-    },
-    {
-      "nome": "CB / TL FLORIANO 01",
-      "codigo": "000001617"
-    },
-    {
-      "nome": "CB / TL PARNAIBA 01",
-      "codigo": "000001618"
-    },
-    {
-      "nome": "CB / TL PICOS 01",
-      "codigo": "000001619"
-    },
-    {
-      "nome": "CB / TL SAO PAULO 02",
-      "codigo": "000002667"
-    },
-    {
-      "nome": "CB / TL SAO PAULO 11",
-      "codigo": "000001345"
-    },
-    {
-      "nome": "CB / TL SAO PAULO 15",
-      "codigo": "000002491"
-    },
-    {
-      "nome": "CB / TL SINOP 02",
-      "codigo": "000001669"
-    },
-    {
-      "nome": "CB CUIABA 02",
-      "codigo": "000001135"
-    },
-    {
-      "nome": "CB RIO BRANCO 02",
-      "codigo": "000001126"
-    },
-    {
-      "nome": "CB/TL SAO PAULO 22",
-      "codigo": "000001579"
-    },
-    {
-      "nome": "CO AGUAS DE LINDOIA 01",
-      "codigo": "000000462"
-    },
-    {
-      "nome": "CO ALFENAS",
-      "codigo": "000000991"
-    },
-    {
-      "nome": "CO ALFENAS 02",
-      "codigo": "000002498"
-    },
-    {
-      "nome": "CO ALTAMIRA 01",
-      "codigo": "000001671"
-    },
-    {
-      "nome": "CO AMERICANA 02",
-      "codigo": "000001084"
-    },
-    {
-      "nome": "CO AMPARO 02",
-      "codigo": "000001759"
-    },
-    {
-      "nome": "CO ANAPOLIS",
-      "codigo": "000002004"
-    },
-    {
-      "nome": "CO ANAPOLIS 03",
-      "codigo": "000002530"
-    },
-    {
-      "nome": "CO ANGRA DOS REIS 02",
-      "codigo": "000001435"
-    },
-    {
-      "nome": "CO APARECIDA DE GOIANIA 01",
-      "codigo": "000001367"
-    },
-    {
-      "nome": "CO APUCARANA 01",
-      "codigo": "000002493"
-    },
-    {
-      "nome": "CO ARACAJU 02 FL",
-      "codigo": "000001329"
-    },
-    {
-      "nome": "CO ARACATUBA 01",
-      "codigo": "000000679"
-    },
-    {
-      "nome": "CO ARAGUAINA 02",
-      "codigo": "000001396"
-    },
-    {
-      "nome": "CO ARAGUARI 01",
-      "codigo": "000001348"
-    },
-    {
-      "nome": "CO ARAPIRACA 02",
-      "codigo": "000002617"
-    },
-    {
-      "nome": "CO ARAPONGAS 02",
-      "codigo": "000001020"
-    },
-    {
-      "nome": "CO ARARANGUA 01",
-      "codigo": "000000606"
-    },
-    {
-      "nome": "CO ARARAQUARA",
-      "codigo": "000001549"
-    },
-    {
-      "nome": "CO ARARAQUARA 02",
-      "codigo": "000002508"
-    },
-    {
-      "nome": "CO ARARUAMA",
-      "codigo": "000001444"
-    },
-    {
-      "nome": "CO ARAXA 02",
-      "codigo": "000002600"
-    },
-    {
-      "nome": "CO ARUJA 01",
-      "codigo": "000001967"
-    },
-    {
-      "nome": "CO ASSIS",
-      "codigo": "000001346"
-    },
-    {
-      "nome": "CO ASSIS 03",
-      "codigo": "000002523"
-    },
-    {
-      "nome": "CO ATIBAIA 01",
-      "codigo": "000001195"
-    },
-    {
-      "nome": "CO AVARE 01",
-      "codigo": "000000515"
-    },
-    {
-      "nome": "CO BAGE 02",
-      "codigo": "000001812"
-    },
-    {
-      "nome": "CO BARBACENA 02",
-      "codigo": "000002079"
-    },
-    {
-      "nome": "CO BARREIRAS 01",
-      "codigo": "000000817"
-    },
-    {
-      "nome": "CO BARRETOS",
-      "codigo": "000000816"
-    },
-    {
-      "nome": "CO BARRETOS 02",
-      "codigo": "000002564"
-    },
-    {
-      "nome": "CO BAURU 01",
-      "codigo": "000000939"
-    },
-    {
-      "nome": "CO BEBEDOURO 01",
-      "codigo": "000001909"
-    },
-    {
-      "nome": "CO BELEM 02 FL",
-      "codigo": "000000971"
-    },
-    {
-      "nome": "CO BELFORD ROXO 01",
-      "codigo": "000002583"
-    },
-    {
-      "nome": "CO BELFORD ROXO 03",
-      "codigo": "000002291"
-    },
-    {
-      "nome": "CO BELO HORIZONTE 02",
-      "codigo": "000001871"
-    },
-    {
-      "nome": "CO BELO HORIZONTE 03",
-      "codigo": "000001059"
-    },
-    {
-      "nome": "CO BENEVIDES 02",
-      "codigo": "000002099"
-    },
-    {
-      "nome": "CO BETIM 02",
-      "codigo": "000002294"
-    },
-    {
-      "nome": "CO BIRIGUI 01",
-      "codigo": "000001770"
-    },
-    {
-      "nome": "CO BLUMENAU 02",
-      "codigo": "000002659"
-    },
-    {
-      "nome": "CO BOA VISTA 02",
-      "codigo": "000002500"
-    },
-    {
-      "nome": "CO BOITUVA 01",
-      "codigo": "000000704"
-    },
-    {
-      "nome": "CO BOM DESPACHO 01",
-      "codigo": "000000677"
-    },
-    {
-      "nome": "CO BOTUCATU 02",
-      "codigo": "000001365"
-    },
-    {
-      "nome": "CO BRAGANCA PAULISTA 02",
-      "codigo": "000002529"
-    },
-    {
-      "nome": "CO BRASILIA 01",
-      "codigo": "000000272"
-    },
-    {
-      "nome": "CO BRASILIA 02",
-      "codigo": "000001352"
-    },
-    {
-      "nome": "CO BRUSQUE 02",
-      "codigo": "000001855"
-    },
-    {
-      "nome": "CO CABO FRIO 01",
-      "codigo": "000000254"
-    },
-    {
-      "nome": "CO CACADOR 01",
-      "codigo": "000000920"
-    },
-    {
-      "nome": "CO CACHOEIRA DO SUL 02",
-      "codigo": "000001104"
-    },
-    {
-      "nome": "CO CACHOEIRO DE ITAPEMIRIM 02",
-      "codigo": "000001561"
-    },
-    {
-      "nome": "CO CACOAL 01",
-      "codigo": "000002490"
-    },
-    {
-      "nome": "CO CAIEIRAS 01",
-      "codigo": "000000553"
-    },
-    {
-      "nome": "CO CAJAZEIRAS 01",
-      "codigo": "000000834"
-    },
-    {
-      "nome": "CO CAMACARI 02",
-      "codigo": "000002550"
-    },
-    {
-      "nome": "CO CAMAQUA 03",
-      "codigo": "000002432"
-    },
-    {
-      "nome": "CO CAMBE 01",
-      "codigo": "000000765"
-    },
-    {
-      "nome": "CO CAMPINA GRANDE 02",
-      "codigo": "000001748"
-    },
-    {
-      "nome": "CO CAMPINAS 01",
-      "codigo": "000001284"
-    },
-    {
-      "nome": "CO CAMPO GRANDE 02 FL",
-      "codigo": "000000760"
-    },
-    {
-      "nome": "CO CAMPO GRANDE 03",
-      "codigo": "000002025"
-    },
-    {
-      "nome": "CO CAMPO LARGO 01",
-      "codigo": "000000407"
-    },
-    {
-      "nome": "CO CAMPO MOURAO 01",
-      "codigo": "000000927"
-    },
-    {
-      "nome": "CO CAMPOS DOS GOYTACAZES 01",
-      "codigo": "000000527"
-    },
-    {
-      "nome": "CO CANOAS 02",
-      "codigo": "000001844"
-    },
-    {
-      "nome": "CO CANOINHAS 01",
-      "codigo": "000001402"
-    },
-    {
-      "nome": "CO CARAGUATATUBA 01",
-      "codigo": "000000952"
-    },
-    {
-      "nome": "CO CARAPICUIBA 01",
-      "codigo": "000000907"
-    },
-    {
-      "nome": "CO CARATINGA 01",
-      "codigo": "000001712"
-    },
-    {
-      "nome": "CO CARAZINHO 02",
-      "codigo": "000002612"
-    },
-    {
-      "nome": "CO CARIACICA 02",
-      "codigo": "000002653"
-    },
-    {
-      "nome": "CO CARUARU 01",
-      "codigo": "000000731"
-    },
-    {
-      "nome": "CO CASCAVEL 02",
-      "codigo": "000002551"
-    },
-    {
-      "nome": "CO CATAGUASES 01",
-      "codigo": "000000513"
-    },
-    {
-      "nome": "CO CATALAO 01",
-      "codigo": "000000573"
-    },
-    {
-      "nome": "CO CATANDUVA",
-      "codigo": "000001418"
-    },
-    {
-      "nome": "CO CATANDUVA 02",
-      "codigo": "000002447"
-    },
-    {
-      "nome": "CO CAXIAS DO SUL",
-      "codigo": "000001692"
-    },
-    {
-      "nome": "CO CAXIAS DO SUL 02",
-      "codigo": "000002356"
-    },
-    {
-      "nome": "CO CAXIAS DO SUL 03",
-      "codigo": "000002480"
-    },
-    {
-      "nome": "CO CAXIAS 01",
-      "codigo": "000002626"
-    },
-    {
-      "nome": "CO CAXIAS 02",
-      "codigo": "000002538"
-    },
-    {
-      "nome": "CO COLATINA 02",
-      "codigo": "000001733"
-    },
-    {
-      "nome": "CO CONCORDIA 01",
-      "codigo": "000000444"
-    },
-    {
-      "nome": "CO CONSELHEIRO LAFAIETE 02",
-      "codigo": "000001312"
-    },
-    {
-      "nome": "CO CONTAGEM 02",
-      "codigo": "000002649"
-    },
-    {
-      "nome": "CO COTIA 01",
-      "codigo": "000000737"
-    },
-    {
-      "nome": "CO CRICIUMA 02",
-      "codigo": "000002622"
-    },
-    {
-      "nome": "CO CUIABA 01 FL",
-      "codigo": "000001680"
-    },
-    {
-      "nome": "CO CURITIBA 03",
-      "codigo": "000002362"
-    },
-    {
-      "nome": "CO CURITIBANOS 01",
-      "codigo": "000001772"
-    },
-    {
-      "nome": "CO CURVELO 02",
-      "codigo": "000001983"
-    },
-    {
-      "nome": "CO DIADEMA 01",
-      "codigo": "000000512"
-    },
-    {
-      "nome": "CO DIVINOPOLIS 02",
-      "codigo": "000001019"
-    },
-    {
-      "nome": "CO DOURADOS 01",
-      "codigo": "000000524"
-    },
-    {
-      "nome": "CO DUQUE DE CAXIAS 01",
-      "codigo": "000002018"
-    },
-    {
-      "nome": "CO DUQUE DE CAXIAS 02",
-      "codigo": "000001873"
-    },
-    {
-      "nome": "CO ERECHIM 02",
-      "codigo": "000001249"
-    },
-    {
-      "nome": "CO ESPIRITO SANTO DO PINHAL 01",
-      "codigo": "000001880"
-    },
-    {
-      "nome": "CO ESTANCIA VELHA 01",
-      "codigo": "000002485"
-    },
-    {
-      "nome": "CO ESTEIO 01",
-      "codigo": "000000964"
-    },
-    {
-      "nome": "CO EUNAPOLIS",
-      "codigo": "000002539"
-    },
-    {
-      "nome": "CO EUNAPOLIS 01",
-      "codigo": "000002666"
-    },
-    {
-      "nome": "CO EXTREMA 01",
-      "codigo": "000001883"
-    },
-    {
-      "nome": "CO FARROUPILHA 01",
-      "codigo": "000000724"
-    },
-    {
-      "nome": "CO FEIRA DE SANTANA 02",
-      "codigo": "000002153"
-    },
-    {
-      "nome": "CO FLORIANOPOLIS 01",
-      "codigo": "000001765"
-    },
-    {
-      "nome": "CO FORMIGA 01",
-      "codigo": "000000718"
-    },
-    {
-      "nome": "CO FORMOSA 02",
-      "codigo": "000001651"
-    },
-    {
-      "nome": "CO FORTALEZA",
-      "codigo": "000002542"
-    },
-    {
-      "nome": "CO FOZ DO IGUACU 02",
-      "codigo": "000001005"
-    },
-    {
-      "nome": "CO FRANCA 02",
-      "codigo": "000001874"
-    },
-    {
-      "nome": "CO GARANHUNS 01",
-      "codigo": "000000613"
-    },
-    {
-      "nome": "CO GARCA 01",
-      "codigo": "000002452"
-    },
-    {
-      "nome": "CO GOIANIA 01",
-      "codigo": "000000996"
-    },
-    {
-      "nome": "CO GOIANIA 03",
-      "codigo": "000001816"
-    },
-    {
-      "nome": "CO GOV VALADARES 01",
-      "codigo": "000000917"
-    },
-    {
-      "nome": "CO GRAVATAI",
-      "codigo": "000001986"
-    },
-    {
-      "nome": "CO GUAIBA 01",
-      "codigo": "000000741"
-    },
-    {
-      "nome": "CO GUANAMBI",
-      "codigo": "000000411"
-    },
-    {
-      "nome": "CO GUANAMBI 02",
-      "codigo": "000002479"
-    },
-    {
-      "nome": "CO GUAPIMIRIM",
-      "codigo": "000001649"
-    },
-    {
-      "nome": "CO GUAPIMIRIM 02",
-      "codigo": "000002407"
-    },
-    {
-      "nome": "CO GUARAPARI 01",
-      "codigo": "000001606"
-    },
-    {
-      "nome": "CO GUARAPUAVA 01",
-      "codigo": "000000433"
-    },
-    {
-      "nome": "CO GUARATINGUETA 01",
-      "codigo": "000000199"
-    },
-    {
-      "nome": "CO GUARUJA",
-      "codigo": "000001703"
-    },
-    {
-      "nome": "CO GUARUJA 02",
-      "codigo": "000002422"
-    },
-    {
-      "nome": "CO GUARULHOS 01",
-      "codigo": "000002154"
-    },
-    {
-      "nome": "CO GUAXUPE 01",
-      "codigo": "000000728"
-    },
-    {
-      "nome": "CO GURUPI 02",
-      "codigo": "000001707"
-    },
-    {
-      "nome": "CO HOLAMBRA 01",
-      "codigo": "000001120"
-    },
-    {
-      "nome": "CO HORTOLANDIA 01",
-      "codigo": "000000337"
-    },
-    {
-      "nome": "CO IBITINGA 02",
-      "codigo": "000001160"
-    },
-    {
-      "nome": "CO IGREJINHA 01",
-      "codigo": "000001806"
-    },
-    {
-      "nome": "CO IJUI 01",
-      "codigo": "000000370"
-    },
-    {
-      "nome": "CO ILHEUS",
-      "codigo": "000000558"
-    },
-    {
-      "nome": "CO ILHEUS 02",
-      "codigo": "000002671"
-    },
-    {
-      "nome": "CO IMPERATRIZ 02",
-      "codigo": "000000997"
-    },
-    {
-      "nome": "CO INDAIAL 01",
-      "codigo": "000000631"
-    },
-    {
-      "nome": "CO INDAIATUBA 02",
-      "codigo": "000001754"
-    },
-    {
-      "nome": "CO IPATINGA 02",
-      "codigo": "000001156"
-    },
-    {
-      "nome": "CO IRECE 01",
-      "codigo": "000001158"
-    },
-    {
-      "nome": "CO ITABIRA 01",
-      "codigo": "000001607"
-    },
-    {
-      "nome": "CO ITABIRITO 01",
-      "codigo": "000002057"
-    },
-    {
-      "nome": "CO ITABORAI 01",
-      "codigo": "000001866"
-    },
-    {
-      "nome": "CO ITABUNA 01",
-      "codigo": "000000474"
-    },
-    {
-      "nome": "CO ITAJAI 01",
-      "codigo": "000002664"
-    },
-    {
-      "nome": "CO ITAJAI 02",
-      "codigo": "000001769"
-    },
-    {
-      "nome": "CO ITAJUBA 01",
-      "codigo": "000000516"
-    },
-    {
-      "nome": "CO ITAPECERICA DA SERRA 01",
-      "codigo": "000001361"
-    },
-    {
-      "nome": "CO ITAPERUNA 02",
-      "codigo": "000002544"
-    },
-    {
-      "nome": "CO ITAPETININGA",
-      "codigo": "000000932"
-    },
-    {
-      "nome": "CO ITAPETININGA 02",
-      "codigo": "000002458"
-    },
-    {
-      "nome": "CO ITAPEVA 02",
-      "codigo": "000001534"
-    },
-    {
-      "nome": "CO ITAPEVI",
-      "codigo": "000001947"
-    },
-    {
-      "nome": "CO ITAPEVI 01",
-      "codigo": "000002495"
-    },
-    {
-      "nome": "CO ITAPIRA 01",
-      "codigo": "000000743"
-    },
-    {
-      "nome": "CO ITAQUAQUECETUBA 02",
-      "codigo": "000001044"
-    },
-    {
-      "nome": "CO ITAUNA 01",
-      "codigo": "000000658"
-    },
-    {
-      "nome": "CO ITU",
-      "codigo": "000002146"
-    },
-    {
-      "nome": "CO ITU 01",
-      "codigo": "000002644"
-    },
-    {
-      "nome": "CO ITUIUTABA 01",
-      "codigo": "000002185"
-    },
-    {
-      "nome": "CO ITUMBIARA 01",
-      "codigo": "000000431"
-    },
-    {
-      "nome": "CO ITUPEVA",
-      "codigo": "000000477"
-    },
-    {
-      "nome": "CO JABOATAO DOS GUARARAPES 03",
-      "codigo": "000002478"
-    },
-    {
-      "nome": "CO JABOTICABAL 01",
-      "codigo": "000000759"
-    },
-    {
-      "nome": "CO JACAREI 03",
-      "codigo": "000002454"
-    },
-    {
-      "nome": "CO JACUTINGA 01",
-      "codigo": "000001330"
-    },
-    {
-      "nome": "CO JAD BHZ",
-      "codigo": "000001182"
-    },
-    {
-      "nome": "CO JAD FORTALEZA",
-      "codigo": "000002620"
-    },
-    {
-      "nome": "CO JAD MANAUS",
-      "codigo": "000002287"
-    },
-    {
-      "nome": "CO JAD PORTO ALEGRE",
-      "codigo": "000002443"
-    },
-    {
-      "nome": "CO JAD SALVADOR",
-      "codigo": "000002173"
-    },
-    {
-      "nome": "CO JAD SAO PAULO",
-      "codigo": "000000086"
-    },
-    {
-      "nome": "CO JAGUARIUNA 02",
-      "codigo": "000002049"
-    },
-    {
-      "nome": "CO JARAGUA DO SUL 02",
-      "codigo": "000002616"
-    },
-    {
-      "nome": "CO JATAI 01",
-      "codigo": "000000719"
-    },
-    {
-      "nome": "CO JAU 02",
-      "codigo": "000001069"
-    },
-    {
-      "nome": "CO JI-PARANA 02",
-      "codigo": "000002496"
-    },
-    {
-      "nome": "CO JOACABA 02",
-      "codigo": "000001988"
-    },
-    {
-      "nome": "CO JOAO MONLEVADE 01",
-      "codigo": "000001604"
-    },
-    {
-      "nome": "CO JOAO PESSOA 02 FL",
-      "codigo": "000001701"
-    },
-    {
-      "nome": "CO JOINVILLE 02",
-      "codigo": "000002536"
-    },
-    {
-      "nome": "CO JUAZEIRO DO NORTE 01",
-      "codigo": "000001217"
-    },
-    {
-      "nome": "CO JUIZ DE FORA 02",
-      "codigo": "000001755"
-    },
-    {
-      "nome": "CO JUNDIAI 01",
-      "codigo": "000002285"
-    },
-    {
-      "nome": "CO LAGES 01",
-      "codigo": "000001267"
-    },
-    {
-      "nome": "CO LAGOA DA PRATA 01",
-      "codigo": "000000660"
-    },
-    {
-      "nome": "CO LAGOA SANTA 03",
-      "codigo": "000001980"
-    },
-    {
-      "nome": "CO LAJEADO 01",
-      "codigo": "000000618"
-    },
-    {
-      "nome": "CO LAVRAS 02",
-      "codigo": "000002579"
-    },
-    {
-      "nome": "CO LENCOIS PAULISTA 01",
-      "codigo": "000001612"
-    },
-    {
-      "nome": "CO LIMEIRA",
-      "codigo": "000002150"
-    },
-    {
-      "nome": "CO LINHARES 01",
-      "codigo": "000001654"
-    },
-    {
-      "nome": "CO LINS 01",
-      "codigo": "000000769"
-    },
-    {
-      "nome": "CO LONDRINA 01",
-      "codigo": "000001706"
-    },
-    {
-      "nome": "CO MACAE 02",
-      "codigo": "000002650"
-    },
-    {
-      "nome": "CO MACAPA",
-      "codigo": "000001343"
-    },
-    {
-      "nome": "CO MACAPA 02",
-      "codigo": "000002549"
-    },
-    {
-      "nome": "CO MACEIO 01 FL",
-      "codigo": "000001721"
-    },
-    {
-      "nome": "CO MAFRA 02",
-      "codigo": "000002483"
-    },
-    {
-      "nome": "CO MANAUS",
-      "codigo": "000001602"
-    },
-    {
-      "nome": "CO MANHUACU 01",
-      "codigo": "000000684"
-    },
-    {
-      "nome": "CO MAR DE ESPANHA 01",
-      "codigo": "000002137"
-    },
-    {
-      "nome": "CO MARABA",
-      "codigo": "000001594"
-    },
-    {
-      "nome": "CO MARABA 03",
-      "codigo": "000002471"
-    },
-    {
-      "nome": "CO MARICA 02",
-      "codigo": "000002344"
-    },
-    {
-      "nome": "CO MARILIA 01",
-      "codigo": "000000812"
-    },
-    {
-      "nome": "CO MARINGA 02",
-      "codigo": "000000980"
-    },
-    {
-      "nome": "CO MIRASSOL",
-      "codigo": "000001997"
-    },
-    {
-      "nome": "CO MIRASSOL 02",
-      "codigo": "000002670"
-    },
-    {
-      "nome": "CO MOCOCA 01",
-      "codigo": "000000951"
-    },
-    {
-      "nome": "CO MOGI DAS CRUZES 01",
-      "codigo": "000000420"
-    },
-    {
-      "nome": "CO MOGI MIRIM 02",
-      "codigo": "000002456"
-    },
-    {
-      "nome": "CO MONGAGUA 02",
-      "codigo": "000002084"
-    },
-    {
-      "nome": "CO MONTE ALTO 01",
-      "codigo": "000000463"
-    },
-    {
-      "nome": "CO MONTE MOR 02",
-      "codigo": "000001072"
-    },
-    {
-      "nome": "CO MONTE SIAO 01",
-      "codigo": "000001853"
-    },
-    {
-      "nome": "CO MONTES CLAROS 01",
-      "codigo": "000000161"
-    },
-    {
-      "nome": "CO MOSSORO 02",
-      "codigo": "000001753"
-    },
-    {
-      "nome": "CO MURIAE 02",
-      "codigo": "000001127"
-    },
-    {
-      "nome": "CO NATAL 01 FL",
-      "codigo": "000000286"
-    },
-    {
-      "nome": "CO NAVEGANTES 01",
-      "codigo": "000001791"
-    },
-    {
-      "nome": "CO NITEROI 02",
-      "codigo": "000002541"
-    },
-    {
-      "nome": "CO NOVA FRIBURGO",
-      "codigo": "000000640"
-    },
-    {
-      "nome": "CO NOVA FRIBURGO 02",
-      "codigo": "000002295"
-    },
-    {
-      "nome": "CO NOVA LIMA 02",
-      "codigo": "000001981"
-    },
-    {
-      "nome": "CO NOVA SERRANA 01",
-      "codigo": "000001318"
-    },
-    {
-      "nome": "CO NOVO HAMBURGO 02",
-      "codigo": "000001767"
-    },
-    {
-      "nome": "CO OLINDA 02",
-      "codigo": "000002364"
-    },
-    {
-      "nome": "CO OSORIO 01",
-      "codigo": "000000973"
-    },
-    {
-      "nome": "CO OURINHOS 01",
-      "codigo": "000000071"
-    },
-    {
-      "nome": "CO OURO BRANCO 02",
-      "codigo": "000002457"
-    },
-    {
-      "nome": "CO OURO FINO 02",
-      "codigo": "000001233"
-    },
-    {
-      "nome": "CO OURO PRETO 03",
-      "codigo": "000001982"
-    },
-    {
-      "nome": "CO PALHOCA 02",
-      "codigo": "000001231"
-    },
-    {
-      "nome": "CO PALMAS 01 FL",
-      "codigo": "000000455"
-    },
-    {
-      "nome": "CO PARA DE MINAS 01",
-      "codigo": "000001398"
-    },
-    {
-      "nome": "CO PARACATU 01",
-      "codigo": "000001228"
-    },
-    {
-      "nome": "CO PARANAGUA 02",
-      "codigo": "000001226"
-    },
-    {
-      "nome": "CO PARANAVAI 01",
-      "codigo": "000000531"
-    },
-    {
-      "nome": "CO PARATY 01",
-      "codigo": "000001282"
-    },
-    {
-      "nome": "CO PARAUAPEBAS 02",
-      "codigo": "000001314"
-    },
-    {
-      "nome": "CO PASSO FUNDO 02",
-      "codigo": "000002293"
-    },
-    {
-      "nome": "CO PASSOS 02",
-      "codigo": "000001235"
-    },
-    {
-      "nome": "CO PATO BRANCO 01",
-      "codigo": "000000641"
-    },
-    {
-      "nome": "CO PATOS DE MINAS 01",
-      "codigo": "000000810"
-    },
-    {
-      "nome": "CO PATOS 01",
-      "codigo": "000001262"
-    },
-    {
-      "nome": "CO PATROCINIO 01",
-      "codigo": "000001811"
-    },
-    {
-      "nome": "CO PAULINIA",
-      "codigo": "000001285"
-    },
-    {
-      "nome": "CO PAULINIA 02",
-      "codigo": "000002449"
-    },
-    {
-      "nome": "CO PAULO AFONSO 01",
-      "codigo": "000001115"
-    },
-    {
-      "nome": "CO PELOTAS 02",
-      "codigo": "000001401"
-    },
-    {
-      "nome": "CO PETROLINA",
-      "codigo": "000002455"
-    },
-    {
-      "nome": "CO PETROLINA 03",
-      "codigo": "000002486"
-    },
-    {
-      "nome": "CO PETROPOLIS 02",
-      "codigo": "000002586"
-    },
-    {
-      "nome": "CO PIMENTA BUENO 01",
-      "codigo": "000002502"
-    },
-    {
-      "nome": "CO PINHAIS 02",
-      "codigo": "000001766"
-    },
-    {
-      "nome": "CO PIRACAIA 02",
-      "codigo": "000001662"
-    },
-    {
-      "nome": "CO PIRACICABA 02",
-      "codigo": "000002163"
-    },
-    {
-      "nome": "CO PIRAQUARA 01",
-      "codigo": "000002605"
-    },
-    {
-      "nome": "CO PIRASSUNUNGA 01",
-      "codigo": "000001218"
-    },
-    {
-      "nome": "CO POCOS DE CALDAS 01",
-      "codigo": "000000118"
-    },
-    {
-      "nome": "CO PONTA GROSSA 03",
-      "codigo": "000002390"
-    },
-    {
-      "nome": "CO PONTE NOVA 01",
-      "codigo": "000000643"
-    },
-    {
-      "nome": "CO PORTO ALEGRE 01",
-      "codigo": "000000402"
-    },
-    {
-      "nome": "CO PORTO ALEGRE 02",
-      "codigo": "000000378"
-    },
-    {
-      "nome": "CO PORTO ALEGRE 03",
-      "codigo": "000000762"
-    },
-    {
-      "nome": "CO PORTO FERREIRA 01",
-      "codigo": "000001734"
-    },
-    {
-      "nome": "CO PORTO VELHO 01",
-      "codigo": "000000042"
-    },
-    {
-      "nome": "CO POUSO ALEGRE 02",
-      "codigo": "000001593"
-    },
-    {
-      "nome": "CO PRESIDENTE PRUDENTE 02",
-      "codigo": "000002061"
-    },
-    {
-      "nome": "CO QUEIMADOS",
-      "codigo": "000001987"
-    },
-    {
-      "nome": "CO QUEIMADOS 01",
-      "codigo": "000002665"
-    },
-    {
-      "nome": "CO RECIFE 01",
-      "codigo": "000001410"
-    },
-    {
-      "nome": "CO REDENCAO 01",
-      "codigo": "000002051"
-    },
-    {
-      "nome": "CO REGISTRO 01",
-      "codigo": "000001528"
-    },
-    {
-      "nome": "CO RIBEIRAO PRETO 01",
-      "codigo": "000000182"
-    },
-    {
-      "nome": "CO RIBEIRAO PRETO 02",
-      "codigo": "000002475"
-    },
-    {
-      "nome": "CO RIBEIRAO PRETO 04",
-      "codigo": "000002522"
-    },
-    {
-      "nome": "CO RIO BRANCO 02 FL",
-      "codigo": "000001248"
-    },
-    {
-      "nome": "CO RIO CLARO 02",
-      "codigo": "000001556"
-    },
-    {
-      "nome": "CO RIO DAS OSTRAS 01",
-      "codigo": "000000421"
-    },
-    {
-      "nome": "CO RIO DE JANEIRO 01",
-      "codigo": "000000030"
-    },
-    {
-      "nome": "CO RIO DE JANEIRO 03",
-      "codigo": "000000289"
-    },
-    {
-      "nome": "CO RIO DE JANEIRO 04",
-      "codigo": "000000796"
-    },
-    {
-      "nome": "CO RIO DE JANEIRO 05",
-      "codigo": "000002102"
-    },
-    {
-      "nome": "CO RIO DE JANEIRO 06",
-      "codigo": "000002484"
-    },
-    {
-      "nome": "CO RIO DE JANEIRO 07",
-      "codigo": "000000792"
-    },
-    {
-      "nome": "CO RIO DE JANEIRO 08",
-      "codigo": "000001381"
-    },
-    {
-      "nome": "CO RIO DE JANEIRO 10",
-      "codigo": "000002611"
-    },
-    {
-      "nome": "CO RIO DE JANEIRO 13",
-      "codigo": "000002030"
-    },
-    {
-      "nome": "CO RIO DO SUL 02",
-      "codigo": "000001476"
-    },
-    {
-      "nome": "CO RIO GRANDE 02",
-      "codigo": "000001933"
-    },
-    {
-      "nome": "CO RIO VERDE 03",
-      "codigo": "000002401"
-    },
-    {
-      "nome": "CO RONDONOPOLIS",
-      "codigo": "000001946"
-    },
-    {
-      "nome": "CO RONDONOPOLIS 03",
-      "codigo": "000002416"
-    },
-    {
-      "nome": "CO SALVADOR",
-      "codigo": "000001930"
-    },
-    {
-      "nome": "CO SALVADOR",
-      "codigo": "000001638"
-    },
-    {
-      "nome": "CO SAMAMBAIA 01",
-      "codigo": "000000771"
-    },
-    {
-      "nome": "CO SANTA BARBARA DO OESTE 01",
-      "codigo": "000000882"
-    },
-    {
-      "nome": "CO SANTA MARIA",
-      "codigo": "000001976"
-    },
-    {
-      "nome": "CO SANTA MARIA 01",
-      "codigo": "000002661"
-    },
-    {
-      "nome": "CO SANTA RITA DO SAPUCAI 02",
-      "codigo": "000001428"
-    },
-    {
-      "nome": "CO SANTA ROSA 02",
-      "codigo": "000001890"
-    },
-    {
-      "nome": "CO SANTAREM 01",
-      "codigo": "000000440"
-    },
-    {
-      "nome": "CO SANTO ANDRE 01",
-      "codigo": "000001817"
-    },
-    {
-      "nome": "CO SANTO ANGELO 02",
-      "codigo": "000001091"
-    },
-    {
-      "nome": "CO SANTO ANTONIO DE PADUA",
-      "codigo": "000001198"
-    },
-    {
-      "nome": "CO SANTOS 02",
-      "codigo": "000001464"
-    },
-    {
-      "nome": "CO SAO BENTO DO SUL 01",
-      "codigo": "000002651"
-    },
-    {
-      "nome": "CO SAO BORJA 02",
-      "codigo": "000001130"
-    },
-    {
-      "nome": "CO SAO CARLOS",
-      "codigo": "000001451"
-    },
-    {
-      "nome": "CO SAO CARLOS 01",
-      "codigo": "000002499"
-    },
-    {
-      "nome": "CO SAO FRANCISCO DO SUL 01",
-      "codigo": "000000484"
-    },
-    {
-      "nome": "CO SAO GABRIEL",
-      "codigo": "000000473"
-    },
-    {
-      "nome": "CO SAO GABRIEL 02",
-      "codigo": "000002554"
-    },
-    {
-      "nome": "CO SAO GONCALO 01",
-      "codigo": "000001261"
-    },
-    {
-      "nome": "CO SAO GONCALO 02",
-      "codigo": "000002658"
-    },
-    {
-      "nome": "CO SAO GOTARDO 01",
-      "codigo": "000000822"
-    },
-    {
-      "nome": "CO SAO JOAO DA BOA VISTA 01",
-      "codigo": "000001650"
-    },
-    {
-      "nome": "CO SAO JOAO DE MERITI 01",
-      "codigo": "000002464"
-    },
-    {
-      "nome": "CO SAO JOAO DEL REI 02",
-      "codigo": "000002292"
-    },
-    {
-      "nome": "CO SAO JOAQUIM DA BARRA 02",
-      "codigo": "000002460"
-    },
-    {
-      "nome": "CO SAO JOSE DO RIO PARDO 02",
-      "codigo": "000002363"
-    },
-    {
-      "nome": "CO SAO JOSE DO RIO PRETO 01",
-      "codigo": "000002382"
-    },
-    {
-      "nome": "CO SAO JOSE DOS CAMPOS 01",
-      "codigo": "000002088"
-    },
-    {
-      "nome": "CO SAO JOSE DOS PINHAIS 02 FL",
-      "codigo": "000001682"
-    },
-    {
-      "nome": "CO SAO LEOPOLDO 01",
-      "codigo": "000000585"
-    },
-    {
-      "nome": "CO SAO LOURENCO",
-      "codigo": "000001168"
-    },
-    {
-      "nome": "CO SAO LOURENCO 02",
-      "codigo": "000002660"
-    },
-    {
-      "nome": "CO SAO LUIS 02 FL",
-      "codigo": "000001289"
-    },
-    {
-      "nome": "CO SAO LUIS 03",
-      "codigo": "000002016"
-    },
-    {
-      "nome": "CO SAO PAULO 01",
-      "codigo": "000001936"
-    },
-    {
-      "nome": "CO SAO PAULO 02",
-      "codigo": "000002606"
-    },
-    {
-      "nome": "CO SAO PAULO 10",
-      "codigo": "000002204"
-    },
-    {
-      "nome": "CO SAO PAULO 12",
-      "codigo": "000002015"
-    },
-    {
-      "nome": "CO SAO PAULO 16",
-      "codigo": "000000947"
+      "origem": "CO REDENCAO 01",
+      "destino": "LM/CB/TL MARABA 01"
     },
     {
-      "nome": "CO SAO ROQUE 01",
-      "codigo": "000000586"
+      "origem": "LM/CB/TL MARABA 01",
+      "destino": "CO REDENCAO 01"
     },
     {
-      "nome": "CO SAO SEBASTIAO DO PARAISO 01",
-      "codigo": "000002034"
+      "origem": "LM/CB/TL MARABA 01",
+      "destino": "CO MARABA 03"
     },
     {
-      "nome": "CO SERRA 01",
-      "codigo": "000001851"
+      "origem": "CO MARABA 03",
+      "destino": "LM/CB/TL MARABA 01"
     },
     {
-      "nome": "CO SERTAOZINHO",
-      "codigo": "000002524"
+      "origem": "CO PARAUAPEBAS 02",
+      "destino": "LM/CB/TL MARABA 01"
     },
     {
-      "nome": "CO SERTAOZINHO 02",
-      "codigo": "000002627"
+      "origem": "LM/CB/TL MARABA 01",
+      "destino": "CO PARAUAPEBAS 02"
     },
     {
-      "nome": "CO SETE LAGOAS",
-      "codigo": "000000137"
+      "origem": "BALSA ANA BEATRIZ (PORTO MACAPA)",
+      "destino": "CO MACAPA"
     },
     {
-      "nome": "CO SETE LAGOAS 01",
-      "codigo": "000000275"
+      "origem": "CO MACAPA",
+      "destino": "CO BELEM 02 FL"
     },
     {
-      "nome": "CO SINOP 01",
-      "codigo": "000001814"
+      "origem": "CO BELEM 02 FL",
+      "destino": "CO MACAPA"
     },
     {
-      "nome": "CO SOBRAL 01",
-      "codigo": "000001614"
+      "origem": "CO SAO LUIS 02 FL",
+      "destino": "CO BELEM 02 FL"
     },
     {
-      "nome": "CO SOROCABA 01",
-      "codigo": "000002575"
+      "origem": "CO BELEM 02 FL",
+      "destino": "CO SAO LUIS 02 FL"
     },
     {
-      "nome": "CO STA CRUZ DO SUL 02",
-      "codigo": "000001739"
+      "origem": "CO BENEVIDES 02",
+      "destino": "CO BELEM 02 FL"
     },
     {
-      "nome": "CO STA RITA DO SAPUCAI",
-      "codigo": "000000299"
+      "origem": "CO BELEM 02 FL",
+      "destino": "CO BENEVIDES 02"
     },
     {
-      "nome": "CO SUMARE 02",
-      "codigo": "000001720"
+      "origem": "HUB ITAPEVI | ITAPEVI",
+      "destino": "CO BELEM 02 FL"
     },
     {
-      "nome": "CO SUZANO 01",
-      "codigo": "000000696"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO BELEM 02 FL"
     },
     {
-      "nome": "CO TAGUATINGA 01",
-      "codigo": "000001052"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO BELEM 02 FL"
     },
     {
-      "nome": "CO TATUI 01",
-      "codigo": "000000579"
+      "origem": "CO BELEM 02 FL",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "CO TAUBATE 01",
-      "codigo": "000001590"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO BELEM 02 FL"
     },
     {
-      "nome": "CO TEIXEIRA DE FREITAS 02",
-      "codigo": "000002477"
+      "origem": "FL BELO HORIZONTE",
+      "destino": "TC DEPOT 01 - FREGUESIA DO O"
     },
     {
-      "nome": "CO TEOFILO OTONI 01",
-      "codigo": "000000721"
+      "origem": "TC DEPOT 01 - FREGUESIA DO O",
+      "destino": "FL BELO HORIZONTE"
     },
     {
-      "nome": "CO TERESINA 01 FL",
-      "codigo": "000001553"
+      "origem": "CO MONTES CLAROS 01",
+      "destino": "FL BELO HORIZONTE"
     },
     {
-      "nome": "CO TERESOPOLIS 01",
-      "codigo": "000002615"
+      "origem": "FL BELO HORIZONTE",
+      "destino": "CO MONTES CLAROS 01"
     },
     {
-      "nome": "CO TIETE 01",
-      "codigo": "000000506"
+      "origem": "CO CURVELO 02",
+      "destino": "FL BELO HORIZONTE"
     },
     {
-      "nome": "CO TIJUCAS 01",
-      "codigo": "000002002"
+      "origem": "FL BELO HORIZONTE",
+      "destino": "CO CURVELO 02"
     },
     {
-      "nome": "CO TIMOTEO 01",
-      "codigo": "000000074"
+      "origem": "CO NOVA SERRANA 01",
+      "destino": "FL BELO HORIZONTE"
     },
     {
-      "nome": "CO TOLEDO 01",
-      "codigo": "000000738"
+      "origem": "FL BELO HORIZONTE",
+      "destino": "CO NOVA SERRANA 01"
     },
     {
-      "nome": "CO TRES CORACOES 01",
-      "codigo": "000000661"
+      "origem": "CO BARBACENA 02",
+      "destino": "CO SAO JOAO DEL REI 02"
     },
     {
-      "nome": "CO TRES LAGOAS 01",
-      "codigo": "000001735"
+      "origem": "CO SAO JOAO DEL REI 02",
+      "destino": "CO BARBACENA 02"
     },
     {
-      "nome": "CO TRES RIOS 01",
-      "codigo": "000000445"
+      "origem": "CO BARBACENA 02",
+      "destino": "FL BELO HORIZONTE"
     },
     {
-      "nome": "CO TUBARAO 01",
-      "codigo": "000000890"
+      "origem": "FL BELO HORIZONTE",
+      "destino": "CO BARBACENA 02"
     },
     {
-      "nome": "CO TUPA 02",
-      "codigo": "000001975"
+      "origem": "CO PONTE NOVA 01",
+      "destino": "CO MANHUACU 01"
     },
     {
-      "nome": "CO UBA 01",
-      "codigo": "000000374"
+      "origem": "CO MANHUACU 01",
+      "destino": "CO PONTE NOVA 01"
     },
     {
-      "nome": "CO UBERABA 01",
-      "codigo": "000000068"
+      "origem": "CO VICOSA 02",
+      "destino": "FL BELO HORIZONTE"
     },
     {
-      "nome": "CO UBERLANDIA",
-      "codigo": "000001718"
+      "origem": "FL BELO HORIZONTE",
+      "destino": "CO VICOSA 02"
     },
     {
-      "nome": "CO UBERLANDIA 01",
-      "codigo": "000002662"
+      "origem": "CO JOAO MONLEVADE 01",
+      "destino": "CO ITABIRA 01"
     },
     {
-      "nome": "CO UMUARAMA 01",
-      "codigo": "000000294"
+      "origem": "CO ITABIRA 01",
+      "destino": "CO JOAO MONLEVADE 01"
     },
     {
-      "nome": "CO UNIAO DA VITORIA 01",
-      "codigo": "000000371"
+      "origem": "CO ITABIRA 01",
+      "destino": "FL BELO HORIZONTE"
     },
     {
-      "nome": "CO URUGUAIANA 02",
-      "codigo": "000001283"
+      "origem": "FL BELO HORIZONTE",
+      "destino": "CO ITABIRA 01"
     },
     {
-      "nome": "CO VALENCA",
-      "codigo": "000002569"
+      "origem": "CO BOM DESPACHO 01",
+      "destino": "CO DIVINOPOLIS 02"
     },
     {
-      "nome": "CO VALINHOS 02",
-      "codigo": "000001426"
+      "origem": "CO DIVINOPOLIS 02",
+      "destino": "CO BOM DESPACHO 01"
     },
     {
-      "nome": "CO VARGEM GRANDE DO SUL 01",
-      "codigo": "000000061"
+      "origem": "CO DIVINOPOLIS 02",
+      "destino": "CO FORMIGA 01"
     },
     {
-      "nome": "CO VARGINHA 01",
-      "codigo": "000000539"
+      "origem": "CO FORMIGA 01",
+      "destino": "CO DIVINOPOLIS 02"
     },
     {
-      "nome": "CO VARZEA PAULISTA",
-      "codigo": "000001085"
+      "origem": "CO DIVINOPOLIS 02",
+      "destino": "CO LAGOA DA PRATA 01"
     },
     {
-      "nome": "CO VICOSA 02",
-      "codigo": "000001681"
+      "origem": "CO LAGOA DA PRATA 01",
+      "destino": "CO DIVINOPOLIS 02"
     },
     {
-      "nome": "CO VIDEIRA 01",
-      "codigo": "000001242"
+      "origem": "CO DIVINOPOLIS 02",
+      "destino": "FL BELO HORIZONTE"
     },
     {
-      "nome": "CO VILA VELHA 02",
-      "codigo": "000001313"
+      "origem": "FL BELO HORIZONTE",
+      "destino": "CO DIVINOPOLIS 02"
     },
     {
-      "nome": "CO VILHENA",
-      "codigo": "000001724"
+      "origem": "CO BETIM 02",
+      "destino": "FL BELO HORIZONTE"
     },
     {
-      "nome": "CO VILHENA 01",
-      "codigo": "000002489"
+      "origem": "FL BELO HORIZONTE",
+      "destino": "CO BETIM 02"
     },
     {
-      "nome": "CO VINHEDO 01",
-      "codigo": "000000857"
+      "origem": "CAPIM BRANCO",
+      "destino": "FL BELO HORIZONTE"
     },
     {
-      "nome": "CO VITORIA",
-      "codigo": "000002535"
+      "origem": "FL BELO HORIZONTE",
+      "destino": "CAPIM BRANCO"
     },
     {
-      "nome": "CO VITORIA DA CONQUISTA 01",
-      "codigo": "000001008"
+      "origem": "CO ITABIRITO 01",
+      "destino": "FL BELO HORIZONTE"
     },
     {
-      "nome": "CO VOLTA REDONDA 01",
-      "codigo": "000000339"
+      "origem": "FL BELO HORIZONTE",
+      "destino": "CO ITABIRITO 01"
     },
     {
-      "nome": "CO VOTORANTIM 01",
-      "codigo": "000001860"
+      "origem": "CO BELO HORIZONTE 02",
+      "destino": "FL BELO HORIZONTE"
     },
     {
-      "nome": "CO VOTUPORANGA 01",
-      "codigo": "000000342"
+      "origem": "FL BELO HORIZONTE",
+      "destino": "CO BELO HORIZONTE 02"
     },
     {
-      "nome": "CO XANXERE 01",
-      "codigo": "000000566"
+      "origem": "LJ BELO HORIZONTE 03",
+      "destino": "FL BELO HORIZONTE"
     },
     {
-      "nome": "DEPOT MILKRUN I",
-      "codigo": "000002703"
+      "origem": "FL BELO HORIZONTE",
+      "destino": "LJ BELO HORIZONTE 03"
     },
     {
-      "nome": "DEPOT MILKRUN II",
-      "codigo": "000002704"
+      "origem": "CO BELO HORIZONTE 03",
+      "destino": "FL BELO HORIZONTE"
     },
     {
-      "nome": "DLM BELEM 04",
-      "codigo": "000001515"
+      "origem": "FL BELO HORIZONTE",
+      "destino": "CO BELO HORIZONTE 03"
     },
     {
-      "nome": "DLM BELEM 05",
-      "codigo": "000001516"
+      "origem": "CO CONTAGEM 02",
+      "destino": "FL BELO HORIZONTE"
     },
     {
-      "nome": "DLM BELEM 10",
-      "codigo": "000001563"
+      "origem": "FL BELO HORIZONTE",
+      "destino": "CO CONTAGEM 02"
     },
     {
-      "nome": "DLM BELO HORIZONTE 04",
-      "codigo": "000001506"
+      "origem": "CO BELO HORIZONTE 03",
+      "destino": "FL BELO HORIZONTE"
     },
     {
-      "nome": "DLM CAMPO GRANDE",
-      "codigo": "000001931"
+      "origem": "FL BELO HORIZONTE",
+      "destino": "CO BELO HORIZONTE 03"
     },
     {
-      "nome": "DLM CAMPO GRANDE 03",
-      "codigo": "000002463"
+      "origem": "FL BELO HORIZONTE",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "DLM CUIABA 03",
-      "codigo": "000001502"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "FL BELO HORIZONTE"
     },
     {
-      "nome": "DLM CUIABA 04",
-      "codigo": "000002087"
+      "origem": "FL BELO HORIZONTE",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "DLM CURITIBA 03",
-      "codigo": "000002214"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "FL BELO HORIZONTE"
     },
     {
-      "nome": "DLM FLORIANOPOLIS 04",
-      "codigo": "000002138"
+      "origem": "FL BELO HORIZONTE",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "DLM FORTALEZA 05",
-      "codigo": "000001783"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "FL BELO HORIZONTE"
     },
     {
-      "nome": "DLM GOIANIA 02",
-      "codigo": "000001487"
+      "origem": "FL RIO DE JANEIRO",
+      "destino": "FL BELO HORIZONTE"
     },
     {
-      "nome": "DLM GOIANIA 03",
-      "codigo": "000001488"
+      "origem": "FL BELO HORIZONTE",
+      "destino": "FL RIO DE JANEIRO"
     },
     {
-      "nome": "DLM GOIANIA 04",
-      "codigo": "000001489"
+      "origem": "FL BRASILIA",
+      "destino": "FL BELO HORIZONTE"
     },
     {
-      "nome": "DLM GOIANIA 05",
-      "codigo": "000001490"
+      "origem": "FL BELO HORIZONTE",
+      "destino": "FL BRASILIA"
     },
     {
-      "nome": "DLM GOIANIA 06",
-      "codigo": "000001491"
+      "origem": "CO CARATINGA 01",
+      "destino": "CO IPATINGA 02"
     },
     {
-      "nome": "DLM GOIANIA 07",
-      "codigo": "000001492"
+      "origem": "CO IPATINGA 02",
+      "destino": "CO CARATINGA 01"
     },
     {
-      "nome": "DLM GOIANIA 08",
-      "codigo": "000001493"
+      "origem": "CO TEOFILO OTONI 01",
+      "destino": "CO IPATINGA 02"
     },
     {
-      "nome": "DLM GOIANIA 09",
-      "codigo": "000001494"
+      "origem": "CO IPATINGA 02",
+      "destino": "CO TEOFILO OTONI 01"
     },
     {
-      "nome": "DLM GOIANIA 10",
-      "codigo": "000001495"
+      "origem": "FL BELO HORIZONTE",
+      "destino": "CO GOV VALADARES 01"
     },
     {
-      "nome": "DLM GOIANIA 11",
-      "codigo": "000001496"
+      "origem": "CO IPATINGA 02",
+      "destino": "CO TIMOTEO 01"
     },
     {
-      "nome": "DLM GOIANIA 13",
-      "codigo": "000001673"
+      "origem": "CO TIMOTEO 01",
+      "destino": "CO IPATINGA 02"
     },
     {
-      "nome": "DLM GOIANIA 14",
-      "codigo": "000001711"
+      "origem": "CO IPATINGA 02",
+      "destino": "FL BELO HORIZONTE"
     },
     {
-      "nome": "DLM GOIANIA 15",
-      "codigo": "000001717"
+      "origem": "FL BELO HORIZONTE",
+      "destino": "CO IPATINGA 02"
     },
     {
-      "nome": "DLM GOIANIA 18",
-      "codigo": "000002225"
+      "origem": "FL BRASILIA",
+      "destino": "CO SAMAMBAIA 01"
     },
     {
-      "nome": "DLM GRAVATAI 02",
-      "codigo": "000002415"
+      "origem": "CO SAMAMBAIA 01",
+      "destino": "FL BRASILIA"
     },
     {
-      "nome": "DLM GUARULHOS 02",
-      "codigo": "000001161"
+      "origem": "FL BRASILIA",
+      "destino": "CO BRASILIA 02"
     },
     {
-      "nome": "DLM GUARULHOS 03",
-      "codigo": "000002472"
+      "origem": "CO BRASILIA 02",
+      "destino": "FL BRASILIA"
     },
     {
-      "nome": "DLM IMPERATRIZ 02",
-      "codigo": "000001940"
+      "origem": "FL BRASILIA",
+      "destino": "CO FORMOSA 02"
     },
     {
-      "nome": "DLM ITAPEVI 01",
-      "codigo": "000001469"
+      "origem": "CO FORMOSA 02",
+      "destino": "FL BRASILIA"
     },
     {
-      "nome": "DLM JABOATAO DOS GUARARAPES 01",
-      "codigo": "000001819"
+      "origem": "FL BRASILIA",
+      "destino": "CO TAGUATINGA 01"
     },
     {
-      "nome": "DLM JACAREI 01",
-      "codigo": "000001952"
+      "origem": "CO TAGUATINGA 01",
+      "destino": "FL BRASILIA"
     },
     {
-      "nome": "DLM MACEIO 02",
-      "codigo": "000001540"
+      "origem": "CO SAO LUIS 03",
+      "destino": "FL BRASILIA"
     },
     {
-      "nome": "DLM MANAUS",
-      "codigo": "000001304"
+      "origem": "FL BRASILIA",
+      "destino": "CO SAO LUIS 03"
     },
     {
-      "nome": "DLM MANAUS 02",
-      "codigo": "000002097"
+      "origem": "CO GOIANIA 01",
+      "destino": "FL BRASILIA"
     },
     {
-      "nome": "DLM MANAUS 03",
-      "codigo": "000001305"
+      "origem": "FL BRASILIA",
+      "destino": "CO GOIANIA 01"
     },
     {
-      "nome": "DLM MANAUS 04",
-      "codigo": "000001306"
+      "origem": "CO ARAGUAINA 02",
+      "destino": "FL BRASILIA"
     },
     {
-      "nome": "DLM MANAUS 07",
-      "codigo": "000001340"
+      "origem": "FL BRASILIA",
+      "destino": "CO ARAGUAINA 02"
     },
     {
-      "nome": "DLM MANAUS 08",
-      "codigo": "000001498"
+      "origem": "FL BRASILIA",
+      "destino": "CO PALMAS 01 FL"
     },
     {
-      "nome": "DLM MANAUS 09",
-      "codigo": "000001519"
+      "origem": "FL BRASILIA",
+      "destino": "CO PALMAS 01 FL"
     },
     {
-      "nome": "DLM MANAUS 13",
-      "codigo": "000001570"
+      "origem": "FL BRASILIA",
+      "destino": "LM SAO LUIS 01"
     },
     {
-      "nome": "DLM MARICA",
-      "codigo": "000001628"
+      "origem": "CO ARAGUAINA 02",
+      "destino": "FL BRASILIA"
     },
     {
-      "nome": "DLM NITEROI 01",
-      "codigo": "000001955"
+      "origem": "FL BRASILIA",
+      "destino": "CO ARAGUAINA 02"
     },
     {
-      "nome": "DLM NOVO PROGRESSO 01",
-      "codigo": "000001750"
+      "origem": "LJ GOIANIA 02",
+      "destino": "FL BRASILIA"
     },
     {
-      "nome": "DLM PETROLINA",
-      "codigo": "000002306"
+      "origem": "FL BRASILIA",
+      "destino": "LJ GOIANIA 02"
     },
     {
-      "nome": "DLM PETROPOLIS 01",
-      "codigo": "000001957"
+      "origem": "FL BRASILIA",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "DLM PORTO ALEGRE 07",
-      "codigo": "000001513"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "FL BRASILIA"
     },
     {
-      "nome": "DLM PORTO VELHO 02",
-      "codigo": "000001473"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "FL BRASILIA"
     },
     {
-      "nome": "DLM RECIFE 02",
-      "codigo": "000001963"
+      "origem": "CO CUIABA 01 FL",
+      "destino": "CO RONDONOPOLIS 03"
     },
     {
-      "nome": "DLM RECIFE 04",
-      "codigo": "000001972"
+      "origem": "CO RONDONOPOLIS 03",
+      "destino": "CO CUIABA 01 FL"
     },
     {
-      "nome": "DLM RIO BRANCO",
-      "codigo": "000001061"
+      "origem": "CO CUIABA 01 FL",
+      "destino": "CO SINOP 01"
     },
     {
-      "nome": "DLM RIO DE JANEIRO 21",
-      "codigo": "000001932"
+      "origem": "CO SINOP 01",
+      "destino": "CO CUIABA 01 FL"
     },
     {
-      "nome": "DLM RIO DE JANEIRO 22",
-      "codigo": "000001522"
+      "origem": "CO CUIABA 01 FL",
+      "destino": "CO PORTO VELHO 01"
     },
     {
-      "nome": "DLM RIO DE JANEIRO 24",
-      "codigo": "000001954"
+      "origem": "CO RIO BRANCO 02 FL",
+      "destino": "TL PORTO VELHO 04"
     },
     {
-      "nome": "DLM SALVADOR",
-      "codigo": "000001793"
+      "origem": "TL PORTO VELHO 04",
+      "destino": "CO RIO BRANCO 02 FL"
     },
     {
-      "nome": "DLM SALVADOR 02",
-      "codigo": "000001945"
+      "origem": "CO PORTO VELHO 01",
+      "destino": "CO CUIABA 01 FL"
     },
     {
-      "nome": "DLM SAO LUIS",
-      "codigo": "000001827"
+      "origem": "CO CUIABA 01 FL",
+      "destino": "CO PORTO VELHO 01"
     },
     {
-      "nome": "DLM SAO PAULO 03",
-      "codigo": "000001961"
+      "origem": "CO CUIABA 01 FL",
+      "destino": "CO JI-PARANA 02"
     },
     {
-      "nome": "DLM SAO PAULO 04",
-      "codigo": "000001960"
+      "origem": "CO JI-PARANA 02",
+      "destino": "CO CUIABA 01 FL"
     },
     {
-      "nome": "DLM SAO PAULO 06",
-      "codigo": "000002488"
+      "origem": "CO CUIABA 01 FL",
+      "destino": "CO JI-PARANA 02"
     },
     {
-      "nome": "DLM SAO PAULO 12",
-      "codigo": "000001564"
+      "origem": "CO PORTO VELHO 01",
+      "destino": "CO JI-PARANA 02"
     },
     {
-      "nome": "DLM SAO PAULO 14",
-      "codigo": "000002497"
+      "origem": "CO PORTO VELHO 01",
+      "destino": "CO PIMENTA BUENO 01"
     },
     {
-      "nome": "DLM SAO PAULO 25",
-      "codigo": "000001776"
+      "origem": "PA GRISTCH CUIABA",
+      "destino": "CO CUIABA 01 FL"
     },
     {
-      "nome": "DLM STO ANTONIO DA PATRULHA 01",
-      "codigo": "000001970"
+      "origem": "CO CUIABA 01 FL",
+      "destino": "PA GRISTCH CUIABA"
     },
     {
-      "nome": "DLM TEOFILO OTONI 03",
-      "codigo": "000002043"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO CUIABA 01 FL"
     },
     {
-      "nome": "DLM TERESOPOLIS 01",
-      "codigo": "000001948"
+      "origem": "CO CUIABA 01 FL",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "DLM VARZEA GRANDE 01",
-      "codigo": "000002228"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO CUIABA 01 FL"
     },
     {
-      "nome": "EMISSAO TECA",
-      "codigo": "000002621"
+      "origem": "CO DOURADOS 01",
+      "destino": "CO CAMPO GRANDE 02 FL"
     },
     {
-      "nome": "FL BELEM",
-      "codigo": "000000002"
+      "origem": "CO CAMPO GRANDE 02 FL",
+      "destino": "CO DOURADOS 01"
     },
     {
-      "nome": "FL BELO HORIZONTE",
-      "codigo": "000000003"
+      "origem": "CO CAMPO GRANDE 02 FL",
+      "destino": "CO TRES LAGOAS 01"
     },
     {
-      "nome": "FL BELO HORIZONTE - DEVOLUCAO",
-      "codigo": "000002693"
+      "origem": "CO TRES LAGOAS 01",
+      "destino": "CO CAMPO GRANDE 02 FL"
     },
     {
-      "nome": "FL BRASILIA",
-      "codigo": "000002638"
+      "origem": "CO SAO JOSE DOS PINHAIS 02 FL",
+      "destino": "CO PINHAIS 02"
     },
     {
-      "nome": "FL BRASILIA",
-      "codigo": "000000004"
+      "origem": "FL JOINVILLE 02",
+      "destino": "CO SAO JOSE DOS PINHAIS 02 FL"
     },
     {
-      "nome": "FL BRASILIA - DEVOLUCAO",
-      "codigo": "000002689"
+      "origem": "CO SAO JOSE DOS PINHAIS 02 FL",
+      "destino": "FL JOINVILLE 02"
     },
     {
-      "nome": "FL CAMPO GRANDE",
-      "codigo": "000001258"
+      "origem": "PA JOINVILLE 01",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "FL CUIABA",
-      "codigo": "000001215"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "PA JOINVILLE 01"
     },
     {
-      "nome": "FL FORTALEZA",
-      "codigo": "000001041"
+      "origem": "HUB EXTREMA | EXTREMA",
+      "destino": "FL RIO DE JANEIRO"
     },
     {
-      "nome": "FL FORTALEZA - DEVOLUCAO",
-      "codigo": "000002695"
+      "origem": "VULCABRAS",
+      "destino": "HUB EXTREMA | EXTREMA"
     },
     {
-      "nome": "FL GOIANIA",
-      "codigo": "000000058"
+      "origem": "CO ITAJUBA 01",
+      "destino": "HUB EXTREMA | EXTREMA"
     },
     {
-      "nome": "FL JOINVILLE 02",
-      "codigo": "000002473"
+      "origem": "CO POUSO ALEGRE 02",
+      "destino": "CO OURO FINO 02"
     },
     {
-      "nome": "FL MACEIO",
-      "codigo": "000001111"
+      "origem": "CO OURO FINO 02",
+      "destino": "CO POUSO ALEGRE 02"
     },
     {
-      "nome": "FL MANAUS - DEVOLUCAO",
-      "codigo": "000002691"
+      "origem": "CO SAO LOURENCO",
+      "destino": "CO ITAJUBA 01"
     },
     {
-      "nome": "FL MANAUS JAD",
-      "codigo": "000000005"
+      "origem": "CO ITAJUBA 01",
+      "destino": "CO SAO LOURENCO"
     },
     {
-      "nome": "FL PALMAS",
-      "codigo": "000001023"
+      "origem": "CO ITAJUBA 01",
+      "destino": "HUB EXTREMA | EXTREMA"
     },
     {
-      "nome": "FL PORTO ALEGRE",
-      "codigo": "000002341"
+      "origem": "HUB EXTREMA | EXTREMA",
+      "destino": "CO ITAJUBA 01"
     },
     {
-      "nome": "FL PORTO ALEGRE - DEVOLUCAO",
-      "codigo": "000002692"
+      "origem": "CO LAVRAS 02",
+      "destino": "CO VARGINHA 01"
     },
     {
-      "nome": "FL RECIFE",
-      "codigo": "000000979"
+      "origem": "CO VARGINHA 01",
+      "destino": "CO LAVRAS 02"
     },
     {
-      "nome": "FL RECIFE - DEVOLUCAO",
-      "codigo": "000002694"
+      "origem": "CO VARGINHA 01",
+      "destino": "CO ALFENAS 02"
     },
     {
-      "nome": "FL RIO BRANCO",
-      "codigo": "000001691"
+      "origem": "CO ALFENAS 02",
+      "destino": "CO VARGINHA 01"
     },
     {
-      "nome": "FL RIO DE JANEIRO",
-      "codigo": "000000007"
+      "origem": "VARGINHA (PHILIPS)",
+      "destino": "HUB EXTREMA | EXTREMA"
     },
     {
-      "nome": "FL RIO DEVOLUCAO",
-      "codigo": "000002687"
+      "origem": "HUB EXTREMA | EXTREMA",
+      "destino": "ML / CB / TL VARGINHA 01"
     },
     {
-      "nome": "FL SALVADOR",
-      "codigo": "000000008"
+      "origem": "LJ JURUAIA 01",
+      "destino": "HUB EXTREMA | EXTREMA"
     },
     {
-      "nome": "FL SALVADOR",
-      "codigo": "000002656"
+      "origem": "HUB EXTREMA | EXTREMA",
+      "destino": "CO GUAXUPE 01"
     },
     {
-      "nome": "FL SALVADOR - DEVOLUCAO",
-      "codigo": "000002690"
+      "origem": "PA JACUTINGA 01",
+      "destino": "HUB EXTREMA | EXTREMA"
     },
     {
-      "nome": "FL SAO LUIS",
-      "codigo": "000001188"
+      "origem": "HUB EXTREMA | EXTREMA",
+      "destino": "PA JACUTINGA 01"
     },
     {
-      "nome": "FL SSA VULNERAVEL",
-      "codigo": "000002504"
+      "origem": "CB / TL FLORIANO 01",
+      "destino": "HB PEDRA BRANCA 01"
     },
     {
-      "nome": "FL TERESINA",
-      "codigo": "000001468"
+      "origem": "HB PEDRA BRANCA 01",
+      "destino": "CB / TL FLORIANO 01"
     },
     {
-      "nome": "FL VITORIA",
-      "codigo": "000000946"
+      "origem": "CO JUAZEIRO DO NORTE 01",
+      "destino": "FL FORTALEZA"
     },
     {
-      "nome": "FL VITORIA - DEVOLUCAO",
-      "codigo": "000002696"
+      "origem": "FL FORTALEZA",
+      "destino": "CO JUAZEIRO DO NORTE 01"
     },
     {
-      "nome": "HB IPATINGA 02",
-      "codigo": "000001803"
+      "origem": "CB / TL PARNAIBA 01",
+      "destino": "CO SOBRAL 01"
     },
     {
-      "nome": "HB SAO JOSE DOS PINHAIS",
-      "codigo": "000002643"
+      "origem": "CO SOBRAL 01",
+      "destino": "CB / TL PARNAIBA 01"
     },
     {
-      "nome": "HB VICOSA 01",
-      "codigo": "000002685"
+      "origem": "CO TERESINA 01 FL",
+      "destino": "CB / TL PARNAIBA 01"
     },
     {
-      "nome": "JE ADAMANTINA 01",
-      "codigo": "000001829"
+      "origem": "CO SOBRAL 01",
+      "destino": "ML / LM / CB / TL FORTALEZA 01"
     },
     {
-      "nome": "JE AGUDOS 01",
-      "codigo": "000002168"
+      "origem": "FL FORTALEZA",
+      "destino": "CO SOBRAL 01"
     },
     {
-      "nome": "JE ALFREDO VASCONCELOS 01",
-      "codigo": "000001927"
+      "origem": "CO TERESINA 01 FL",
+      "destino": "FL FORTALEZA"
     },
     {
-      "nome": "JE ANDRADINA 02",
-      "codigo": "000002682"
+      "origem": "FL FORTALEZA",
+      "destino": "CO TERESINA 01 FL"
     },
     {
-      "nome": "JE ANDRELANDIA 01",
-      "codigo": "000002607"
+      "origem": "FL FORTALEZA",
+      "destino": "LM FORTALEZA"
     },
     {
-      "nome": "JE ARACOIABA DA SERRA 01",
-      "codigo": "000001824"
+      "origem": "CO TERESINA 01 FL",
+      "destino": "FL FORTALEZA"
     },
     {
-      "nome": "JE ARAUJOS",
-      "codigo": "000002314"
+      "origem": "FL FORTALEZA",
+      "destino": "CO TERESINA 01 FL"
     },
     {
-      "nome": "JE ARCOS 03",
-      "codigo": "000002669"
+      "origem": "LJ FORTALEZA 03",
+      "destino": "FL FORTALEZA"
     },
     {
-      "nome": "JE ASCURRA 01",
-      "codigo": "000002395"
+      "origem": "LM/CB/TL IMPERATRIZ 01",
+      "destino": "CO BELEM 02 FL"
     },
     {
-      "nome": "JE BAEPENDI",
-      "codigo": "000002091"
+      "origem": "LM/CB/TL IMPERATRIZ 01",
+      "destino": "CO SAO LUIS 02 FL"
     },
     {
-      "nome": "JE BAEPENDI 02",
-      "codigo": "000002380"
+      "origem": "LM/CB/TL IMPERATRIZ 01",
+      "destino": "CO CAXIAS 01"
     },
     {
-      "nome": "JE BALNEARIO BARRA DO SUL 01",
-      "codigo": "000002112"
+      "origem": "FL FORTALEZA",
+      "destino": "LM/CB/TL IMPERATRIZ 01"
     },
     {
-      "nome": "JE BILAC 01",
-      "codigo": "000001916"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "FL FORTALEZA"
     },
     {
-      "nome": "JE BURITAMA 02",
-      "codigo": "000002688"
+      "origem": "FL FORTALEZA",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "JE CACAPAVA 05",
-      "codigo": "000002619"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "FL FORTALEZA"
     },
     {
-      "nome": "JE CAFELANDIA 02",
-      "codigo": "000002106"
+      "origem": "CO RIO VERDE 03",
+      "destino": "CO JATAI 01"
     },
     {
-      "nome": "JE CAJATI 02",
-      "codigo": "000002534"
+      "origem": "CO JATAI 01",
+      "destino": "CO RIO VERDE 03"
     },
     {
-      "nome": "JE CAMPOS DO JORDAO",
-      "codigo": "000001888"
+      "origem": "CO GOIANIA 03",
+      "destino": "CO RIO VERDE 03"
     },
     {
-      "nome": "JE CAPAO BONITO 02",
-      "codigo": "000002487"
+      "origem": "CO RIO VERDE 03",
+      "destino": "CO GOIANIA 03"
     },
     {
-      "nome": "JE CAPELA DO ALTO 01",
-      "codigo": "000001825"
+      "origem": "CO GOIANIA 01",
+      "destino": "CO GOIANIA 03"
     },
     {
-      "nome": "JE CAPELINHA 01",
-      "codigo": "000002409"
+      "origem": "LJ GOIANIA 02",
+      "destino": "CO GOIANIA 03"
     },
     {
-      "nome": "JE CAPIVARI 01",
-      "codigo": "000002041"
+      "origem": "CO ANAPOLIS 03",
+      "destino": "CO GOIANIA 03"
     },
     {
-      "nome": "JE CARMO DO RIO CLARO 01",
-      "codigo": "000002672"
+      "origem": "CO GOIANIA 03",
+      "destino": "CO ANAPOLIS 03"
     },
     {
-      "nome": "JE CASSIA 01",
-      "codigo": "000002366"
+      "origem": "CO GOIANIA 03",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "JE CHA GRANDE 01",
-      "codigo": "000002211"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO GOIANIA 03"
     },
     {
-      "nome": "JE CHAVANTES 01",
-      "codigo": "000002235"
+      "origem": "CO IMPERATRIZ 02",
+      "destino": "ML BALSAS 01"
     },
     {
-      "nome": "JE CONCEICAO DO COITE 02",
-      "codigo": "000002608"
+      "origem": "ML BALSAS 01",
+      "destino": "CO IMPERATRIZ 02"
     },
     {
-      "nome": "JE CONSELHEIRO PENA 02",
-      "codigo": "000002516"
+      "origem": "PA GASPAR ESCRITORIO",
+      "destino": "CO ITAJAI 02"
     },
     {
-      "nome": "JE CORUPA 01",
-      "codigo": "000002070"
+      "origem": "CO ITAJAI 02",
+      "destino": "PA GASPAR 01"
     },
     {
-      "nome": "JE CRAVINHOS 02",
-      "codigo": "000002533"
+      "origem": "CO BRUSQUE 02",
+      "destino": "CO ITAJAI 02"
     },
     {
-      "nome": "JE CRUZ DAS ALMAS 01",
-      "codigo": "000002090"
+      "origem": "CO ITAJAI 02",
+      "destino": "CO BRUSQUE 02"
     },
     {
-      "nome": "JE CRUZ DAS ALMAS 03",
-      "codigo": "000002628"
+      "origem": "CO NAVEGANTES 01",
+      "destino": "CO ITAJAI 02"
     },
     {
-      "nome": "JE DORES DE CAMPOS 01",
-      "codigo": "000002288"
+      "origem": "CO ITAJAI 02",
+      "destino": "CO NAVEGANTES 01"
     },
     {
-      "nome": "JE ESTRELA DOESTE",
-      "codigo": "000002540"
+      "origem": "CO JUIZ DE FORA 02",
+      "destino": "CO UBA 01"
     },
     {
-      "nome": "JE FAMA 01",
-      "codigo": "000002081"
+      "origem": "CO UBA 01",
+      "destino": "CO JUIZ DE FORA 02"
     },
     {
-      "nome": "JE GRAVATA 01",
-      "codigo": "000002213"
+      "origem": "CO MURIAE 02",
+      "destino": "CO JUIZ DE FORA 02"
     },
     {
-      "nome": "JE GUARAMIRIM 02",
-      "codigo": "000002570"
+      "origem": "CO JUIZ DE FORA 02",
+      "destino": "CO MURIAE 02"
     },
     {
-      "nome": "JE GUARANI DAS MISSOES 01",
-      "codigo": "000001905"
+      "origem": "CO MAR DE ESPANHA 01",
+      "destino": "CO JUIZ DE FORA 02"
     },
     {
-      "nome": "JE IBIRÁ 01",
-      "codigo": "000002519"
+      "origem": "CO JUIZ DE FORA 02",
+      "destino": "CO MAR DE ESPANHA 01"
     },
     {
-      "nome": "JE IBIUNA 01",
-      "codigo": "000002003"
+      "origem": "FL JOINVILLE 02",
+      "destino": "CO SAO BENTO DO SUL 01"
     },
     {
-      "nome": "JE INDIANA 01",
-      "codigo": "000001841"
+      "origem": "CO SAO BENTO DO SUL 01",
+      "destino": "FL JOINVILLE 02"
     },
     {
-      "nome": "JE IRACEMAPOLIS 01",
-      "codigo": "000002024"
+      "origem": "CO SAO FRANCISCO DO SUL 01",
+      "destino": "FL JOINVILLE 02"
     },
     {
-      "nome": "JE ITACARAMBI 01",
-      "codigo": "000002135"
+      "origem": "FL JOINVILLE 02",
+      "destino": "CO SAO FRANCISCO DO SUL 01"
     },
     {
-      "nome": "JE ITAIÓPOLIS 01",
-      "codigo": "000002510"
+      "origem": "CO INDAIAL 01",
+      "destino": "CO SAO JOSE DOS PINHAIS 02 FL"
     },
     {
-      "nome": "JE ITAMOGI 01",
-      "codigo": "000002580"
+      "origem": "CO SAO JOSE DOS PINHAIS 02 FL",
+      "destino": "CO INDAIAL 01"
     },
     {
-      "nome": "JE ITAMONTE 02",
-      "codigo": "000002518"
+      "origem": "PA BRITANIA JOINVILLE",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "JE ITANHAEM 03",
-      "codigo": "000002474"
+      "origem": "CO SANTAREM 01",
+      "destino": "LM/CB/TL MARABA 01"
     },
     {
-      "nome": "JE ITAPEMA 01",
-      "codigo": "000002639"
+      "origem": "LM/CB/TL MARABA 01",
+      "destino": "CO SANTAREM 01"
     },
     {
-      "nome": "JE ITAPEMIRIM 01",
-      "codigo": "000002272"
+      "origem": "FL MANAUS JAD",
+      "destino": "CO BOA VISTA 02"
     },
     {
-      "nome": "JE ITAPORANGA 01",
-      "codigo": "000002040"
+      "origem": "CO BOA VISTA 02",
+      "destino": "FL MANAUS JAD"
     },
     {
-      "nome": "JE ITAQUI 02",
-      "codigo": "000002223"
+      "origem": "FL MANAUS JAD",
+      "destino": "CO BOA VISTA 02"
     },
     {
-      "nome": "JE JACAREPAGUA 01",
-      "codigo": "000002357"
+      "origem": "FL MANAUS JAD",
+      "destino": "NAVEGAM LOG MANAUS"
     },
     {
-      "nome": "JE JAGUARIAIVA 02",
-      "codigo": "000002614"
+      "origem": "HUB ITAPEVI | ITAPEVI",
+      "destino": "FL MANAUS JAD"
     },
     {
-      "nome": "JE JALES 02",
-      "codigo": "000002567"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "FL MANAUS JAD"
     },
     {
-      "nome": "JE JAMBEIRO 01",
-      "codigo": "000002104"
+      "origem": "FL MANAUS JAD",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "JE JANAUBA 01",
-      "codigo": "000001882"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "FL MANAUS JAD"
     },
     {
-      "nome": "JE JEQUIE 04",
-      "codigo": "000002613"
+      "origem": "POSTO FISCAL MACEIO (SEFAZ)",
+      "destino": "CO MACEIO 01 FL"
     },
     {
-      "nome": "JE JEQUITINHONHA 01",
-      "codigo": "000002178"
+      "origem": "CO MACEIO 01 FL",
+      "destino": "POSTO FISCAL MACEIO (SEFAZ)"
     },
     {
-      "nome": "JE JOANOPOLIS 01",
-      "codigo": "000001818"
+      "origem": "CAICO (INTERIORIZACAO)",
+      "destino": "CO NATAL 01 FL"
     },
     {
-      "nome": "JE JOSE BONIFACIO 02",
-      "codigo": "000002509"
+      "origem": "CO NATAL 01 FL",
+      "destino": "CAICO (INTERIORIZACAO)"
     },
     {
-      "nome": "JE JUNQUEIROPOLIS 02",
-      "codigo": "000002566"
+      "origem": "FL RECIFE",
+      "destino": "CO GARANHUNS 01"
     },
     {
-      "nome": "JE LARANJAL PAULISTA 02",
-      "codigo": "000002506"
+      "origem": "CO GARANHUNS 01",
+      "destino": "FL RECIFE"
     },
     {
-      "nome": "JE LEME 01",
-      "codigo": "000002418"
+      "origem": "CO CAJAZEIRAS 01",
+      "destino": "FL RECIFE"
     },
     {
-      "nome": "JE MASSARANDUBA 01",
-      "codigo": "000002053"
+      "origem": "FL RECIFE",
+      "destino": "CO CAJAZEIRAS 01"
     },
     {
-      "nome": "JE MATIAS BARBOSA 01",
-      "codigo": "000002094"
+      "origem": "FL RECIFE",
+      "destino": "CO CAJAZEIRAS 01"
     },
     {
-      "nome": "JE MIRACATU 01",
-      "codigo": "000002336"
+      "origem": "CO JOAO PESSOA 02 FL",
+      "destino": "FL RECIFE"
     },
     {
-      "nome": "JE MIRANDA 01",
-      "codigo": "000002215"
+      "origem": "FL RECIFE",
+      "destino": "CO JOAO PESSOA 02 FL"
     },
     {
-      "nome": "JE MOGI GUACU 02",
-      "codigo": "000002537"
+      "origem": "FL RECIFE",
+      "destino": "CO CAJAZEIRAS 01"
     },
     {
-      "nome": "JE MONTE SANTO 01",
-      "codigo": "000002048"
+      "origem": "FL RECIFE",
+      "destino": "CO OLINDA 02"
     },
     {
-      "nome": "JE NANUQUE",
-      "codigo": "000002179"
+      "origem": "CO OLINDA 02",
+      "destino": "FL RECIFE"
     },
     {
-      "nome": "JE NAZARE PAULISTA 01",
-      "codigo": "000002074"
+      "origem": "FL RECIFE",
+      "destino": "CO RECIFE 01"
     },
     {
-      "nome": "JE NOVA CAMPINA 01",
-      "codigo": "000002103"
+      "origem": "CO RECIFE 01",
+      "destino": "FL RECIFE"
     },
     {
-      "nome": "JE NOVA IGUACU 01",
-      "codigo": "000002009"
+      "origem": "FL RECIFE",
+      "destino": "CO RECIFE 01"
     },
     {
-      "nome": "JE OIAPOQUE 01",
-      "codigo": "000001918"
+      "origem": "CO RECIFE 01",
+      "destino": "FL RECIFE"
     },
     {
-      "nome": "JE OLIMPIA 02",
-      "codigo": "000002629"
+      "origem": "FL RECIFE",
+      "destino": "CO NATAL 01 FL"
     },
     {
-      "nome": "JE OSWALDO CRUZ 01",
-      "codigo": "000002378"
+      "origem": "FL FORTALEZA",
+      "destino": "FL RECIFE"
     },
     {
-      "nome": "JE PALMAS 01",
-      "codigo": "000002071"
+      "origem": "FL RECIFE",
+      "destino": "FL FORTALEZA"
     },
     {
-      "nome": "JE PALMEIRA DAS MISSOES 01",
-      "codigo": "000002085"
+      "origem": "CO NATAL 01 FL",
+      "destino": "FL RECIFE"
     },
     {
-      "nome": "JE PALMITAL 01",
-      "codigo": "000002321"
+      "origem": "FL RECIFE",
+      "destino": "CO NATAL 01 FL"
     },
     {
-      "nome": "JE PALMITAL 02",
-      "codigo": "000002604"
+      "origem": "FL RECIFE",
+      "destino": "ML / LM FERNANDO DE NORONHA 01"
     },
     {
-      "nome": "JE PANORAMA 01",
-      "codigo": "000001836"
+      "origem": "FL SALVADOR",
+      "destino": "FL RECIFE"
     },
     {
-      "nome": "JE PARIQUERA-ACU 01",
-      "codigo": "000002346"
+      "origem": "FL RECIFE",
+      "destino": "FL SALVADOR"
     },
     {
-      "nome": "JE PAULICEIA 01",
-      "codigo": "000002394"
+      "origem": "FL RECIFE",
+      "destino": "CO JABOATAO DOS GUARARAPES 03"
     },
     {
-      "nome": "JE PEDRO LEOPOLDO 01",
-      "codigo": "000002300"
+      "origem": "FL RECIFE",
+      "destino": "CO JABOATAO DOS GUARARAPES 03"
     },
     {
-      "nome": "JE PEREIRA BARRETO 02",
-      "codigo": "000002547"
+      "origem": "CO JABOATAO DOS GUARARAPES 03",
+      "destino": "FL RECIFE"
     },
     {
-      "nome": "JE PERUIBE 01",
-      "codigo": "000001868"
+      "origem": "HB SALGUEIRO 01",
+      "destino": "LM / CB / TL RECIFE 01"
     },
     {
-      "nome": "JE PIRAJUI 01",
-      "codigo": "000002175"
+      "origem": "LM / CB / TL RECIFE 01",
+      "destino": "HB SALGUEIRO 01"
     },
     {
-      "nome": "JE PIRES DO RIO 01",
-      "codigo": "000001928"
+      "origem": "CO CARUARU 01",
+      "destino": "FL RECIFE"
     },
     {
-      "nome": "JE PITANGUEIRAS 02",
-      "codigo": "000002507"
+      "origem": "FL RECIFE",
+      "destino": "CO CARUARU 01"
     },
     {
-      "nome": "JE POMPEIA 01",
-      "codigo": "000002347"
+      "origem": "CO GARANHUNS 01",
+      "destino": "SERRA TALHADA (CO GARANHUNS)"
     },
     {
-      "nome": "JE PONTAL 02",
-      "codigo": "000002000"
+      "origem": "CO ARAPIRACA 02",
+      "destino": "FL RECIFE"
     },
     {
-      "nome": "JE PRADOS 02",
-      "codigo": "000002648"
+      "origem": "FL RECIFE",
+      "destino": "CO ARAPIRACA 02"
     },
     {
-      "nome": "JE PRAIA GRANDE 02",
-      "codigo": "000002624"
+      "origem": "FL RIO DE JANEIRO",
+      "destino": "FL RECIFE"
     },
     {
-      "nome": "JE PRESIDENTE EPITACIO 01",
-      "codigo": "000001830"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "FL RECIFE"
     },
     {
-      "nome": "JE PRESIDENTE EPITACIO 02",
-      "codigo": "000002038"
+      "origem": "FL RECIFE",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "JE PRESIDENTE EPITACIO 03",
-      "codigo": "000002238"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "FL RECIFE"
     },
     {
-      "nome": "JE PRESIDENTE VENCESLAU 01",
-      "codigo": "000001831"
+      "origem": "FL RIO DE JANEIRO",
+      "destino": "FL RIO DE JANEIRO"
     },
     {
-      "nome": "JE REDENCAO DA SERRA 01",
-      "codigo": "000002139"
+      "origem": "CO CABO FRIO 01",
+      "destino": "FL RIO DE JANEIRO"
     },
     {
-      "nome": "JE RESENDE 04",
-      "codigo": "000002200"
+      "origem": "FL RIO DE JANEIRO",
+      "destino": "CO CABO FRIO 01"
     },
     {
-      "nome": "JE RIBEIRAO BRANCO 01",
-      "codigo": "000002109"
+      "origem": "FL RIO DE JANEIRO",
+      "destino": "CO RIO DE JANEIRO 10"
     },
     {
-      "nome": "JE ROCINHA - RIO 01",
-      "codigo": "000002358"
+      "origem": "FL RIO DE JANEIRO",
+      "destino": "FL RIO DE JANEIRO"
     },
     {
-      "nome": "JE SANTA BARBARA DO PARA 02",
-      "codigo": "000002552"
+      "origem": "CO BELFORD ROXO 03",
+      "destino": "FL RIO DE JANEIRO"
     },
     {
-      "nome": "JE SANTA FE DO SUL 04",
-      "codigo": "000002674"
+      "origem": "FL RIO DE JANEIRO",
+      "destino": "CO BELFORD ROXO 03"
     },
     {
-      "nome": "JE SANTA GERTRUDES 02",
-      "codigo": "000002525"
+      "origem": "CO VOLTA REDONDA 01",
+      "destino": "FL RIO DE JANEIRO"
     },
     {
-      "nome": "JE SANTA ISABEL 01",
-      "codigo": "000002045"
+      "origem": "FL RIO DE JANEIRO",
+      "destino": "CO VOLTA REDONDA 01"
     },
     {
-      "nome": "JE SANTA RITA DO PASSA QUATRO 02",
-      "codigo": "000002517"
+      "origem": "CO JUIZ DE FORA 02",
+      "destino": "FL RIO DE JANEIRO"
     },
     {
-      "nome": "JE SANTIAGO 01",
-      "codigo": "000001992"
+      "origem": "FL RIO DE JANEIRO",
+      "destino": "CO JUIZ DE FORA 02"
     },
     {
-      "nome": "JE SANTO AMARO 01",
-      "codigo": "000001985"
+      "origem": "CO TRES RIOS 01",
+      "destino": "FL RIO DE JANEIRO"
     },
     {
-      "nome": "JE SANTOS DUMONT 01",
-      "codigo": "000002089"
+      "origem": "FL RIO DE JANEIRO",
+      "destino": "CO TRES RIOS 01"
     },
     {
-      "nome": "JE SAO FRANCISCO XAVIER 01",
-      "codigo": "000002250"
+      "origem": "CO GUAPIMIRIM 02",
+      "destino": "FL RIO DE JANEIRO"
     },
     {
-      "nome": "JE SAO JOSE DA COROA GRANDE 01",
-      "codigo": "000002216"
+      "origem": "FL RIO DE JANEIRO",
+      "destino": "CO GUAPIMIRIM 02"
     },
     {
-      "nome": "JE SAO MATEUS DO SUL 01",
-      "codigo": "000001998"
+      "origem": "CO NOVA FRIBURGO 02",
+      "destino": "FL RIO DE JANEIRO"
     },
     {
-      "nome": "JE SAO PAULO 01",
-      "codigo": "000002069"
+      "origem": "FL RIO DE JANEIRO",
+      "destino": "CO NOVA FRIBURGO 02"
     },
     {
-      "nome": "JE SAO PAULO 02",
-      "codigo": "000002202"
+      "origem": "CO PARATY 01",
+      "destino": "FL RIO DE JANEIRO"
     },
     {
-      "nome": "JE SARZEDO 01",
-      "codigo": "000002080"
+      "origem": "FL RIO DE JANEIRO",
+      "destino": "CO PARATY 01"
     },
     {
-      "nome": "JE SENGES 01",
-      "codigo": "000002098"
+      "origem": "CO ITABORAI 01",
+      "destino": "FL RIO DE JANEIRO"
     },
     {
-      "nome": "JE SERRINHA 01",
-      "codigo": "000002123"
+      "origem": "FL RIO DE JANEIRO",
+      "destino": "CO ITABORAI 01"
     },
     {
-      "nome": "JE SOBRADINHO 01",
-      "codigo": "000002348"
+      "origem": "CO MARICA 02",
+      "destino": "FL RIO DE JANEIRO"
     },
     {
-      "nome": "JE SOCORRO 02",
-      "codigo": "000002548"
+      "origem": "FL RIO DE JANEIRO",
+      "destino": "CO MARICA 02"
     },
     {
-      "nome": "JE TAMANDARE 01",
-      "codigo": "000002206"
+      "origem": "CO NITEROI 02",
+      "destino": "FL RIO DE JANEIRO"
     },
     {
-      "nome": "JE TANABI 01",
-      "codigo": "000001869"
+      "origem": "FL RIO DE JANEIRO",
+      "destino": "CO ITABORAI 01"
     },
     {
-      "nome": "JE TARTARUGALZINHO 01",
-      "codigo": "000002010"
+      "origem": "CO ITAPERUNA 02",
+      "destino": "FL RIO DE JANEIRO"
     },
     {
-      "nome": "JE URUPES 02",
-      "codigo": "000002597"
+      "origem": "FL RIO DE JANEIRO",
+      "destino": "CO ITAPERUNA 02"
     },
     {
-      "nome": "JE VALENTIM GENTIL 01",
-      "codigo": "000002652"
+      "origem": "CO ITAPERUNA 02",
+      "destino": "FL RIO DE JANEIRO"
     },
     {
-      "nome": "JE VALPARAISO 02",
-      "codigo": "000002571"
+      "origem": "FL RIO DE JANEIRO",
+      "destino": "CO ITAPERUNA 02"
     },
     {
-      "nome": "JE VARGEM GRANDE PAULISTA 02",
-      "codigo": "000002578"
+      "origem": "LJ RIO DE JANEIRO 05",
+      "destino": "FL RIO DE JANEIRO"
     },
     {
-      "nome": "JE VILA EDE 01",
-      "codigo": "000002403"
+      "origem": "CO RIO DE JANEIRO 01",
+      "destino": "FL RIO DE JANEIRO"
     },
     {
-      "nome": "JE VITORIA DO JARI 01",
-      "codigo": "000001864"
+      "origem": "FL RIO DE JANEIRO",
+      "destino": "CO RIO DE JANEIRO 01"
     },
     {
-      "nome": "JE WENCESLAU BRAZ 01",
-      "codigo": "000002623"
+      "origem": "CO RIO DE JANEIRO 08",
+      "destino": "FL RIO DE JANEIRO"
     },
     {
-      "nome": "LJ BARUERI 03",
-      "codigo": "000001432"
+      "origem": "FL RIO DE JANEIRO",
+      "destino": "CO RIO DE JANEIRO 08"
     },
     {
-      "nome": "LJ BARUERI 04",
-      "codigo": "000000829"
+      "origem": "CO RIO DE JANEIRO 04",
+      "destino": "FL RIO DE JANEIRO"
     },
     {
-      "nome": "LJ BELO HORIZONTE",
-      "codigo": "000001849"
+      "origem": "FL RIO DE JANEIRO",
+      "destino": "CO RIO DE JANEIRO 04"
     },
     {
-      "nome": "LJ BELO HORIZONTE 01",
-      "codigo": "000001100"
+      "origem": "FL RIO DE JANEIRO",
+      "destino": "CO RIO DE JANEIRO 03"
     },
     {
-      "nome": "LJ BELO HORIZONTE 03",
-      "codigo": "000001420"
+      "origem": "CO TERESOPOLIS 01",
+      "destino": "FL RIO DE JANEIRO"
     },
     {
-      "nome": "LJ BELO HORIZONTE 04",
-      "codigo": "000001657"
+      "origem": "CO RIO DE JANEIRO 07",
+      "destino": "FL RIO DE JANEIRO"
     },
     {
-      "nome": "LJ BELO HORIZONTE 05",
-      "codigo": "000001653"
+      "origem": "FL RIO DE JANEIRO",
+      "destino": "CO RIO DE JANEIRO 04"
     },
     {
-      "nome": "LJ BERTIOGA 01",
-      "codigo": "000002461"
+      "origem": "CO RIO DE JANEIRO 07",
+      "destino": "FL RIO DE JANEIRO"
     },
     {
-      "nome": "LJ BLUMENAU 01",
-      "codigo": "000001645"
+      "origem": "FL RIO DE JANEIRO",
+      "destino": "CO RIO DE JANEIRO 07"
     },
     {
-      "nome": "LJ BORDA DA MATA 01",
-      "codigo": "000001328"
+      "origem": "LJ EXTREMA 02",
+      "destino": "FL RIO DE JANEIRO"
     },
     {
-      "nome": "LJ CAMPINA GRANDE 01",
-      "codigo": "000000051"
+      "origem": "FL RIO DE JANEIRO",
+      "destino": "CO DUQUE DE CAXIAS 02"
     },
     {
-      "nome": "LJ CAMPINAS 01",
-      "codigo": "000002047"
+      "origem": "FL RIO DE JANEIRO",
+      "destino": "TC DEPOT 01 - FREGUESIA DO O"
     },
     {
-      "nome": "LJ CAMPINAS 02",
-      "codigo": "000001877"
+      "origem": "TC DEPOT 01 - FREGUESIA DO O",
+      "destino": "FL RIO DE JANEIRO"
     },
     {
-      "nome": "LJ CARUARU 01",
-      "codigo": "000002381"
+      "origem": "FL RIO DE JANEIRO",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LJ CAXIAS DO SUL 01",
-      "codigo": "000000821"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "FL RIO DE JANEIRO"
     },
     {
-      "nome": "LJ CAXIAS DO SUL 03",
-      "codigo": "000001562"
+      "origem": "FL RIO DE JANEIRO",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LJ CHAPECO 02",
-      "codigo": "000001146"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "FL RIO DE JANEIRO"
     },
     {
-      "nome": "LJ CORONEL FABRICIANO 01",
-      "codigo": "000001756"
+      "origem": "FL RIO DE JANEIRO",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LJ CRICIUMA 01",
-      "codigo": "000002400"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "FL RIO DE JANEIRO"
     },
     {
-      "nome": "LJ CURITIBA",
-      "codigo": "000001601"
+      "origem": "FL RIO DE JANEIRO",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LJ CURITIBA 02",
-      "codigo": "000001429"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "FL RIO DE JANEIRO"
     },
     {
-      "nome": "LJ CURITIBA 03 FL",
-      "codigo": "000000029"
+      "origem": "FL RIO DE JANEIRO",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LJ EMBU DAS ARTES 01",
-      "codigo": "000000668"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "FL RIO DE JANEIRO"
     },
     {
-      "nome": "LJ EXTREMA 01",
-      "codigo": "000001189"
+      "origem": "FL RIO DE JANEIRO",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LJ EXTREMA 02",
-      "codigo": "000002609"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "FL RIO DE JANEIRO"
     },
     {
-      "nome": "LJ FLORIANOPOLIS 01",
-      "codigo": "000001373"
+      "origem": "FL RIO DE JANEIRO",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LJ FORTALEZA 01",
-      "codigo": "000001708"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "FL RIO DE JANEIRO"
     },
     {
-      "nome": "LJ FORTALEZA 02",
-      "codigo": "000001437"
+      "origem": "CO ITAJAI 02",
+      "destino": "FL RIO DE JANEIRO"
     },
     {
-      "nome": "LJ FORTALEZA 03",
-      "codigo": "000002563"
+      "origem": "FL RIO DE JANEIRO",
+      "destino": "CO ITAJAI 02"
     },
     {
-      "nome": "LJ FRANCA 02",
-      "codigo": "000002083"
+      "origem": "FL RIO DE JANEIRO",
+      "destino": "HUB ITAPEVI | ITAPEVI"
     },
     {
-      "nome": "LJ GARIBALDI 01",
-      "codigo": "000000475"
+      "origem": "TC TECA MATRIZ",
+      "destino": "FL RIO DE JANEIRO"
     },
     {
-      "nome": "LJ GASPAR 01",
-      "codigo": "000001560"
+      "origem": "HUB ITAPEVI | ITAPEVI",
+      "destino": "FL RIO DE JANEIRO"
     },
     {
-      "nome": "LJ GOIANIA 01",
-      "codigo": "000000098"
+      "origem": "CO CARAPICUIBA 01",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LJ GOIANIA 02",
-      "codigo": "000001677"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO CARAPICUIBA 01"
     },
     {
-      "nome": "LJ GOIANIA 04",
-      "codigo": "000001943"
+      "origem": "CO COTIA 01",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LJ GOIANIA 06",
-      "codigo": "000001686"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO COTIA 01"
     },
     {
-      "nome": "LJ GUARULHOS 02",
-      "codigo": "000001356"
+      "origem": "CO DIADEMA 01",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LJ GUARULHOS 03",
-      "codigo": "000001372"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO DIADEMA 01"
     },
     {
-      "nome": "LJ HOLAMBRA 01",
-      "codigo": "000002453"
+      "origem": "CO ITAPECERICA DA SERRA 01",
+      "destino": "TC TECA MATRIZ"
     },
     {
-      "nome": "LJ JARAGUA DO SUL 01",
-      "codigo": "000001315"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO ITAPECERICA DA SERRA 01"
     },
     {
-      "nome": "LJ JAU 01",
-      "codigo": "000002595"
+      "origem": "CO ITAPEVI 01",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LJ JOAO PESSOA 01",
-      "codigo": "000001935"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO ITAPEVI 01"
     },
     {
-      "nome": "LJ JOINVILLE 01",
-      "codigo": "000001694"
+      "origem": "LJ OSASCO 01",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LJ JOINVILLE 03",
-      "codigo": "000001400"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "LJ OSASCO 01"
     },
     {
-      "nome": "LJ JUNDIAI 01",
-      "codigo": "000002501"
+      "origem": "CO SANTO ANDRE 01",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LJ JURUAIA 01",
-      "codigo": "000001551"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO SANTO ANDRE 01"
     },
     {
-      "nome": "LJ LOUVEIRA 01",
-      "codigo": "000002602"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "LJ SAO PAULO 04"
     },
     {
-      "nome": "LJ MANAUS",
-      "codigo": "000001731"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO SAO PAULO 10"
     },
     {
-      "nome": "LJ MOGI GUACU",
-      "codigo": "000002205"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO SAO PAULO 16"
     },
     {
-      "nome": "LJ OSASCO 01",
-      "codigo": "000002280"
+      "origem": "CO CAIEIRAS 01",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LJ PORTO ALEGRE 01",
-      "codigo": "000002451"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO CAIEIRAS 01"
     },
     {
-      "nome": "LJ PORTO ALEGRE 02",
-      "codigo": "000002183"
+      "origem": "TC DEPOT 01 - FREGUESIA DO O",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LJ RECIFE 01",
-      "codigo": "000001576"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "TC DEPOT 01 - FREGUESIA DO O"
     },
     {
-      "nome": "LJ RIO DAS OSTRAS 01",
-      "codigo": "000001294"
+      "origem": "TC DEPOT 01 - FREGUESIA DO O",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LJ RIO DE JANEIRO 01",
-      "codigo": "000002269"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "TC DEPOT 01 - FREGUESIA DO O"
     },
     {
-      "nome": "LJ RIO DE JANEIRO 02",
-      "codigo": "000001291"
+      "origem": "TC DEPOT 01 - FREGUESIA DO O",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LJ RIO DE JANEIRO 03",
-      "codigo": "000001627"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "TC DEPOT 01 - FREGUESIA DO O"
     },
     {
-      "nome": "LJ RIO DE JANEIRO 04",
-      "codigo": "000000442"
+      "origem": "TC DEPOT 01 - FREGUESIA DO O",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LJ RIO DE JANEIRO 06",
-      "codigo": "000001771"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "TC DEPOT 01 - FREGUESIA DO O"
     },
     {
-      "nome": "LJ RIO DE JANEIRO 08",
-      "codigo": "000001344"
+      "origem": "TC DEPOT 01 - FREGUESIA DO O",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LJ RIO DE JANEIRO 10",
-      "codigo": "000002663"
+      "origem": "TC DEPOT 01 - FREGUESIA DO O",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LJ SALVADOR 01",
-      "codigo": "000002152"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "TC DEPOT 01 - FREGUESIA DO O"
     },
     {
-      "nome": "LJ SALVADOR 02",
-      "codigo": "000001999"
+      "origem": "TC DEPOT 01 - FREGUESIA DO O",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LJ SANTA CRUZ DO CAPIBARIBE 01",
-      "codigo": "000001773"
+      "origem": "TC DEPOT 01 - FREGUESIA DO O",
+      "destino": "TC TECA MATRIZ"
     },
     {
-      "nome": "LJ SANTO ANDRE 02",
-      "codigo": "000002031"
+      "origem": "TC TECA MATRIZ",
+      "destino": "TC DEPOT 01 - FREGUESIA DO O"
     },
     {
-      "nome": "LJ SANTOS 01",
-      "codigo": "000000501"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO SAO PAULO 12"
     },
     {
-      "nome": "LJ SAO BERNARDO DO CAMPO 02",
-      "codigo": "000002036"
+      "origem": "LJ ITAPEVI 01",
+      "destino": "MT JADLOG SEDE"
     },
     {
-      "nome": "LJ SAO CAETANO DO SUL 01",
-      "codigo": "000001809"
+      "origem": "MT JADLOG SEDE",
+      "destino": "LJ ITAPEVI 01"
     },
     {
-      "nome": "LJ SAO CARLOS 01",
-      "codigo": "000000557"
+      "origem": "HUB ITAPEVI | ITAPEVI",
+      "destino": "TC TECA MATRIZ"
     },
     {
-      "nome": "LJ SAO JOSE DOS CAMPOS 02",
-      "codigo": "000002241"
+      "origem": "HUB ITAPEVI | ITAPEVI",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LJ SAO JOSE DOS PINHAIS 01",
-      "codigo": "000001646"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "HUB ITAPEVI | ITAPEVI"
     },
     {
-      "nome": "LJ SAO PAULO",
-      "codigo": "000000916"
+      "origem": "HUB ITAPEVI | ITAPEVI",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LJ SAO PAULO",
-      "codigo": "000001086"
+      "origem": "CO POCOS DE CALDAS 01",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LJ SAO PAULO 01",
-      "codigo": "000001371"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO POCOS DE CALDAS 01"
     },
     {
-      "nome": "LJ SAO PAULO 02",
-      "codigo": "000001598"
+      "origem": "CO GUARATINGUETA 01",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LJ SAO PAULO 03",
-      "codigo": "000001850"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO GUARATINGUETA 01"
     },
     {
-      "nome": "LJ SAO PAULO 04",
-      "codigo": "000000213"
+      "origem": "LJ SAO JOSE DOS CAMPOS 02",
+      "destino": "CO CARAGUATATUBA 01"
     },
     {
-      "nome": "LJ SAO PAULO 05",
-      "codigo": "000001131"
+      "origem": "CO CARAGUATATUBA 01",
+      "destino": "LJ SAO JOSE DOS CAMPOS 02"
     },
     {
-      "nome": "LJ SAO PAULO 06",
-      "codigo": "000001150"
+      "origem": "CO JACAREI 03",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LJ SAO PAULO 07",
-      "codigo": "000002151"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "LJ SAO JOSE DOS CAMPOS 02"
     },
     {
-      "nome": "LJ SAO PAULO 09",
-      "codigo": "000000938"
+      "origem": "CO SAO ROQUE 01",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LJ SAO PAULO 10",
-      "codigo": "000001780"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO SAO ROQUE 01"
     },
     {
-      "nome": "LJ SAO PAULO 11",
-      "codigo": "000000773"
+      "origem": "CO TIETE 01",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LJ SAO PAULO 12",
-      "codigo": "000001763"
+      "origem": "CO BOITUVA 01",
+      "destino": "CO TIETE 01"
     },
     {
-      "nome": "LJ SAO PAULO 13",
-      "codigo": "000002625"
+      "origem": "CO TIETE 01",
+      "destino": "CO BOITUVA 01"
     },
     {
-      "nome": "LJ SAO PAULO 14",
-      "codigo": "000002033"
+      "origem": "CO ITAPETININGA 02",
+      "destino": "CO ITAPEVA 02"
     },
     {
-      "nome": "LJ SAO PAULO 16",
-      "codigo": "000001225"
+      "origem": "CO ITAPEVA 02",
+      "destino": "CO ITAPETININGA 02"
     },
     {
-      "nome": "LJ SAO PAULO 17",
-      "codigo": "000001083"
+      "origem": "CO ITAPETININGA 02",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LJ SAO PAULO 18",
-      "codigo": "000001643"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO ITAPETININGA 02"
     },
     {
-      "nome": "LJ SAO PAULO 20",
-      "codigo": "000000502"
+      "origem": "CO RIO CLARO 02",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LJ SAO PAULO 22",
-      "codigo": "000002429"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO RIO CLARO 02"
     },
     {
-      "nome": "LJ SAO PAULO 23",
-      "codigo": "000000352"
+      "origem": "CO REGISTRO 01",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LJ SAO PAULO 24",
-      "codigo": "000002032"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO REGISTRO 01"
     },
     {
-      "nome": "LJ SAO PAULO 25",
-      "codigo": "000002462"
+      "origem": "LJ BERTIOGA 01",
+      "destino": "CO SANTOS 02"
     },
     {
-      "nome": "LJ SAO PAULO 26",
-      "codigo": "000000347"
+      "origem": "CO SANTOS 02",
+      "destino": "LJ BERTIOGA 01"
     },
     {
-      "nome": "LJ SAO PAULO 29",
-      "codigo": "000001667"
+      "origem": "CO GUARUJA 02",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LJ SAO PAULO 35",
-      "codigo": "000000647"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO GUARUJA 02"
     },
     {
-      "nome": "LJ SUMARE 01",
-      "codigo": "000001527"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO MONGAGUA 02"
     },
     {
-      "nome": "LJ TABOAO DA SERRA 01",
-      "codigo": "000000373"
+      "origem": "TC DEPOT 01 - FREGUESIA DO O",
+      "destino": "CO GUARULHOS 01"
     },
     {
-      "nome": "LJ TORITAMA 01",
-      "codigo": "000001749"
+      "origem": "CO GUARULHOS 01",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LJ VIANA 01",
-      "codigo": "000001363"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO GUARULHOS 01"
     },
     {
-      "nome": "LM / CB / TL  CHAPECO 01",
-      "codigo": "000001139"
+      "origem": "CO MOGI DAS CRUZES 01",
+      "destino": "CO SUZANO 01"
     },
     {
-      "nome": "LM / CB / TL  JOACABA 01",
-      "codigo": "000001136"
+      "origem": "CO SUZANO 01",
+      "destino": "CO MOGI DAS CRUZES 01"
     },
     {
-      "nome": "LM / CB / TL  JOINVILLE 01",
-      "codigo": "000001137"
+      "origem": "PA FERRAZ DE VASCONSELOS 01",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LM / CB / TL  LAGES 01",
-      "codigo": "000001138"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO ARUJA 01"
     },
     {
-      "nome": "LM / CB / TL  PASSO FUNDO 01",
-      "codigo": "000001485"
+      "origem": "CO OURO FINO 02",
+      "destino": "CO POUSO ALEGRE 02"
     },
     {
-      "nome": "LM / CB / TL  PATO BRANCO 01",
-      "codigo": "000001142"
+      "origem": "CO SAO LOURENCO",
+      "destino": "CO ITAJUBA 01"
     },
     {
-      "nome": "LM / CB / TL  PONTA GROSSA 01",
-      "codigo": "000001140"
+      "origem": "CO ARACATUBA 01",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LM / CB / TL  SAO LUIS 01",
-      "codigo": "000001323"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO ARACATUBA 01"
     },
     {
-      "nome": "LM / CB / TL  UMUARAMA 01",
-      "codigo": "000001141"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO LINS 01"
     },
     {
-      "nome": "LM / CB / TL BELEM 01",
-      "codigo": "000001047"
+      "origem": "CO BOTUCATU 02",
+      "destino": "CO AVARE 01"
     },
     {
-      "nome": "LM / CB / TL FEIRA DE SANTANA 01",
-      "codigo": "000001685"
+      "origem": "CO AVARE 01",
+      "destino": "CO BOTUCATU 02"
     },
     {
-      "nome": "LM / CB / TL GOVERNADOR VALADARES",
-      "codigo": "000001132"
+      "origem": "CO JAU 02",
+      "destino": "CO BAURU 01"
     },
     {
-      "nome": "LM / CB / TL IPATINGA",
-      "codigo": "000001134"
+      "origem": "CO BAURU 01",
+      "destino": "CO JAU 02"
     },
     {
-      "nome": "LM / CB / TL RECIFE 01",
-      "codigo": "000001048"
+      "origem": "CO BAURU 01",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LM / CB / TL SANTAREM 01",
-      "codigo": "000001326"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO BAURU 01"
     },
     {
-      "nome": "LM / CB / TL SAO RAIMUNDO NONATO 01",
-      "codigo": "000001676"
+      "origem": "LJ SUMARE 01",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LM / CB FLORIANOPOLIS 02",
-      "codigo": "000001425"
+      "origem": "CO AMERICANA 02",
+      "destino": "CO SANTA BARBARA DO OESTE 01"
     },
     {
-      "nome": "LM ARACAJU 02",
-      "codigo": "000001448"
+      "origem": "CO MONTE MOR 02",
+      "destino": "CO HORTOLANDIA 01"
     },
     {
-      "nome": "LM ARACATUBA 02",
-      "codigo": "000001741"
+      "origem": "CO HORTOLANDIA 01",
+      "destino": "CO MONTE MOR 02"
     },
     {
-      "nome": "LM BAURU 02",
-      "codigo": "000001742"
+      "origem": "CO SUMARE 02",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LM BELEM 08",
-      "codigo": "000001520"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO PAULINIA 02"
     },
     {
-      "nome": "LM BELEM 09",
-      "codigo": "000001550"
+      "origem": "CO ATIBAIA 01",
+      "destino": "HUB EXTREMA | EXTREMA"
     },
     {
-      "nome": "LM BELO HORIZONTE",
-      "codigo": "000001951"
+      "origem": "HUB EXTREMA | EXTREMA",
+      "destino": "CO ATIBAIA 01"
     },
     {
-      "nome": "LM BELO HORIZONTE 01",
-      "codigo": "000001421"
+      "origem": "VULCABRAS",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LM CAMPINAS 01",
-      "codigo": "000001744"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "HUB EXTREMA | EXTREMA"
     },
     {
-      "nome": "LM CHAPECO 02",
-      "codigo": "000001900"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "HUB EXTREMA | EXTREMA"
     },
     {
-      "nome": "LM CUIABA 05",
-      "codigo": "000002399"
+      "origem": "HUB EXTREMA | EXTREMA",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LM FEIRA DE SANTANA 03",
-      "codigo": "000002008"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "HUB EXTREMA | EXTREMA"
     },
     {
-      "nome": "LM FORTALEZA",
-      "codigo": "000002470"
+      "origem": "VULCABRAS",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LM FORTALEZA 03",
-      "codigo": "000001779"
+      "origem": "PA EXTREMA 06 DEVOLUCAO",
+      "destino": "PA EXTREMA 06 DEVOLUCAO"
     },
     {
-      "nome": "LM FORTALEZA 07",
-      "codigo": "000002465"
+      "origem": "MULTILASER",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LM GASPAR",
-      "codigo": "000002448"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "HUB EXTREMA | EXTREMA"
     },
     {
-      "nome": "LM GUARATINGUETA 01",
-      "codigo": "000001747"
+      "origem": "CO VALINHOS 02",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LM IGUATU 01",
-      "codigo": "000001615"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO VALINHOS 02"
     },
     {
-      "nome": "LM IRECE 01",
-      "codigo": "000001687"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO VALINHOS 02"
     },
     {
-      "nome": "LM ITUPEVA 01",
-      "codigo": "000001390"
+      "origem": "LJ JUNDIAI 01",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LM MANAUS 03",
-      "codigo": "000002545"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "5B CO ITUPEVA 02"
     },
     {
-      "nome": "LM MANAUS 05",
-      "codigo": "000002646"
+      "origem": "PADOVANI (CO ITU 02)",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LM MANAUS 06",
-      "codigo": "000001339"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO ITU"
     },
     {
-      "nome": "LM MANAUS 10",
-      "codigo": "000001554"
+      "origem": "CO AMPARO 02",
+      "destino": "CO JAGUARIUNA 02"
     },
     {
-      "nome": "LM MANAUS 16",
-      "codigo": "000001800"
+      "origem": "CO JAGUARIUNA 02",
+      "destino": "CO AMPARO 02"
     },
     {
-      "nome": "LM MONTES CLAROS 01",
-      "codigo": "000002063"
+      "origem": "CO MONTE SIAO 01",
+      "destino": "CO AGUAS DE LINDOIA 01"
     },
     {
-      "nome": "LM MONTES CLAROS 04",
-      "codigo": "000001482"
+      "origem": "CO AGUAS DE LINDOIA 01",
+      "destino": "CO MONTE SIAO 01"
     },
     {
-      "nome": "LM NATAL 02",
-      "codigo": "000002208"
+      "origem": "CO MONTE SIAO 01",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LM NATAL 03",
-      "codigo": "000002555"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO MONTE SIAO 01"
     },
     {
-      "nome": "LM OURINHOS 02",
-      "codigo": "000001740"
+      "origem": "CO JABOTICABAL 01",
+      "destino": "CO MONTE ALTO 01"
     },
     {
-      "nome": "LM PEDRA BRANCA 01",
-      "codigo": "000001616"
+      "origem": "CO MONTE ALTO 01",
+      "destino": "CO JABOTICABAL 01"
     },
     {
-      "nome": "LM PORTO VELHO 05",
-      "codigo": "000002237"
+      "origem": "CO BARRETOS 02",
+      "destino": "CO SAO CARLOS 01"
     },
     {
-      "nome": "LM PRESIDENTE PRUDENTE 02",
-      "codigo": "000001743"
+      "origem": "CO SAO CARLOS 01",
+      "destino": "CO BARRETOS 02"
     },
     {
-      "nome": "LM RECIFE 03",
-      "codigo": "000001529"
+      "origem": "CO PORTO FERREIRA 01",
+      "destino": "CO SAO CARLOS 01"
     },
     {
-      "nome": "LM REGISTRO",
-      "codigo": "000001028"
+      "origem": "CO SAO CARLOS 01",
+      "destino": "CO PORTO FERREIRA 01"
     },
     {
-      "nome": "LM RIBEIRAO PRETO 01",
-      "codigo": "000001029"
+      "origem": "CO IBITINGA 02",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LM RIBEIRAO PRETO 03",
-      "codigo": "000001589"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO IBITINGA 02"
     },
     {
-      "nome": "LM RIO BRANCO 04",
-      "codigo": "000002543"
+      "origem": "CO SAO CARLOS 01",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LM RIO DE JANEIRO 05",
-      "codigo": "000002557"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO SAO CARLOS 01"
     },
     {
-      "nome": "LM SALVADOR 05",
-      "codigo": "000002481"
+      "origem": "HUB ITAPEVI | ITAPEVI",
+      "destino": "CO MIRASSOL 01"
     },
     {
-      "nome": "LM SALVADOR 06",
-      "codigo": "000002553"
+      "origem": "CO VOTUPORANGA 01",
+      "destino": "CO MIRASSOL 01"
     },
     {
-      "nome": "LM SAO JOAO DE MERITI 02",
-      "codigo": "000002029"
+      "origem": "CO MIRASSOL 01",
+      "destino": "CO VOTUPORANGA 01"
     },
     {
-      "nome": "LM SAO JOSE DO RIO PRETO 02",
-      "codigo": "000001745"
+      "origem": "CO CATANDUVA 02",
+      "destino": "CO MIRASSOL 01"
     },
     {
-      "nome": "LM SAO JOSE DOS CAMPOS 01",
-      "codigo": "000001746"
+      "origem": "CO MIRASSOL 01",
+      "destino": "CO CATANDUVA 02"
     },
     {
-      "nome": "LM SAO LUIS 01",
-      "codigo": "000002585"
+      "origem": "CO MIRASSOL 01",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LM SAO LUIS 05",
-      "codigo": "000002425"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO MIRASSOL 01"
     },
     {
-      "nome": "LM SAO LUIS 06",
-      "codigo": "000002437"
+      "origem": "CO SERTAOZINHO",
+      "destino": "CO RIBEIRAO PRETO 04"
     },
     {
-      "nome": "LM SAO PAULO 01",
-      "codigo": "000002655"
+      "origem": "CO RIBEIRAO PRETO 04",
+      "destino": "CO SERTAOZINHO"
     },
     {
-      "nome": "LM SAO PAULO 08",
-      "codigo": "000001222"
+      "origem": "CO PASSOS 02",
+      "destino": "CO RIBEIRAO PRETO 04"
     },
     {
-      "nome": "LM SAO PAULO 10",
-      "codigo": "000001878"
+      "origem": "CO RIBEIRAO PRETO 04",
+      "destino": "CO PASSOS 02"
     },
     {
-      "nome": "LM SEABRA 01",
-      "codigo": "000001683"
+      "origem": "CO RIBEIRAO PRETO 02",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LM SOROCABA",
-      "codigo": "000001030"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO RIBEIRAO PRETO 02"
     },
     {
-      "nome": "LM TEOFILO OTONI 02",
-      "codigo": "000001805"
+      "origem": "CO PORTO FERREIRA 01",
+      "destino": "CO PIRASSUNUNGA 01"
     },
     {
-      "nome": "LM UBERLANDIA 02",
-      "codigo": "000001481"
+      "origem": "CO PIRASSUNUNGA 01",
+      "destino": "CO PORTO FERREIRA 01"
     },
     {
-      "nome": "LM/CB/TL IMPERATRIZ 01",
-      "codigo": "000001322"
+      "origem": "CO FRANCA 02",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "LM/CB/TL MARABA 01",
-      "codigo": "000001325"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO FRANCA 02"
     },
     {
-      "nome": "LM/CB/TL SALVADOR 01",
-      "codigo": "000001057"
+      "origem": "LJ CAMPINAS 02",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "MILK RUN GUARATINGUETA",
-      "codigo": "000002679"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO CAMPINAS 01"
     },
     {
-      "nome": "MILK RUN SAO JOSE DOS CAMPOS",
-      "codigo": "000002680"
+      "origem": "CO ASSIS 03",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "MILK RUN TAU",
-      "codigo": "000002678"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO ASSIS 03"
     },
     {
-      "nome": "MILKRUN MCZ",
-      "codigo": "000002705"
+      "origem": "CO ASSIS 03",
+      "destino": "CO TUPA 02"
     },
     {
-      "nome": "ML / CB / TL  FLORIANOPOLIS 01",
-      "codigo": "000001039"
+      "origem": "CO TUPA 02",
+      "destino": "CO ASSIS 03"
     },
     {
-      "nome": "ML / CB / TL  SINOP 01",
-      "codigo": "000001040"
+      "origem": "CO GARCA 01",
+      "destino": "CO ASSIS 03"
     },
     {
-      "nome": "ML / CB / TL BLUMENAU 01",
-      "codigo": "000001452"
+      "origem": "CO ASSIS 03",
+      "destino": "CO GARCA 01"
     },
     {
-      "nome": "ML / CB / TL CAMPO GRANDE 01",
-      "codigo": "000001088"
+      "origem": "CO PRESIDENTE PRUDENTE 02",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "ML / CB / TL JAD RIO DE JANEIRO",
-      "codigo": "000001230"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO PRESIDENTE PRUDENTE 02"
     },
     {
-      "nome": "ML / CB / TL LARANJEIRAS DO SUL 01",
-      "codigo": "000001461"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "TC TECA MATRIZ"
     },
     {
-      "nome": "ML / CB / TL LONDRINA 01",
-      "codigo": "000001454"
+      "origem": "TC TECA MATRIZ",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "ML / CB / TL VARGINHA 01",
-      "codigo": "000001483"
+      "origem": "PA SIQUEIRA CAMPOS",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "ML / CB CRICIUMA 01",
-      "codigo": "000001486"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "PA SIQUEIRA CAMPOS 02"
     },
     {
-      "nome": "ML / LM / CB / TL BOA VISTA 01",
-      "codigo": "000001064"
+      "origem": "FL SALVADOR",
+      "destino": "CO FEIRA DE SANTANA 02"
     },
     {
-      "nome": "ML / LM / CB / TL CAMPINA GRANDE 01",
-      "codigo": "000001298"
+      "origem": "CO FEIRA DE SANTANA 02",
+      "destino": "FL SALVADOR"
     },
     {
-      "nome": "ML / LM / CB / TL CASCAVEL 01",
-      "codigo": "000001143"
+      "origem": "FL SALVADOR",
+      "destino": "LM SALVADOR 06"
     },
     {
-      "nome": "ML / LM / CB / TL CURITIBA 02",
-      "codigo": "000001014"
+      "origem": "CO CAMACARI 02",
+      "destino": "FL SALVADOR"
     },
     {
-      "nome": "ML / LM / CB / TL CURITIBANOS 01",
-      "codigo": "000001462"
+      "origem": "FL SALVADOR",
+      "destino": "CO CAMACARI 02"
     },
     {
-      "nome": "ML / LM / CB / TL FORTALEZA 01",
-      "codigo": "000001049"
+      "origem": "CO IRECE 01",
+      "destino": "LM/CB/TL SALVADOR 01"
     },
     {
-      "nome": "ML / LM / CB / TL GOIANIA 17",
-      "codigo": "000001908"
+      "origem": "LM/CB/TL SALVADOR 01",
+      "destino": "CO IRECE 01"
     },
     {
-      "nome": "ML / LM / CB / TL JOAO PESSOA 01",
-      "codigo": "000001297"
+      "origem": "CO PAULO AFONSO 01",
+      "destino": "LM/CB/TL SALVADOR 01"
     },
     {
-      "nome": "ML / LM / CB / TL MACEIO 01",
-      "codigo": "000001296"
+      "origem": "LM/CB/TL SALVADOR 01",
+      "destino": "CO PAULO AFONSO 01"
     },
     {
-      "nome": "ML / LM / CB / TL MARINGA 02",
-      "codigo": "000001144"
+      "origem": "CO BARREIRAS 01",
+      "destino": "FL SALVADOR"
     },
     {
-      "nome": "ML / LM / CB / TL MOSSORO 01",
-      "codigo": "000001302"
+      "origem": "LM/CB/TL SALVADOR 01",
+      "destino": "CO BARREIRAS 01"
     },
     {
-      "nome": "ML / LM / CB / TL NATAL 01",
-      "codigo": "000001300"
+      "origem": "CO VALENCA 02",
+      "destino": "LM/CB/TL SALVADOR 01"
     },
     {
-      "nome": "ML / LM / CB / TL PATOS 01",
-      "codigo": "000001299"
+      "origem": "LM/CB/TL SALVADOR 01",
+      "destino": "CO VALENCA 02"
     },
     {
-      "nome": "ML / LM / CB / TL RONDONOPOLIS 01",
-      "codigo": "000001089"
+      "origem": "CO JAD SALVADOR",
+      "destino": "FL SALVADOR"
     },
     {
-      "nome": "ML / LM / CB GOIANIA 12",
-      "codigo": "000001497"
+      "origem": "FL SALVADOR",
+      "destino": "CO JAD SALVADOR"
     },
     {
-      "nome": "ML / LM FERNANDO DE NORONHA 01",
-      "codigo": "000001663"
+      "origem": "CO VALENCA 02",
+      "destino": "LM/CB/TL SALVADOR 01"
     },
     {
-      "nome": "ML BALSAS 01",
-      "codigo": "000001674"
+      "origem": "LM/CB/TL SALVADOR 01",
+      "destino": "CO VALENCA 02"
     },
     {
-      "nome": "ML BELFORD ROXO 01",
-      "codigo": "000002459"
+      "origem": "CO PETROLINA 03",
+      "destino": "FL SALVADOR"
     },
     {
-      "nome": "ML DUQUE DE CAXIAS 02",
-      "codigo": "000002027"
+      "origem": "FL SALVADOR",
+      "destino": "CO PETROLINA 03"
     },
     {
-      "nome": "ML JI-PARANA 01",
-      "codigo": "000002515"
+      "origem": "LM SALVADOR 05",
+      "destino": "FL SALVADOR"
     },
     {
-      "nome": "ML MOGI DAS CRUZES 01",
-      "codigo": "000002441"
+      "origem": "FL SALVADOR",
+      "destino": "LM SALVADOR 05"
     },
     {
-      "nome": "ML RIO BRANCO 03",
-      "codigo": "000002494"
+      "origem": "LM SALVADOR 06",
+      "destino": "FL SALVADOR"
     },
     {
-      "nome": "ML/CB MACAPA",
-      "codigo": "000002596"
+      "origem": "FL SALVADOR",
+      "destino": "LM SALVADOR 06"
     },
     {
-      "nome": "ML/CB/TL GOIANIA 01",
-      "codigo": "000001038"
+      "origem": "CO VITORIA DA CONQUISTA 01",
+      "destino": "FL VITORIA"
     },
     {
-      "nome": "ML/LM APARECIDA DE GOIANIA 01",
-      "codigo": "000001117"
+      "origem": "FL VITORIA",
+      "destino": "CO VITORIA DA CONQUISTA 01"
     },
     {
-      "nome": "ML/LM/CB/TL MANAUS 01",
-      "codigo": "000001063"
+      "origem": "CO EUNAPOLIS",
+      "destino": "FL VITORIA"
     },
     {
-      "nome": "MT JADLOG SEDE",
-      "codigo": "000002593"
+      "origem": "FL VITORIA",
+      "destino": "CO EUNAPOLIS"
     },
     {
-      "nome": "MT JADLOG SEDE",
-      "codigo": "000000001"
+      "origem": "CO VITORIA DA CONQUISTA 01",
+      "destino": "FL VITORIA"
     },
     {
-      "nome": "MT NEXUS 87 – AEREO",
-      "codigo": "000002634"
+      "origem": "FL VITORIA",
+      "destino": "CO VITORIA DA CONQUISTA 01"
     },
     {
-      "nome": "MT NEXUS 87 - EMISSAO",
-      "codigo": "000002645"
+      "origem": "FL VITORIA",
+      "destino": "CO VITORIA DA CONQUISTA 01"
     },
     {
-      "nome": "MT NEXUS 87 - OVERSIZE",
-      "codigo": "000002637"
+      "origem": "CO VITORIA DA CONQUISTA 01",
+      "destino": "LM/CB/TL SALVADOR 01"
     },
     {
-      "nome": "MT NEXUS 87 – PERECIVEL",
-      "codigo": "000002636"
+      "origem": "LM/CB/TL SALVADOR 01",
+      "destino": "CO VITORIA DA CONQUISTA 01"
     },
     {
-      "nome": "MT NEXUS 87 – VULNERAVEL",
-      "codigo": "000002635"
+      "origem": "CO ILHEUS",
+      "destino": "CO ITABUNA 01"
     },
     {
-      "nome": "MT NEXUS 87 PERUS",
-      "codigo": "000002631"
+      "origem": "CO ITABUNA 01",
+      "destino": "CO ILHEUS"
     },
     {
-      "nome": "NEXUS REV. DAFITI",
-      "codigo": "000002698"
+      "origem": "CO EUNAPOLIS",
+      "destino": "CO ITABUNA 01"
     },
     {
-      "nome": "NEXUS REV. ICOMM",
-      "codigo": "000002701"
+      "origem": "CO ITABUNA 01",
+      "destino": "CO EUNAPOLIS"
     },
     {
-      "nome": "NEXUS REV. KABUM",
-      "codigo": "000002708"
+      "origem": "CO TEIXEIRA DE FREITAS 02",
+      "destino": "CO ITABUNA 01"
     },
     {
-      "nome": "NEXUS REV. RENNER",
-      "codigo": "000002702"
+      "origem": "CO ITABUNA 01",
+      "destino": "CO TEIXEIRA DE FREITAS 02"
     },
     {
-      "nome": "NEXUS REV. RIACHUELO",
-      "codigo": "000002699"
+      "origem": "CO ITABUNA 01",
+      "destino": "LM/CB/TL SALVADOR 01"
     },
     {
-      "nome": "NEXUS REV. ZARA",
-      "codigo": "000002700"
+      "origem": "LM/CB/TL SALVADOR 01",
+      "destino": "CO ITABUNA 01"
     },
     {
-      "nome": "PA ALHANDRA 01",
-      "codigo": "000001453"
+      "origem": "CO GUANAMBI 02",
+      "destino": "LM/CB/TL SALVADOR 01"
     },
     {
-      "nome": "PA AMERICANAS",
-      "codigo": "000002261"
+      "origem": "LM/CB/TL SALVADOR 01",
+      "destino": "CO GUANAMBI 02"
     },
     {
-      "nome": "PA ARAÇARIGUAMA",
-      "codigo": "000002640"
+      "origem": "HUB ITAPEVI | ITAPEVI",
+      "destino": "FL SALVADOR"
     },
     {
-      "nome": "PA ARCOS 02",
-      "codigo": "000001984"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "FL SALVADOR"
     },
     {
-      "nome": "PA ARMAZEM/BANCOS 01",
-      "codigo": "000001466"
+      "origem": "FL SALVADOR",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "PA ARUJA 01",
-      "codigo": "000001162"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "FL SALVADOR"
     },
     {
-      "nome": "PA ATIBAIA 01",
-      "codigo": "000001380"
+      "origem": "CO INDAIAL 01",
+      "destino": "CO RIO DO SUL 02"
     },
     {
-      "nome": "PA ATIBAIA 02",
-      "codigo": "000001704"
+      "origem": "CO RIO DO SUL 02",
+      "destino": "CO INDAIAL 01"
     },
     {
-      "nome": "PA BARUERI 01",
-      "codigo": "000002584"
+      "origem": "CO PINHAIS 02",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "PA BARUERI 02",
-      "codigo": "000001625"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO SAO JOSE DOS PINHAIS 02 FL"
     },
     {
-      "nome": "PA BARUERI 04",
-      "codigo": "000000695"
+      "origem": "CO SAO JOSE DOS PINHAIS 02 FL",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "PA BARUERI 06",
-      "codigo": "000001204"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO SAO JOSE DOS PINHAIS 02 FL"
     },
     {
-      "nome": "PA BARUERI 07",
-      "codigo": "000000056"
+      "origem": "CO JARAGUA DO SUL 02",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "PA BARUERI 08",
-      "codigo": "000001290"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO JARAGUA DO SUL 02"
     },
     {
-      "nome": "PA BARUERI 09",
-      "codigo": "000001737"
+      "origem": "LJ CURITIBA 03 FL",
+      "destino": "CO PARANAGUA 02"
     },
     {
-      "nome": "PA BELO HORIZONTE 01",
-      "codigo": "000000062"
+      "origem": "CO PARANAGUA 02",
+      "destino": "LJ CURITIBA 03 FL"
     },
     {
-      "nome": "PA BELO HORIZONTE 02",
-      "codigo": "000000634"
+      "origem": "CO PONTA GROSSA 03",
+      "destino": "LJ CURITIBA 03 FL"
     },
     {
-      "nome": "PA BELO HORIZONTE 03",
-      "codigo": "000001157"
+      "origem": "LJ CURITIBA 03 FL",
+      "destino": "CO PONTA GROSSA 03"
     },
     {
-      "nome": "PA BOTICARIO",
-      "codigo": "000002262"
+      "origem": "CO TIJUCAS 01",
+      "destino": "CO ITAJAI 02"
     },
     {
-      "nome": "PA CAJAMAR 02",
-      "codigo": "000001309"
+      "origem": "CO ITAJAI 02",
+      "destino": "CO TIJUCAS 01"
     },
     {
-      "nome": "PA CAMICADO",
-      "codigo": "000002263"
+      "origem": "CO ITAJAI 02",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "PA CAMPINAS 04",
-      "codigo": "000001155"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO ITAJAI 02"
     },
     {
-      "nome": "PA CAMPINAS 05",
-      "codigo": "000001276"
+      "origem": "FL PORTO ALEGRE",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "PA CARIACICA 01",
-      "codigo": "000001596"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "FL PORTO ALEGRE"
     },
     {
-      "nome": "PA CARREFOUR",
-      "codigo": "000002265"
+      "origem": "FL PORTO ALEGRE",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "PA COTIA",
-      "codigo": "000001608"
+      "origem": "CO ARARANGUA 01",
+      "destino": "CO CRICIUMA 02"
     },
     {
-      "nome": "PA COTIA 04",
-      "codigo": "000001668"
+      "origem": "CO CRICIUMA 02",
+      "destino": "CO ARARANGUA 01"
     },
     {
-      "nome": "PA DOIS CORREGOS 01",
-      "codigo": "000002546"
+      "origem": "LJ CRICIUMA 01",
+      "destino": "FL PORTO ALEGRE"
     },
     {
-      "nome": "PA DUQUE CAXIAS 01",
-      "codigo": "000000231"
+      "origem": "HUB ITAPEVI | ITAPEVI",
+      "destino": "FL PORTO ALEGRE"
     },
     {
-      "nome": "PA EMBU DAS ARTES 01",
-      "codigo": "000002686"
+      "origem": "CO OSORIO 01",
+      "destino": "FL PORTO ALEGRE"
     },
     {
-      "nome": "PA EXTREMA 01",
-      "codigo": "000001268"
+      "origem": "FL PORTO ALEGRE",
+      "destino": "CO OSORIO 01"
     },
     {
-      "nome": "PA EXTREMA 02",
-      "codigo": "000002562"
+      "origem": "CO SANTO ANGELO 02",
+      "destino": "CO SANTA ROSA 02"
     },
     {
-      "nome": "PA EXTREMA 03",
-      "codigo": "000001438"
+      "origem": "CO SANTA ROSA 02",
+      "destino": "CO SANTO ANGELO 02"
     },
     {
-      "nome": "PA EXTREMA 05",
-      "codigo": "000001725"
+      "origem": "CO SANTO ANGELO 02",
+      "destino": "CO SAO BORJA 02"
     },
     {
-      "nome": "PA EXTREMA 06",
-      "codigo": "000001910"
+      "origem": "CO SAO BORJA 02",
+      "destino": "CO SANTO ANGELO 02"
     },
     {
-      "nome": "PA EXTREMA 07",
-      "codigo": "000002391"
+      "origem": "CO SANTO ANGELO 02",
+      "destino": "FL PORTO ALEGRE"
     },
     {
-      "nome": "PA EXTREMA 08",
-      "codigo": "000002565"
+      "origem": "FL PORTO ALEGRE",
+      "destino": "CO SANTO ANGELO 02"
     },
     {
-      "nome": "PA FERRAZ DE VASCONSELOS 01",
-      "codigo": "000001699"
+      "origem": "CO ERECHIM 02",
+      "destino": "CO CONCORDIA 01"
     },
     {
-      "nome": "PA FRANCO DA ROCHA 02",
-      "codigo": "000001726"
+      "origem": "CO CONCORDIA 01",
+      "destino": "CO ERECHIM 02"
     },
     {
-      "nome": "PA GASPAR 01",
-      "codigo": "000001239"
+      "origem": "CO ERECHIM 02",
+      "destino": "FL PORTO ALEGRE"
     },
     {
-      "nome": "PA GOIANIA 01",
-      "codigo": "000000542"
+      "origem": "FL PORTO ALEGRE",
+      "destino": "CO ERECHIM 02"
     },
     {
-      "nome": "PA GOIANIA 02",
-      "codigo": "000001237"
+      "origem": "FL PORTO ALEGRE",
+      "destino": "CO LAJEADO 01"
     },
     {
-      "nome": "PA GOIANIA 03",
-      "codigo": "000001632"
+      "origem": "CO SANTA MARIA",
+      "destino": "CO SAO GABRIEL 02"
     },
     {
-      "nome": "PA GUARULHOS 01",
-      "codigo": "000001727"
+      "origem": "CO SAO GABRIEL 02",
+      "destino": "CO SANTA MARIA"
     },
     {
-      "nome": "PA INDAIATUBA 01",
-      "codigo": "000000226"
+      "origem": "CO SANTA MARIA",
+      "destino": "CO URUGUAIANA 02"
     },
     {
-      "nome": "PA ITAQUA",
-      "codigo": "000002641"
+      "origem": "CO URUGUAIANA 02",
+      "destino": "CO SANTA MARIA"
     },
     {
-      "nome": "PA JABOATAO DOS GUARARAPES 02",
-      "codigo": "000001411"
+      "origem": "CO SANTA MARIA",
+      "destino": "FL PORTO ALEGRE"
     },
     {
-      "nome": "PA JACUTINGA 01",
-      "codigo": "000001368"
+      "origem": "FL PORTO ALEGRE",
+      "destino": "CO SANTA MARIA"
     },
     {
-      "nome": "PA JAD ADM",
-      "codigo": "000001377"
+      "origem": "CO PELOTAS 02",
+      "destino": "CO BAGE 02"
     },
     {
-      "nome": "PA JAD BRASILIA",
-      "codigo": "000001200"
+      "origem": "CO BAGE 02",
+      "destino": "CO PELOTAS 02"
     },
     {
-      "nome": "PA JAD PICKUP",
-      "codigo": "000001378"
+      "origem": "CO RIO GRANDE 02",
+      "destino": "FL PORTO ALEGRE"
     },
     {
-      "nome": "PA JADLOG 02",
-      "codigo": "000001774"
+      "origem": "FL PORTO ALEGRE",
+      "destino": "CO RIO GRANDE 02"
     },
     {
-      "nome": "PA JANDIRA 01",
-      "codigo": "000001728"
+      "origem": "CO SAO LEOPOLDO 01",
+      "destino": "FL PORTO ALEGRE"
     },
     {
-      "nome": "PA JOAO PESSOA 01",
-      "codigo": "000001672"
+      "origem": "FL PORTO ALEGRE",
+      "destino": "CO SAO LEOPOLDO 01"
     },
     {
-      "nome": "PA JOINVILLE 01",
-      "codigo": "000001216"
+      "origem": "FL PORTO ALEGRE",
+      "destino": "LJ GARIBALDI 01"
     },
     {
-      "nome": "PA JUNDIAI 01",
-      "codigo": "000000868"
+      "origem": "LJ GARIBALDI 01",
+      "destino": "FL PORTO ALEGRE"
     },
     {
-      "nome": "PA JUNDIAI 02",
-      "codigo": "000001178"
+      "origem": "CO CAXIAS DO SUL 02",
+      "destino": "FL PORTO ALEGRE"
     },
     {
-      "nome": "PA LEITURINHA",
-      "codigo": "000001341"
+      "origem": "FL PORTO ALEGRE",
+      "destino": "CO CAXIAS DO SUL 02"
     },
     {
-      "nome": "PA LOUVEIRA 01",
-      "codigo": "000000652"
+      "origem": "CO IGREJINHA 01",
+      "destino": "FL PORTO ALEGRE"
     },
     {
-      "nome": "PA MACEIO 01",
-      "codigo": "000001775"
+      "origem": "FL PORTO ALEGRE",
+      "destino": "CO IGREJINHA 01"
     },
     {
-      "nome": "PA MELI",
-      "codigo": "000001090"
+      "origem": "CO CAXIAS DO SUL 03",
+      "destino": "FL PORTO ALEGRE"
     },
     {
-      "nome": "PA MELI CWB 01",
-      "codigo": "000001600"
+      "origem": "FL PORTO ALEGRE",
+      "destino": "LJ CAXIAS DO SUL 03"
     },
     {
-      "nome": "PA MELI 02",
-      "codigo": "000001504"
+      "origem": "LJ CAXIAS DO SUL 03",
+      "destino": "FL PORTO ALEGRE"
     },
     {
-      "nome": "PA NAZARE PAULISTA 01",
-      "codigo": "000001705"
+      "origem": "FL PORTO ALEGRE",
+      "destino": "CO CAXIAS DO SUL 03"
     },
     {
-      "nome": "PA NETSHOES 02",
-      "codigo": "000001190"
+      "origem": "CO CANOAS 02",
+      "destino": "FL PORTO ALEGRE"
     },
     {
-      "nome": "PA OSASCO 01",
-      "codigo": "000001099"
+      "origem": "FL PORTO ALEGRE",
+      "destino": "CO CANOAS 02"
     },
     {
-      "nome": "PA OSASCO 02",
-      "codigo": "000001587"
+      "origem": "FL PORTO ALEGRE",
+      "destino": "CO PORTO ALEGRE 01"
     },
     {
-      "nome": "PA OSASCO 03",
-      "codigo": "000001760"
+      "origem": "CO PORTO ALEGRE 01",
+      "destino": "FL PORTO ALEGRE"
     },
     {
-      "nome": "PA PINHAIS 01",
-      "codigo": "000000929"
+      "origem": "FL PORTO ALEGRE",
+      "destino": "CO PORTO ALEGRE 02"
     },
     {
-      "nome": "PA RENNER",
-      "codigo": "000002264"
+      "origem": "CO PORTO ALEGRE 02",
+      "destino": "FL PORTO ALEGRE"
     },
     {
-      "nome": "PA RENNER TC",
-      "codigo": "000002630"
+      "origem": "FL PORTO ALEGRE",
+      "destino": "CO JAD PORTO ALEGRE"
     },
     {
-      "nome": "PA RIBEIRAO PIRES 01",
-      "codigo": "000001263"
+      "origem": "FL PORTO ALEGRE",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "PA RIBEIRAO PRETO 01",
-      "codigo": "000000577"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "FL PORTO ALEGRE"
     },
     {
-      "nome": "PA RIO DE JANEIRO 02",
-      "codigo": "000000823"
+      "origem": "CD CASFOZ CASCAVEL",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "PA RIO JAD",
-      "codigo": "000001397"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CD CASFOZ CASCAVEL"
     },
     {
-      "nome": "PA SANTANA DE PARNAIBA 03",
-      "codigo": "000001730"
+      "origem": "CO PARANAVAI 01",
+      "destino": "CO MARINGA 02"
     },
     {
-      "nome": "PA SANTOS 01",
-      "codigo": "000001467"
+      "origem": "CO MARINGA 02",
+      "destino": "CO PARANAVAI 01"
     },
     {
-      "nome": "PA SAO BERNARDO DO CAMPO 01",
-      "codigo": "000000683"
+      "origem": "CO FOZ DO IGUACU 02",
+      "destino": "CD CASFOZ CASCAVEL"
     },
     {
-      "nome": "PA SAO CARLOS 01",
-      "codigo": "000001965"
+      "origem": "CD CASFOZ CASCAVEL",
+      "destino": "CO FOZ DO IGUACU 02"
     },
     {
-      "nome": "PA SAO PAULO",
-      "codigo": "000001113"
+      "origem": "CO TOLEDO 01",
+      "destino": "CD CASFOZ CASCAVEL"
     },
     {
-      "nome": "PA SAO PAULO 01",
-      "codigo": "000002428"
+      "origem": "CD CASFOZ CASCAVEL",
+      "destino": "CO TOLEDO 01"
     },
     {
-      "nome": "PA SAO PAULO 02",
-      "codigo": "000001693"
+      "origem": "CO CAMPO MOURAO 01",
+      "destino": "CD CASFOZ CASCAVEL"
     },
     {
-      "nome": "PA SAO PAULO 03",
-      "codigo": "000000134"
+      "origem": "CD CASFOZ CASCAVEL",
+      "destino": "CO CAMPO MOURAO 01"
     },
     {
-      "nome": "PA SAO PAULO 04",
-      "codigo": "000002589"
+      "origem": "CO MARINGA 02",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "PA SAO PAULO 05",
-      "codigo": "000001822"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO MARINGA 02"
     },
     {
-      "nome": "PA SAO PAULO 07",
-      "codigo": "000000454"
+      "origem": "CO LAGES 01",
+      "destino": "CO INDAIAL 01"
     },
     {
-      "nome": "PA SAO PAULO 08",
-      "codigo": "000001729"
+      "origem": "CO INDAIAL 01",
+      "destino": "CO LAGES 01"
     },
     {
-      "nome": "PA SAO PAULO 09",
-      "codigo": "000001388"
+      "origem": "CO PALHOCA 02",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "PA SAO PAULO 10",
-      "codigo": "000000141"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO PALHOCA 02"
     },
     {
-      "nome": "PA SAO PAULO 21",
-      "codigo": "000000355"
+      "origem": "CO LONDRINA 01",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "PA SAO PAULO 22",
-      "codigo": "000001208"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO LONDRINA 01"
     },
     {
-      "nome": "PA SAO PAULO 23",
-      "codigo": "000001223"
+      "origem": "CO LONDRINA 01",
+      "destino": "CO CAMBE 01"
     },
     {
-      "nome": "PA SAO PAULO 26",
-      "codigo": "000000489"
+      "origem": "CO LONDRINA 01",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "PA SAO PAULO 27",
-      "codigo": "000000523"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO LONDRINA 01"
     },
     {
-      "nome": "PA SAO PAULO 28",
-      "codigo": "000001610"
+      "origem": "CO VIDEIRA 01",
+      "destino": "CO CURITIBANOS 01"
     },
     {
-      "nome": "PA SAO PAULO 30",
-      "codigo": "000000500"
+      "origem": "CO CURITIBANOS 01",
+      "destino": "CO VIDEIRA 01"
     },
     {
-      "nome": "PA SERRA",
-      "codigo": "000001639"
+      "origem": "CO JOACABA 02",
+      "destino": "CO UNIAO DA VITORIA 01"
     },
     {
-      "nome": "PA SERRA 03",
-      "codigo": "000001641"
+      "origem": "CO UNIAO DA VITORIA 01",
+      "destino": "CO JOACABA 02"
     },
     {
-      "nome": "PA SHEIN - NAVE A",
-      "codigo": "000002231"
+      "origem": "LJ CHAPECO 02",
+      "destino": "CO UNIAO DA VITORIA 01"
     },
     {
-      "nome": "PA SHOPEE",
-      "codigo": "000001789"
+      "origem": "CO UNIAO DA VITORIA 01",
+      "destino": "LJ CHAPECO 02"
     },
     {
-      "nome": "PA SIQUEIRA CAMPOS",
-      "codigo": "000001785"
+      "origem": "CO UNIAO DA VITORIA 01",
+      "destino": "CO MAFRA 02"
     },
     {
-      "nome": "PA SIQUEIRA CAMPOS 02",
-      "codigo": "000002492"
+      "origem": "CO MAFRA 02",
+      "destino": "CO UNIAO DA VITORIA 01"
     },
     {
-      "nome": "PA SUMARE 01",
-      "codigo": "000002100"
+      "origem": "CO FRANCISCO BELTRAO 01",
+      "destino": "CO UNIAO DA VITORIA 01"
     },
     {
-      "nome": "PA TABOÃO DA SERRA",
-      "codigo": "000002642"
+      "origem": "CO UNIAO DA VITORIA 01",
+      "destino": "CO FRANCISCO BELTRAO 01"
     },
     {
-      "nome": "PA UBA 01",
-      "codigo": "000002095"
+      "origem": "CO GUARAPUAVA 01",
+      "destino": "CO UNIAO DA VITORIA 01"
     },
     {
-      "nome": "PA UBERLANDIA 01",
-      "codigo": "000002520"
+      "origem": "CO UNIAO DA VITORIA 01",
+      "destino": "CO GUARAPUAVA 01"
     },
     {
-      "nome": "PA VIA VAREJO",
-      "codigo": "000002266"
+      "origem": "CO SAO JOSE DOS PINHAIS 02 FL",
+      "destino": "FL PORTO ALEGRE"
     },
     {
-      "nome": "PA VIANA 01",
-      "codigo": "000001716"
+      "origem": "FL PORTO ALEGRE",
+      "destino": "CO SAO JOSE DOS PINHAIS 02 FL"
     },
     {
-      "nome": "PA VINHEDO 04",
-      "codigo": "000001229"
+      "origem": "LJ CURITIBA 03 FL",
+      "destino": "FL PORTO ALEGRE"
     },
     {
-      "nome": "PA-JAD-PICKUP-CWB",
-      "codigo": "000002270"
+      "origem": "FL PORTO ALEGRE",
+      "destino": "LJ CURITIBA 03 FL"
     },
     {
-      "nome": "TC / FL RIO DE JANEIRO 02",
-      "codigo": "000001794"
+      "origem": "CO TERESINA 01 FL",
+      "destino": "CO CAXIAS 02"
     },
     {
-      "nome": "TC AEREO TECA",
-      "codigo": "000001170"
+      "origem": "CO CAXIAS 02",
+      "destino": "CO TERESINA 01 FL"
     },
     {
-      "nome": "TC ARM FIAT BHZ",
-      "codigo": "000001536"
+      "origem": "HB BOM JESUS 01",
+      "destino": "CB / TL FLORIANO 01"
     },
     {
-      "nome": "TC BANCOS BHZ",
-      "codigo": "000001798"
+      "origem": "CB / TL FLORIANO 01",
+      "destino": "HB BOM JESUS 01"
     },
     {
-      "nome": "TC BLACK FRIDAY",
-      "codigo": "000001458"
+      "origem": "CO TERESINA 01 FL",
+      "destino": "CB / TL FLORIANO 01"
     },
     {
-      "nome": "TC CDA SAO JAD",
-      "codigo": "000001736"
+      "origem": "HB CORRENTE 01",
+      "destino": "CB / TL FLORIANO 01"
     },
     {
-      "nome": "TC CLICK RETIRE RIO 01",
-      "codigo": "000001017"
+      "origem": "CB / TL FLORIANO 01",
+      "destino": "HB CORRENTE 01"
     },
     {
-      "nome": "TC CLICK RETIRE SAO 05",
-      "codigo": "000001648"
+      "origem": "CO TERESINA 01 FL",
+      "destino": "CB / TL PICOS 01"
     },
     {
-      "nome": "TC CLUBE DE COMPRAS CDA",
-      "codigo": "000002511"
+      "origem": "LM / CB / TL SAO RAIMUNDO NONATO 01",
+      "destino": "CB / TL PICOS 01"
     },
     {
-      "nome": "TC DEPOT 01 - FREGUESIA DO O",
-      "codigo": "000000122"
+      "origem": "CB / TL PICOS 01",
+      "destino": "LM / CB / TL SAO RAIMUNDO NONATO 01"
     },
     {
-      "nome": "TC DEPOT 02 - VILA LEOPOLDINA",
-      "codigo": "000002439"
+      "origem": "CB / TL PARNAIBA 01",
+      "destino": "CO TERESINA 01 FL"
     },
     {
-      "nome": "TC DEPOT 1 - FREGUESIA",
-      "codigo": "000002618"
+      "origem": "CO TERESINA 01 FL",
+      "destino": "CB / TL PARNAIBA 01"
     },
     {
-      "nome": "TC EMISSAO TECA",
-      "codigo": "000000159"
+      "origem": "FL RECIFE",
+      "destino": "CO TERESINA 01 FL"
     },
     {
-      "nome": "TC HANGAR JAD",
-      "codigo": "000000561"
+      "origem": "CO UBERABA 01",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "TC JAD INTERNACIONAL",
-      "codigo": "000001393"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO UBERABA 01"
     },
     {
-      "nome": "TC JAD LINE HAUL",
-      "codigo": "000002406"
+      "origem": "4B CO UBERLANDIA 04",
+      "destino": "CO ITUIUTABA 01"
     },
     {
-      "nome": "TC JAD MALOTE",
-      "codigo": "000002513"
+      "origem": "CO ITUIUTABA 01",
+      "destino": "4B CO UBERLANDIA 04"
     },
     {
-      "nome": "TC JAD SALVADOS",
-      "codigo": "000001395"
+      "origem": "CO PATOS DE MINAS 01",
+      "destino": "CO SAO GOTARDO 01"
     },
     {
-      "nome": "TC JADLOG SEDE",
-      "codigo": "000001001"
+      "origem": "CO SAO GOTARDO 01",
+      "destino": "CO PATOS DE MINAS 01"
     },
     {
-      "nome": "TC JOI MECANIZAVEL",
-      "codigo": "000001796"
+      "origem": "CO PARACATU 01",
+      "destino": "CO PATOS DE MINAS 01"
     },
     {
-      "nome": "TC NAO MECANIZAVEL",
-      "codigo": "000001799"
+      "origem": "CO PATOS DE MINAS 01",
+      "destino": "CO PARACATU 01"
     },
     {
-      "nome": "TC N/NE TECA",
-      "codigo": "000000009"
+      "origem": "CO UBERABA 01",
+      "destino": "CO PATOS DE MINAS 01"
     },
     {
-      "nome": "TC PA VINHEDO 02",
-      "codigo": "000000537"
+      "origem": "CO PATOS DE MINAS 01",
+      "destino": "CO UBERABA 01"
     },
     {
-      "nome": "TC REVERSAS-JAD-SAO",
-      "codigo": "000000037"
+      "origem": "CO UBERABA 01",
+      "destino": "CO ARAXA 02"
     },
     {
-      "nome": "TC RIO CONFINADOS",
-      "codigo": "000001183"
+      "origem": "CO ARAXA 02",
+      "destino": "CO UBERABA 01"
     },
     {
-      "nome": "TC SAO CONFINADOS CPA",
-      "codigo": "000000855"
+      "origem": "4B CO UBERLANDIA 04",
+      "destino": "CO ARAGUARI 01"
     },
     {
-      "nome": "TC TECA MATRIZ",
-      "codigo": "000000050"
+      "origem": "CO ARAGUARI 01",
+      "destino": "4B CO UBERLANDIA 04"
     },
     {
-      "nome": "TC TECA NAO MECANIZAVEL",
-      "codigo": "000001169"
+      "origem": "CO ITUMBIARA 01",
+      "destino": "4B CO UBERLANDIA 04"
     },
     {
-      "nome": "TC TESTE 3",
-      "codigo": "000002375"
+      "origem": "4B CO UBERLANDIA 04",
+      "destino": "CO ITUMBIARA 01"
     },
     {
-      "nome": "TC TR BELO HORIZONTE 02",
-      "codigo": "000001174"
+      "origem": "4B CO UBERLANDIA 04",
+      "destino": "CO CATALAO 01"
     },
     {
-      "nome": "TC TR BRASILIA 02",
-      "codigo": "000001172"
+      "origem": "CO CATALAO 01",
+      "destino": "4B CO UBERLANDIA 04"
     },
     {
-      "nome": "TC TR RECIFE 02",
-      "codigo": "000001175"
+      "origem": "CO UBERLANDIA 03",
+      "destino": "4B CO UBERLANDIA 04"
     },
     {
-      "nome": "TC TR RIO DE JANEIRO 02",
-      "codigo": "000001173"
+      "origem": "4B CO UBERLANDIA 04",
+      "destino": "CO UBERLANDIA 03"
     },
     {
-      "nome": "TC TR SALVADOR 02",
-      "codigo": "000001171"
+      "origem": "4B CO UBERLANDIA 04",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "TC VULNERAVEIS BHZ",
-      "codigo": "000001792"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "4B CO UBERLANDIA 04"
     },
     {
-      "nome": "TC VULNERAVEIS RIO",
-      "codigo": "000001382"
+      "origem": "4B CO UBERLANDIA 04",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "TC VULNERAVEL",
-      "codigo": "000001797"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "4B CO UBERLANDIA 04"
     },
     {
-      "nome": "TC VULNERAVEL",
-      "codigo": "000001795"
+      "origem": "CO UNIAO DA VITORIA 01",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "TC VULNERAVEL TECA",
-      "codigo": "000001177"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "CO UNIAO DA VITORIA 01"
     },
     {
-      "nome": "TC 1",
-      "codigo": "000002240"
+      "origem": "CO COLATINA 02",
+      "destino": "FL VITORIA"
     },
     {
-      "nome": "TECA MATRIZ 2",
-      "codigo": "000001892"
+      "origem": "FL VITORIA",
+      "destino": "CO COLATINA 02"
     },
     {
-      "nome": "TL ARACATUBA",
-      "codigo": "000001033"
+      "origem": "CO CACHOEIRO DE ITAPEMIRIM 02",
+      "destino": "FL VITORIA"
     },
     {
-      "nome": "TL BAURU",
-      "codigo": "000001035"
+      "origem": "FL VITORIA",
+      "destino": "CO CACHOEIRO DE ITAPEMIRIM 02"
     },
     {
-      "nome": "TL OSASCO 01",
-      "codigo": "000002587"
+      "origem": "CO VILA VELHA 02",
+      "destino": "FL VITORIA"
     },
     {
-      "nome": "TL OURINHOS",
-      "codigo": "000001031"
+      "origem": "FL VITORIA",
+      "destino": "CO VILA VELHA 02"
     },
     {
-      "nome": "TL PORTO VELHO 04",
-      "codigo": "000002482"
+      "origem": "FL VITORIA",
+      "destino": "CO CARIACICA 01"
     },
     {
-      "nome": "TL PRESIDENTE PRUDENTE",
-      "codigo": "000001032"
+      "origem": "CO SERRA 01",
+      "destino": "FL VITORIA"
     },
     {
-      "nome": "TL SAO BERNARDO DO CAMPO 05",
-      "codigo": "000002574"
+      "origem": "FL VITORIA",
+      "destino": "CO SERRA 01"
     },
     {
-      "nome": "TL SAO CARLOS 01",
-      "codigo": "000001597"
+      "origem": "FL VITORIA",
+      "destino": "MT NEXUS 87 PERUS"
     },
     {
-      "nome": "TL SAO JOSE DO RIO PRETO 01",
-      "codigo": "000001034"
+      "origem": "MT NEXUS 87 PERUS",
+      "destino": "FL VITORIA"
     },
     {
-      "nome": "TR EXTREMA 04",
-      "codigo": "000002568"
+      "origem": "FL BELO HORIZONTE",
+      "destino": "FL VITORIA"
     },
     {
-      "nome": "UML SAO PAULO 20",
-      "codigo": "000001575"
+      "origem": "FL VITORIA",
+      "destino": "FL BELO HORIZONTE"
     },
     {
-      "nome": "4B CO FRANCISCO BELTRAO 02",
-      "codigo": "000002647"
+      "origem": "FL RIO DE JANEIRO",
+      "destino": "FL VITORIA"
     },
     {
-      "nome": "4B CO LIMEIRA 01",
-      "codigo": "000002676"
+      "origem": "FL VITORIA",
+      "destino": "FL RIO DE JANEIRO"
     },
     {
-      "nome": "4B CO UBERLANDIA 04",
-      "codigo": "000002673"
+      "origem": "FL RIO DE JANEIRO",
+      "destino": "FL VITORIA"
     },
     {
-      "nome": "4B CO URUGUAIANA 01",
-      "codigo": "000002675"
+      "origem": "FL VITORIA",
+      "destino": "FL RIO DE JANEIRO"
     },
     {
-      "nome": "4B LJ SAO PAULO 15",
-      "codigo": "000002677"
+      "origem": "FL SALVADOR",
+      "destino": "FL VITORIA"
     },
     {
-      "nome": "5B CO ITUPEVA 02",
-      "codigo": "000002706"
+      "origem": "FL VITORIA",
+      "destino": "FL SALVADOR"
     },
     {
-      "nome": "5B CO VALENCA 01",
-      "codigo": "000002684"
+      "origem": "FL VITORIA",
+      "destino": "MT NEXUS 87 PERUS"
     }
   ]
 }

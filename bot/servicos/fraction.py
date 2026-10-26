@@ -61,6 +61,10 @@ def login_fraction_mega_cartela(
     )
 
 
+class CredenciaisFractionInvalidasError(RuntimeError):
+    """O Fraction recusou as credenciais informadas no login."""
+
+
 def login_fraction(
     page: Page,
     usuario: str,
@@ -92,12 +96,49 @@ def login_fraction(
         name="Login",
     ).click()
 
+    # Aguarda um resultado explícito do login para não deixar uma senha
+    # inválida parecer apenas uma tela que travou até estourar timeout.
+    page.wait_for_function(
+        """() => {
+            const texto = document.body?.innerText || "";
+            if (texto.includes("Login ou senha inválidos.")) return true;
+
+            const visivel = (elemento) =>
+                elemento.getClientRects().length > 0 &&
+                getComputedStyle(elemento).visibility !== "hidden" &&
+                getComputedStyle(elemento).display !== "none";
+
+            return Array.from(
+                document.querySelectorAll('a, [role="link"]')
+            ).some((elemento) =>
+                elemento.innerText.replace(/\\s+/g, " ").trim() === "Consultas" &&
+                visivel(elemento)
+            );
+        }""",
+        timeout=120_000,
+    )
+
+    erro_login = page.get_by_text(
+        "Login ou senha inválidos.",
+        exact=True,
+    ).first
+    if erro_login.is_visible():
+        mensagem_log = (
+            "O Fraction informou 'Login ou senha inválidos.'. Confirme o usuário "
+            "e a senha e atualize a variável de senha correspondente no arquivo "
+            "bot/.env do projeto."
+        )
+        log(f"Warning: {mensagem_log}")
+        raise CredenciaisFractionInvalidasError(
+            "O Fraction recusou o login. Confira o usuário e a senha em bot/.env."
+        )
+
     page.get_by_role(
         "link",
         name="Consultas",
     ).wait_for(
         state="visible",
-        timeout=120_000,
+        timeout=5_000,
     )
 
     log("Login no Fraction concluído.")
@@ -759,11 +800,15 @@ def testar_conexao_fraction_isolada(
             ultimo_erro = (
                 f"{type(erro).__name__}: {erro}"
             )
-
-            log(
-                "Falha no teste de disponibilidade do Fraction: "
-                + ultimo_erro
+            credenciais_invalidas = isinstance(
+                erro,
+                CredenciaisFractionInvalidasError,
             )
+            if not credenciais_invalidas:
+                log(
+                    "Falha no teste de disponibilidade do Fraction: "
+                    + ultimo_erro
+                )
 
         finally:
             fechar_recurso_playwright_seguro(
@@ -774,6 +819,9 @@ def testar_conexao_fraction_isolada(
                 browser,
                 log,
             )
+
+        if credenciais_invalidas:
+            return False, ultimo_erro
 
         if tentativa < tentativas:
             log(

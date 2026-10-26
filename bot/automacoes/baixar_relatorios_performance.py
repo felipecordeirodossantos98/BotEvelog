@@ -566,4 +566,4 @@ def executar_extracao(arquivo, log=lambda msg: None):
         "arquivo_erros": arquivo_erros,
         "total_erros": len(codigos_falhos),
         "pasta": pasta_execucao,
-    }
+}

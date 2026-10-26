@@ -1,0 +1,4172 @@
+{
+  "unidades": [
+    {
+      "unidade": "CB / TL BELEM 11",
+      "codigo": "000001675"
+    },
+    {
+      "unidade": "CB / TL CAMPO GRANDE 02",
+      "codigo": "000001270"
+    },
+    {
+      "unidade": "CB / TL CAMPO GRANDE 10",
+      "codigo": "000001537"
+    },
+    {
+      "unidade": "CB / TL CAMPO MAIOR 01",
+      "codigo": "000001620"
+    },
+    {
+      "unidade": "CB / TL CUIABA 01",
+      "codigo": "000001046"
+    },
+    {
+      "unidade": "CB / TL CURITIBA",
+      "codigo": "000000835"
+    },
+    {
+      "unidade": "CB / TL FLORIANO 01",
+      "codigo": "000001617"
+    },
+    {
+      "unidade": "CB / TL PARNAIBA 01",
+      "codigo": "000001618"
+    },
+    {
+      "unidade": "CB / TL PICOS 01",
+      "codigo": "000001619"
+    },
+    {
+      "unidade": "CB / TL SAO PAULO 02",
+      "codigo": "000002667"
+    },
+    {
+      "unidade": "CB / TL SAO PAULO 11",
+      "codigo": "000001345"
+    },
+    {
+      "unidade": "CB / TL SAO PAULO 15",
+      "codigo": "000002491"
+    },
+    {
+      "unidade": "CB / TL SINOP 02",
+      "codigo": "000001669"
+    },
+    {
+      "unidade": "CB CUIABA 02",
+      "codigo": "000001135"
+    },
+    {
+      "unidade": "CB RIO BRANCO 02",
+      "codigo": "000001126"
+    },
+    {
+      "unidade": "CB/TL SAO PAULO 22",
+      "codigo": "000001579"
+    },
+    {
+      "unidade": "CO AGUAS DE LINDOIA 01",
+      "codigo": "000000462"
+    },
+    {
+      "unidade": "CO ALFENAS",
+      "codigo": "000000991"
+    },
+    {
+      "unidade": "CO ALFENAS 02",
+      "codigo": "000002498"
+    },
+    {
+      "unidade": "CO ALTAMIRA 01",
+      "codigo": "000001671"
+    },
+    {
+      "unidade": "CO AMERICANA 02",
+      "codigo": "000001084"
+    },
+    {
+      "unidade": "CO AMPARO 02",
+      "codigo": "000001759"
+    },
+    {
+      "unidade": "CO ANAPOLIS",
+      "codigo": "000002004"
+    },
+    {
+      "unidade": "CO ANAPOLIS 03",
+      "codigo": "000002530"
+    },
+    {
+      "unidade": "CO ANGRA DOS REIS 02",
+      "codigo": "000001435"
+    },
+    {
+      "unidade": "CO APARECIDA DE GOIANIA 01",
+      "codigo": "000001367"
+    },
+    {
+      "unidade": "CO APUCARANA 01",
+      "codigo": "000002493"
+    },
+    {
+      "unidade": "CO ARACAJU 02 FL",
+      "codigo": "000001329"
+    },
+    {
+      "unidade": "CO ARACATUBA 01",
+      "codigo": "000000679"
+    },
+    {
+      "unidade": "CO ARAGUAINA 02",
+      "codigo": "000001396"
+    },
+    {
+      "unidade": "CO ARAGUARI 01",
+      "codigo": "000001348"
+    },
+    {
+      "unidade": "CO ARAPIRACA 02",
+      "codigo": "000002617"
+    },
+    {
+      "unidade": "CO ARAPONGAS 02",
+      "codigo": "000001020"
+    },
+    {
+      "unidade": "CO ARARANGUA 01",
+      "codigo": "000000606"
+    },
+    {
+      "unidade": "CO ARARAQUARA",
+      "codigo": "000001549"
+    },
+    {
+      "unidade": "CO ARARAQUARA 02",
+      "codigo": "000002508"
+    },
+    {
+      "unidade": "CO ARARUAMA",
+      "codigo": "000001444"
+    },
+    {
+      "unidade": "CO ARAXA 02",
+      "codigo": "000002600"
+    },
+    {
+      "unidade": "CO ARUJA 01",
+      "codigo": "000001967"
+    },
+    {
+      "unidade": "CO ASSIS",
+      "codigo": "000001346"
+    },
+    {
+      "unidade": "CO ASSIS 03",
+      "codigo": "000002523"
+    },
+    {
+      "unidade": "CO ATIBAIA 01",
+      "codigo": "000001195"
+    },
+    {
+      "unidade": "CO AVARE 01",
+      "codigo": "000000515"
+    },
+    {
+      "unidade": "CO BAGE 02",
+      "codigo": "000001812"
+    },
+    {
+      "unidade": "CO BARBACENA 02",
+      "codigo": "000002079"
+    },
+    {
+      "unidade": "CO BARREIRAS 01",
+      "codigo": "000000817"
+    },
+    {
+      "unidade": "CO BARRETOS",
+      "codigo": "000000816"
+    },
+    {
+      "unidade": "CO BARRETOS 02",
+      "codigo": "000002564"
+    },
+    {
+      "unidade": "CO BAURU 01",
+      "codigo": "000000939"
+    },
+    {
+      "unidade": "CO BEBEDOURO 01",
+      "codigo": "000001909"
+    },
+    {
+      "unidade": "CO BELEM 02 FL",
+      "codigo": "000000971"
+    },
+    {
+      "unidade": "CO BELFORD ROXO 01",
+      "codigo": "000002583"
+    },
+    {
+      "unidade": "CO BELFORD ROXO 03",
+      "codigo": "000002291"
+    },
+    {
+      "unidade": "CO BELO HORIZONTE 02",
+      "codigo": "000001871"
+    },
+    {
+      "unidade": "CO BELO HORIZONTE 03",
+      "codigo": "000001059"
+    },
+    {
+      "unidade": "CO BENEVIDES 02",
+      "codigo": "000002099"
+    },
+    {
+      "unidade": "CO BETIM 02",
+      "codigo": "000002294"
+    },
+    {
+      "unidade": "CO BIRIGUI 01",
+      "codigo": "000001770"
+    },
+    {
+      "unidade": "CO BLUMENAU 02",
+      "codigo": "000002659"
+    },
+    {
+      "unidade": "CO BOA VISTA 02",
+      "codigo": "000002500"
+    },
+    {
+      "unidade": "CO BOITUVA 01",
+      "codigo": "000000704"
+    },
+    {
+      "unidade": "CO BOM DESPACHO 01",
+      "codigo": "000000677"
+    },
+    {
+      "unidade": "CO BOTUCATU 02",
+      "codigo": "000001365"
+    },
+    {
+      "unidade": "CO BRAGANCA PAULISTA 02",
+      "codigo": "000002529"
+    },
+    {
+      "unidade": "CO BRASILIA 01",
+      "codigo": "000000272"
+    },
+    {
+      "unidade": "CO BRASILIA 02",
+      "codigo": "000001352"
+    },
+    {
+      "unidade": "CO BRUSQUE 02",
+      "codigo": "000001855"
+    },
+    {
+      "unidade": "CO CABO FRIO 01",
+      "codigo": "000000254"
+    },
+    {
+      "unidade": "CO CACADOR 01",
+      "codigo": "000000920"
+    },
+    {
+      "unidade": "CO CACHOEIRA DO SUL 02",
+      "codigo": "000001104"
+    },
+    {
+      "unidade": "CO CACHOEIRO DE ITAPEMIRIM 02",
+      "codigo": "000001561"
+    },
+    {
+      "unidade": "CO CACOAL 01",
+      "codigo": "000002490"
+    },
+    {
+      "unidade": "CO CAIEIRAS 01",
+      "codigo": "000000553"
+    },
+    {
+      "unidade": "CO CAJAZEIRAS 01",
+      "codigo": "000000834"
+    },
+    {
+      "unidade": "CO CAMACARI 02",
+      "codigo": "000002550"
+    },
+    {
+      "unidade": "CO CAMAQUA 03",
+      "codigo": "000002432"
+    },
+    {
+      "unidade": "CO CAMBE 01",
+      "codigo": "000000765"
+    },
+    {
+      "unidade": "CO CAMPINA GRANDE 02",
+      "codigo": "000001748"
+    },
+    {
+      "unidade": "CO CAMPINAS 01",
+      "codigo": "000001284"
+    },
+    {
+      "unidade": "CO CAMPO GRANDE 02 FL",
+      "codigo": "000000760"
+    },
+    {
+      "unidade": "CO CAMPO GRANDE 03",
+      "codigo": "000002025"
+    },
+    {
+      "unidade": "CO CAMPO LARGO 01",
+      "codigo": "000000407"
+    },
+    {
+      "unidade": "CO CAMPO MOURAO 01",
+      "codigo": "000000927"
+    },
+    {
+      "unidade": "CO CAMPOS DOS GOYTACAZES 01",
+      "codigo": "000000527"
+    },
+    {
+      "unidade": "CO CANOAS 02",
+      "codigo": "000001844"
+    },
+    {
+      "unidade": "CO CANOINHAS 01",
+      "codigo": "000001402"
+    },
+    {
+      "unidade": "CO CARAGUATATUBA 01",
+      "codigo": "000000952"
+    },
+    {
+      "unidade": "CO CARAPICUIBA 01",
+      "codigo": "000000907"
+    },
+    {
+      "unidade": "CO CARATINGA 01",
+      "codigo": "000001712"
+    },
+    {
+      "unidade": "CO CARAZINHO 02",
+      "codigo": "000002612"
+    },
+    {
+      "unidade": "CO CARIACICA 02",
+      "codigo": "000002653"
+    },
+    {
+      "unidade": "CO CARUARU 01",
+      "codigo": "000000731"
+    },
+    {
+      "unidade": "CO CASCAVEL 02",
+      "codigo": "000002551"
+    },
+    {
+      "unidade": "CO CATAGUASES 01",
+      "codigo": "000000513"
+    },
+    {
+      "unidade": "CO CATALAO 01",
+      "codigo": "000000573"
+    },
+    {
+      "unidade": "CO CATANDUVA",
+      "codigo": "000001418"
+    },
+    {
+      "unidade": "CO CATANDUVA 02",
+      "codigo": "000002447"
+    },
+    {
+      "unidade": "CO CAXIAS DO SUL",
+      "codigo": "000001692"
+    },
+    {
+      "unidade": "CO CAXIAS DO SUL 02",
+      "codigo": "000002356"
+    },
+    {
+      "unidade": "CO CAXIAS DO SUL 03",
+      "codigo": "000002480"
+    },
+    {
+      "unidade": "CO CAXIAS 01",
+      "codigo": "000002626"
+    },
+    {
+      "unidade": "CO CAXIAS 02",
+      "codigo": "000002538"
+    },
+    {
+      "unidade": "CO COLATINA 02",
+      "codigo": "000001733"
+    },
+    {
+      "unidade": "CO CONCORDIA 01",
+      "codigo": "000000444"
+    },
+    {
+      "unidade": "CO CONSELHEIRO LAFAIETE 02",
+      "codigo": "000001312"
+    },
+    {
+      "unidade": "CO CONTAGEM 02",
+      "codigo": "000002649"
+    },
+    {
+      "unidade": "CO COTIA 01",
+      "codigo": "000000737"
+    },
+    {
+      "unidade": "CO CRICIUMA 02",
+      "codigo": "000002622"
+    },
+    {
+      "unidade": "CO CUIABA 01 FL",
+      "codigo": "000001680"
+    },
+    {
+      "unidade": "CO CURITIBA 03",
+      "codigo": "000002362"
+    },
+    {
+      "unidade": "CO CURITIBANOS 01",
+      "codigo": "000001772"
+    },
+    {
+      "unidade": "CO CURVELO 02",
+      "codigo": "000001983"
+    },
+    {
+      "unidade": "CO DIADEMA 01",
+      "codigo": "000000512"
+    },
+    {
+      "unidade": "CO DIVINOPOLIS 02",
+      "codigo": "000001019"
+    },
+    {
+      "unidade": "CO DOURADOS 01",
+      "codigo": "000000524"
+    },
+    {
+      "unidade": "CO DUQUE DE CAXIAS 01",
+      "codigo": "000002018"
+    },
+    {
+      "unidade": "CO DUQUE DE CAXIAS 02",
+      "codigo": "000001873"
+    },
+    {
+      "unidade": "CO ERECHIM 02",
+      "codigo": "000001249"
+    },
+    {
+      "unidade": "CO ESPIRITO SANTO DO PINHAL 01",
+      "codigo": "000001880"
+    },
+    {
+      "unidade": "CO ESTANCIA VELHA 01",
+      "codigo": "000002485"
+    },
+    {
+      "unidade": "CO ESTEIO 01",
+      "codigo": "000000964"
+    },
+    {
+      "unidade": "CO EUNAPOLIS",
+      "codigo": "000002539"
+    },
+    {
+      "unidade": "CO EUNAPOLIS 01",
+      "codigo": "000002666"
+    },
+    {
+      "unidade": "CO EXTREMA 01",
+      "codigo": "000001883"
+    },
+    {
+      "unidade": "CO FARROUPILHA 01",
+      "codigo": "000000724"
+    },
+    {
+      "unidade": "CO FEIRA DE SANTANA 02",
+      "codigo": "000002153"
+    },
+    {
+      "unidade": "CO FLORIANOPOLIS 01",
+      "codigo": "000001765"
+    },
+    {
+      "unidade": "CO FORMIGA 01",
+      "codigo": "000000718"
+    },
+    {
+      "unidade": "CO FORMOSA 02",
+      "codigo": "000001651"
+    },
+    {
+      "unidade": "CO FORTALEZA",
+      "codigo": "000002542"
+    },
+    {
+      "unidade": "CO FOZ DO IGUACU 02",
+      "codigo": "000001005"
+    },
+    {
+      "unidade": "CO FRANCA 02",
+      "codigo": "000001874"
+    },
+    {
+      "unidade": "CO GARANHUNS 01",
+      "codigo": "000000613"
+    },
+    {
+      "unidade": "CO GARCA 01",
+      "codigo": "000002452"
+    },
+    {
+      "unidade": "CO GOIANIA 01",
+      "codigo": "000000996"
+    },
+    {
+      "unidade": "CO GOIANIA 03",
+      "codigo": "000001816"
+    },
+    {
+      "unidade": "CO GOV VALADARES 01",
+      "codigo": "000000917"
+    },
+    {
+      "unidade": "CO GRAVATAI",
+      "codigo": "000001986"
+    },
+    {
+      "unidade": "CO GUAIBA 01",
+      "codigo": "000000741"
+    },
+    {
+      "unidade": "CO GUANAMBI",
+      "codigo": "000000411"
+    },
+    {
+      "unidade": "CO GUANAMBI 02",
+      "codigo": "000002479"
+    },
+    {
+      "unidade": "CO GUAPIMIRIM",
+      "codigo": "000001649"
+    },
+    {
+      "unidade": "CO GUAPIMIRIM 02",
+      "codigo": "000002407"
+    },
+    {
+      "unidade": "CO GUARAPARI 01",
+      "codigo": "000001606"
+    },
+    {
+      "unidade": "CO GUARAPUAVA 01",
+      "codigo": "000000433"
+    },
+    {
+      "unidade": "CO GUARATINGUETA 01",
+      "codigo": "000000199"
+    },
+    {
+      "unidade": "CO GUARUJA",
+      "codigo": "000001703"
+    },
+    {
+      "unidade": "CO GUARUJA 02",
+      "codigo": "000002422"
+    },
+    {
+      "unidade": "CO GUARULHOS 01",
+      "codigo": "000002154"
+    },
+    {
+      "unidade": "CO GUAXUPE 01",
+      "codigo": "000000728"
+    },
+    {
+      "unidade": "CO GURUPI 02",
+      "codigo": "000001707"
+    },
+    {
+      "unidade": "CO HOLAMBRA 01",
+      "codigo": "000001120"
+    },
+    {
+      "unidade": "CO HORTOLANDIA 01",
+      "codigo": "000000337"
+    },
+    {
+      "unidade": "CO IBITINGA 02",
+      "codigo": "000001160"
+    },
+    {
+      "unidade": "CO IGREJINHA 01",
+      "codigo": "000001806"
+    },
+    {
+      "unidade": "CO IJUI 01",
+      "codigo": "000000370"
+    },
+    {
+      "unidade": "CO ILHEUS",
+      "codigo": "000000558"
+    },
+    {
+      "unidade": "CO ILHEUS 02",
+      "codigo": "000002671"
+    },
+    {
+      "unidade": "CO IMPERATRIZ 02",
+      "codigo": "000000997"
+    },
+    {
+      "unidade": "CO INDAIAL 01",
+      "codigo": "000000631"
+    },
+    {
+      "unidade": "CO INDAIATUBA 02",
+      "codigo": "000001754"
+    },
+    {
+      "unidade": "CO IPATINGA 02",
+      "codigo": "000001156"
+    },
+    {
+      "unidade": "CO IRECE 01",
+      "codigo": "000001158"
+    },
+    {
+      "unidade": "CO ITABIRA 01",
+      "codigo": "000001607"
+    },
+    {
+      "unidade": "CO ITABIRITO 01",
+      "codigo": "000002057"
+    },
+    {
+      "unidade": "CO ITABORAI 01",
+      "codigo": "000001866"
+    },
+    {
+      "unidade": "CO ITABUNA 01",
+      "codigo": "000000474"
+    },
+    {
+      "unidade": "CO ITAJAI 01",
+      "codigo": "000002664"
+    },
+    {
+      "unidade": "CO ITAJAI 02",
+      "codigo": "000001769"
+    },
+    {
+      "unidade": "CO ITAJUBA 01",
+      "codigo": "000000516"
+    },
+    {
+      "unidade": "CO ITAPECERICA DA SERRA 01",
+      "codigo": "000001361"
+    },
+    {
+      "unidade": "CO ITAPERUNA 02",
+      "codigo": "000002544"
+    },
+    {
+      "unidade": "CO ITAPETININGA",
+      "codigo": "000000932"
+    },
+    {
+      "unidade": "CO ITAPETININGA 02",
+      "codigo": "000002458"
+    },
+    {
+      "unidade": "CO ITAPEVA 02",
+      "codigo": "000001534"
+    },
+    {
+      "unidade": "CO ITAPEVI",
+      "codigo": "000001947"
+    },
+    {
+      "unidade": "CO ITAPEVI 01",
+      "codigo": "000002495"
+    },
+    {
+      "unidade": "CO ITAPIRA 01",
+      "codigo": "000000743"
+    },
+    {
+      "unidade": "CO ITAQUAQUECETUBA 02",
+      "codigo": "000001044"
+    },
+    {
+      "unidade": "CO ITAUNA 01",
+      "codigo": "000000658"
+    },
+    {
+      "unidade": "CO ITU",
+      "codigo": "000002146"
+    },
+    {
+      "unidade": "CO ITU 01",
+      "codigo": "000002644"
+    },
+    {
+      "unidade": "CO ITUIUTABA 01",
+      "codigo": "000002185"
+    },
+    {
+      "unidade": "CO ITUMBIARA 01",
+      "codigo": "000000431"
+    },
+    {
+      "unidade": "CO ITUPEVA",
+      "codigo": "000000477"
+    },
+    {
+      "unidade": "CO JABOATAO DOS GUARARAPES 03",
+      "codigo": "000002478"
+    },
+    {
+      "unidade": "CO JABOTICABAL 01",
+      "codigo": "000000759"
+    },
+    {
+      "unidade": "CO JACAREI 03",
+      "codigo": "000002454"
+    },
+    {
+      "unidade": "CO JACUTINGA 01",
+      "codigo": "000001330"
+    },
+    {
+      "unidade": "CO JAD BHZ",
+      "codigo": "000001182"
+    },
+    {
+      "unidade": "CO JAD FORTALEZA",
+      "codigo": "000002620"
+    },
+    {
+      "unidade": "CO JAD MANAUS",
+      "codigo": "000002287"
+    },
+    {
+      "unidade": "CO JAD PORTO ALEGRE",
+      "codigo": "000002443"
+    },
+    {
+      "unidade": "CO JAD SALVADOR",
+      "codigo": "000002173"
+    },
+    {
+      "unidade": "CO JAD SAO PAULO",
+      "codigo": "000000086"
+    },
+    {
+      "unidade": "CO JAGUARIUNA 02",
+      "codigo": "000002049"
+    },
+    {
+      "unidade": "CO JARAGUA DO SUL 02",
+      "codigo": "000002616"
+    },
+    {
+      "unidade": "CO JATAI 01",
+      "codigo": "000000719"
+    },
+    {
+      "unidade": "CO JAU 02",
+      "codigo": "000001069"
+    },
+    {
+      "unidade": "CO JI-PARANA 02",
+      "codigo": "000002496"
+    },
+    {
+      "unidade": "CO JOACABA 02",
+      "codigo": "000001988"
+    },
+    {
+      "unidade": "CO JOAO MONLEVADE 01",
+      "codigo": "000001604"
+    },
+    {
+      "unidade": "CO JOAO PESSOA 02 FL",
+      "codigo": "000001701"
+    },
+    {
+      "unidade": "CO JOINVILLE 02",
+      "codigo": "000002536"
+    },
+    {
+      "unidade": "CO JUAZEIRO DO NORTE 01",
+      "codigo": "000001217"
+    },
+    {
+      "unidade": "CO JUIZ DE FORA 02",
+      "codigo": "000001755"
+    },
+    {
+      "unidade": "CO JUNDIAI 01",
+      "codigo": "000002285"
+    },
+    {
+      "unidade": "CO LAGES 01",
+      "codigo": "000001267"
+    },
+    {
+      "unidade": "CO LAGOA DA PRATA 01",
+      "codigo": "000000660"
+    },
+    {
+      "unidade": "CO LAGOA SANTA 03",
+      "codigo": "000001980"
+    },
+    {
+      "unidade": "CO LAJEADO 01",
+      "codigo": "000000618"
+    },
+    {
+      "unidade": "CO LAVRAS 02",
+      "codigo": "000002579"
+    },
+    {
+      "unidade": "CO LENCOIS PAULISTA 01",
+      "codigo": "000001612"
+    },
+    {
+      "unidade": "CO LIMEIRA",
+      "codigo": "000002150"
+    },
+    {
+      "unidade": "CO LINHARES 01",
+      "codigo": "000001654"
+    },
+    {
+      "unidade": "CO LINS 01",
+      "codigo": "000000769"
+    },
+    {
+      "unidade": "CO LONDRINA 01",
+      "codigo": "000001706"
+    },
+    {
+      "unidade": "CO MACAE 02",
+      "codigo": "000002650"
+    },
+    {
+      "unidade": "CO MACAPA",
+      "codigo": "000001343"
+    },
+    {
+      "unidade": "CO MACAPA 02",
+      "codigo": "000002549"
+    },
+    {
+      "unidade": "CO MACEIO 01 FL",
+      "codigo": "000001721"
+    },
+    {
+      "unidade": "CO MAFRA 02",
+      "codigo": "000002483"
+    },
+    {
+      "unidade": "CO MANAUS",
+      "codigo": "000001602"
+    },
+    {
+      "unidade": "CO MANHUACU 01",
+      "codigo": "000000684"
+    },
+    {
+      "unidade": "CO MAR DE ESPANHA 01",
+      "codigo": "000002137"
+    },
+    {
+      "unidade": "CO MARABA",
+      "codigo": "000001594"
+    },
+    {
+      "unidade": "CO MARABA 03",
+      "codigo": "000002471"
+    },
+    {
+      "unidade": "CO MARICA 02",
+      "codigo": "000002344"
+    },
+    {
+      "unidade": "CO MARILIA 01",
+      "codigo": "000000812"
+    },
+    {
+      "unidade": "CO MARINGA 02",
+      "codigo": "000000980"
+    },
+    {
+      "unidade": "CO MIRASSOL",
+      "codigo": "000001997"
+    },
+    {
+      "unidade": "CO MIRASSOL 02",
+      "codigo": "000002670"
+    },
+    {
+      "unidade": "CO MOCOCA 01",
+      "codigo": "000000951"
+    },
+    {
+      "unidade": "CO MOGI DAS CRUZES 01",
+      "codigo": "000000420"
+    },
+    {
+      "unidade": "CO MOGI MIRIM 02",
+      "codigo": "000002456"
+    },
+    {
+      "unidade": "CO MONGAGUA 02",
+      "codigo": "000002084"
+    },
+    {
+      "unidade": "CO MONTE ALTO 01",
+      "codigo": "000000463"
+    },
+    {
+      "unidade": "CO MONTE MOR 02",
+      "codigo": "000001072"
+    },
+    {
+      "unidade": "CO MONTE SIAO 01",
+      "codigo": "000001853"
+    },
+    {
+      "unidade": "CO MONTES CLAROS 01",
+      "codigo": "000000161"
+    },
+    {
+      "unidade": "CO MOSSORO 02",
+      "codigo": "000001753"
+    },
+    {
+      "unidade": "CO MURIAE 02",
+      "codigo": "000001127"
+    },
+    {
+      "unidade": "CO NATAL 01 FL",
+      "codigo": "000000286"
+    },
+    {
+      "unidade": "CO NAVEGANTES 01",
+      "codigo": "000001791"
+    },
+    {
+      "unidade": "CO NITEROI 02",
+      "codigo": "000002541"
+    },
+    {
+      "unidade": "CO NOVA FRIBURGO",
+      "codigo": "000000640"
+    },
+    {
+      "unidade": "CO NOVA FRIBURGO 02",
+      "codigo": "000002295"
+    },
+    {
+      "unidade": "CO NOVA LIMA 02",
+      "codigo": "000001981"
+    },
+    {
+      "unidade": "CO NOVA SERRANA 01",
+      "codigo": "000001318"
+    },
+    {
+      "unidade": "CO NOVO HAMBURGO 02",
+      "codigo": "000001767"
+    },
+    {
+      "unidade": "CO OLINDA 02",
+      "codigo": "000002364"
+    },
+    {
+      "unidade": "CO OSORIO 01",
+      "codigo": "000000973"
+    },
+    {
+      "unidade": "CO OURINHOS 01",
+      "codigo": "000000071"
+    },
+    {
+      "unidade": "CO OURO BRANCO 02",
+      "codigo": "000002457"
+    },
+    {
+      "unidade": "CO OURO FINO 02",
+      "codigo": "000001233"
+    },
+    {
+      "unidade": "CO OURO PRETO 03",
+      "codigo": "000001982"
+    },
+    {
+      "unidade": "CO PALHOCA 02",
+      "codigo": "000001231"
+    },
+    {
+      "unidade": "CO PALMAS 01 FL",
+      "codigo": "000000455"
+    },
+    {
+      "unidade": "CO PARA DE MINAS 01",
+      "codigo": "000001398"
+    },
+    {
+      "unidade": "CO PARACATU 01",
+      "codigo": "000001228"
+    },
+    {
+      "unidade": "CO PARANAGUA 02",
+      "codigo": "000001226"
+    },
+    {
+      "unidade": "CO PARANAVAI 01",
+      "codigo": "000000531"
+    },
+    {
+      "unidade": "CO PARATY 01",
+      "codigo": "000001282"
+    },
+    {
+      "unidade": "CO PARAUAPEBAS 02",
+      "codigo": "000001314"
+    },
+    {
+      "unidade": "CO PASSO FUNDO 02",
+      "codigo": "000002293"
+    },
+    {
+      "unidade": "CO PASSOS 02",
+      "codigo": "000001235"
+    },
+    {
+      "unidade": "CO PATO BRANCO 01",
+      "codigo": "000000641"
+    },
+    {
+      "unidade": "CO PATOS DE MINAS 01",
+      "codigo": "000000810"
+    },
+    {
+      "unidade": "CO PATOS 01",
+      "codigo": "000001262"
+    },
+    {
+      "unidade": "CO PATROCINIO 01",
+      "codigo": "000001811"
+    },
+    {
+      "unidade": "CO PAULINIA",
+      "codigo": "000001285"
+    },
+    {
+      "unidade": "CO PAULINIA 02",
+      "codigo": "000002449"
+    },
+    {
+      "unidade": "CO PAULO AFONSO 01",
+      "codigo": "000001115"
+    },
+    {
+      "unidade": "CO PELOTAS 02",
+      "codigo": "000001401"
+    },
+    {
+      "unidade": "CO PETROLINA",
+      "codigo": "000002455"
+    },
+    {
+      "unidade": "CO PETROLINA 03",
+      "codigo": "000002486"
+    },
+    {
+      "unidade": "CO PETROPOLIS 02",
+      "codigo": "000002586"
+    },
+    {
+      "unidade": "CO PIMENTA BUENO 01",
+      "codigo": "000002502"
+    },
+    {
+      "unidade": "CO PINHAIS 02",
+      "codigo": "000001766"
+    },
+    {
+      "unidade": "CO PIRACAIA 02",
+      "codigo": "000001662"
+    },
+    {
+      "unidade": "CO PIRACICABA 02",
+      "codigo": "000002163"
+    },
+    {
+      "unidade": "CO PIRAQUARA 01",
+      "codigo": "000002605"
+    },
+    {
+      "unidade": "CO PIRASSUNUNGA 01",
+      "codigo": "000001218"
+    },
+    {
+      "unidade": "CO POCOS DE CALDAS 01",
+      "codigo": "000000118"
+    },
+    {
+      "unidade": "CO PONTA GROSSA 03",
+      "codigo": "000002390"
+    },
+    {
+      "unidade": "CO PONTE NOVA 01",
+      "codigo": "000000643"
+    },
+    {
+      "unidade": "CO PORTO ALEGRE 01",
+      "codigo": "000000402"
+    },
+    {
+      "unidade": "CO PORTO ALEGRE 02",
+      "codigo": "000000378"
+    },
+    {
+      "unidade": "CO PORTO ALEGRE 03",
+      "codigo": "000000762"
+    },
+    {
+      "unidade": "CO PORTO FERREIRA 01",
+      "codigo": "000001734"
+    },
+    {
+      "unidade": "CO PORTO VELHO 01",
+      "codigo": "000000042"
+    },
+    {
+      "unidade": "CO POUSO ALEGRE 02",
+      "codigo": "000001593"
+    },
+    {
+      "unidade": "CO PRESIDENTE PRUDENTE 02",
+      "codigo": "000002061"
+    },
+    {
+      "unidade": "CO QUEIMADOS",
+      "codigo": "000001987"
+    },
+    {
+      "unidade": "CO QUEIMADOS 01",
+      "codigo": "000002665"
+    },
+    {
+      "unidade": "CO RECIFE 01",
+      "codigo": "000001410"
+    },
+    {
+      "unidade": "CO REDENCAO 01",
+      "codigo": "000002051"
+    },
+    {
+      "unidade": "CO REGISTRO 01",
+      "codigo": "000001528"
+    },
+    {
+      "unidade": "CO RIBEIRAO PRETO 01",
+      "codigo": "000000182"
+    },
+    {
+      "unidade": "CO RIBEIRAO PRETO 02",
+      "codigo": "000002475"
+    },
+    {
+      "unidade": "CO RIBEIRAO PRETO 04",
+      "codigo": "000002522"
+    },
+    {
+      "unidade": "CO RIO BRANCO 02 FL",
+      "codigo": "000001248"
+    },
+    {
+      "unidade": "CO RIO CLARO 02",
+      "codigo": "000001556"
+    },
+    {
+      "unidade": "CO RIO DAS OSTRAS 01",
+      "codigo": "000000421"
+    },
+    {
+      "unidade": "CO RIO DE JANEIRO 01",
+      "codigo": "000000030"
+    },
+    {
+      "unidade": "CO RIO DE JANEIRO 03",
+      "codigo": "000000289"
+    },
+    {
+      "unidade": "CO RIO DE JANEIRO 04",
+      "codigo": "000000796"
+    },
+    {
+      "unidade": "CO RIO DE JANEIRO 05",
+      "codigo": "000002102"
+    },
+    {
+      "unidade": "CO RIO DE JANEIRO 06",
+      "codigo": "000002484"
+    },
+    {
+      "unidade": "CO RIO DE JANEIRO 07",
+      "codigo": "000000792"
+    },
+    {
+      "unidade": "CO RIO DE JANEIRO 08",
+      "codigo": "000001381"
+    },
+    {
+      "unidade": "CO RIO DE JANEIRO 10",
+      "codigo": "000002611"
+    },
+    {
+      "unidade": "CO RIO DE JANEIRO 13",
+      "codigo": "000002030"
+    },
+    {
+      "unidade": "CO RIO DO SUL 02",
+      "codigo": "000001476"
+    },
+    {
+      "unidade": "CO RIO GRANDE 02",
+      "codigo": "000001933"
+    },
+    {
+      "unidade": "CO RIO VERDE 03",
+      "codigo": "000002401"
+    },
+    {
+      "unidade": "CO RONDONOPOLIS",
+      "codigo": "000001946"
+    },
+    {
+      "unidade": "CO RONDONOPOLIS 03",
+      "codigo": "000002416"
+    },
+    {
+      "unidade": "CO SALVADOR",
+      "codigo": "000001930"
+    },
+    {
+      "unidade": "CO SALVADOR",
+      "codigo": "000001638"
+    },
+    {
+      "unidade": "CO SAMAMBAIA 01",
+      "codigo": "000000771"
+    },
+    {
+      "unidade": "CO SANTA BARBARA DO OESTE 01",
+      "codigo": "000000882"
+    },
+    {
+      "unidade": "CO SANTA MARIA",
+      "codigo": "000001976"
+    },
+    {
+      "unidade": "CO SANTA MARIA 01",
+      "codigo": "000002661"
+    },
+    {
+      "unidade": "CO SANTA RITA DO SAPUCAI 02",
+      "codigo": "000001428"
+    },
+    {
+      "unidade": "CO SANTA ROSA 02",
+      "codigo": "000001890"
+    },
+    {
+      "unidade": "CO SANTAREM 01",
+      "codigo": "000000440"
+    },
+    {
+      "unidade": "CO SANTO ANDRE 01",
+      "codigo": "000001817"
+    },
+    {
+      "unidade": "CO SANTO ANGELO 02",
+      "codigo": "000001091"
+    },
+    {
+      "unidade": "CO SANTO ANTONIO DE PADUA",
+      "codigo": "000001198"
+    },
+    {
+      "unidade": "CO SANTOS 02",
+      "codigo": "000001464"
+    },
+    {
+      "unidade": "CO SAO BENTO DO SUL 01",
+      "codigo": "000002651"
+    },
+    {
+      "unidade": "CO SAO BORJA 02",
+      "codigo": "000001130"
+    },
+    {
+      "unidade": "CO SAO CARLOS",
+      "codigo": "000001451"
+    },
+    {
+      "unidade": "CO SAO CARLOS 01",
+      "codigo": "000002499"
+    },
+    {
+      "unidade": "CO SAO FRANCISCO DO SUL 01",
+      "codigo": "000000484"
+    },
+    {
+      "unidade": "CO SAO GABRIEL",
+      "codigo": "000000473"
+    },
+    {
+      "unidade": "CO SAO GABRIEL 02",
+      "codigo": "000002554"
+    },
+    {
+      "unidade": "CO SAO GONCALO 01",
+      "codigo": "000001261"
+    },
+    {
+      "unidade": "CO SAO GONCALO 02",
+      "codigo": "000002658"
+    },
+    {
+      "unidade": "CO SAO GOTARDO 01",
+      "codigo": "000000822"
+    },
+    {
+      "unidade": "CO SAO JOAO DA BOA VISTA 01",
+      "codigo": "000001650"
+    },
+    {
+      "unidade": "CO SAO JOAO DE MERITI 01",
+      "codigo": "000002464"
+    },
+    {
+      "unidade": "CO SAO JOAO DEL REI 02",
+      "codigo": "000002292"
+    },
+    {
+      "unidade": "CO SAO JOAQUIM DA BARRA 02",
+      "codigo": "000002460"
+    },
+    {
+      "unidade": "CO SAO JOSE DO RIO PARDO 02",
+      "codigo": "000002363"
+    },
+    {
+      "unidade": "CO SAO JOSE DO RIO PRETO 01",
+      "codigo": "000002382"
+    },
+    {
+      "unidade": "CO SAO JOSE DOS CAMPOS 01",
+      "codigo": "000002088"
+    },
+    {
+      "unidade": "CO SAO JOSE DOS PINHAIS 02 FL",
+      "codigo": "000001682"
+    },
+    {
+      "unidade": "CO SAO LEOPOLDO 01",
+      "codigo": "000000585"
+    },
+    {
+      "unidade": "CO SAO LOURENCO",
+      "codigo": "000001168"
+    },
+    {
+      "unidade": "CO SAO LOURENCO 02",
+      "codigo": "000002660"
+    },
+    {
+      "unidade": "CO SAO LUIS 02 FL",
+      "codigo": "000001289"
+    },
+    {
+      "unidade": "CO SAO LUIS 03",
+      "codigo": "000002016"
+    },
+    {
+      "unidade": "CO SAO PAULO 01",
+      "codigo": "000001936"
+    },
+    {
+      "unidade": "CO SAO PAULO 02",
+      "codigo": "000002606"
+    },
+    {
+      "unidade": "CO SAO PAULO 10",
+      "codigo": "000002204"
+    },
+    {
+      "unidade": "CO SAO PAULO 12",
+      "codigo": "000002015"
+    },
+    {
+      "unidade": "CO SAO PAULO 16",
+      "codigo": "000000947"
+    },
+    {
+      "unidade": "CO SAO ROQUE 01",
+      "codigo": "000000586"
+    },
+    {
+      "unidade": "CO SAO SEBASTIAO DO PARAISO 01",
+      "codigo": "000002034"
+    },
+    {
+      "unidade": "CO SERRA 01",
+      "codigo": "000001851"
+    },
+    {
+      "unidade": "CO SERTAOZINHO",
+      "codigo": "000002524"
+    },
+    {
+      "unidade": "CO SERTAOZINHO 02",
+      "codigo": "000002627"
+    },
+    {
+      "unidade": "CO SETE LAGOAS",
+      "codigo": "000000137"
+    },
+    {
+      "unidade": "CO SETE LAGOAS 01",
+      "codigo": "000000275"
+    },
+    {
+      "unidade": "CO SINOP 01",
+      "codigo": "000001814"
+    },
+    {
+      "unidade": "CO SOBRAL 01",
+      "codigo": "000001614"
+    },
+    {
+      "unidade": "CO SOROCABA 01",
+      "codigo": "000002575"
+    },
+    {
+      "unidade": "CO STA CRUZ DO SUL 02",
+      "codigo": "000001739"
+    },
+    {
+      "unidade": "CO STA RITA DO SAPUCAI",
+      "codigo": "000000299"
+    },
+    {
+      "unidade": "CO SUMARE 02",
+      "codigo": "000001720"
+    },
+    {
+      "unidade": "CO SUZANO 01",
+      "codigo": "000000696"
+    },
+    {
+      "unidade": "CO TAGUATINGA 01",
+      "codigo": "000001052"
+    },
+    {
+      "unidade": "CO TATUI 01",
+      "codigo": "000000579"
+    },
+    {
+      "unidade": "CO TAUBATE 01",
+      "codigo": "000001590"
+    },
+    {
+      "unidade": "CO TEIXEIRA DE FREITAS 02",
+      "codigo": "000002477"
+    },
+    {
+      "unidade": "CO TEOFILO OTONI 01",
+      "codigo": "000000721"
+    },
+    {
+      "unidade": "CO TERESINA 01 FL",
+      "codigo": "000001553"
+    },
+    {
+      "unidade": "CO TERESOPOLIS 01",
+      "codigo": "000002615"
+    },
+    {
+      "unidade": "CO TIETE 01",
+      "codigo": "000000506"
+    },
+    {
+      "unidade": "CO TIJUCAS 01",
+      "codigo": "000002002"
+    },
+    {
+      "unidade": "CO TIMOTEO 01",
+      "codigo": "000000074"
+    },
+    {
+      "unidade": "CO TOLEDO 01",
+      "codigo": "000000738"
+    },
+    {
+      "unidade": "CO TRES CORACOES 01",
+      "codigo": "000000661"
+    },
+    {
+      "unidade": "CO TRES LAGOAS 01",
+      "codigo": "000001735"
+    },
+    {
+      "unidade": "CO TRES RIOS 01",
+      "codigo": "000000445"
+    },
+    {
+      "unidade": "CO TUBARAO 01",
+      "codigo": "000000890"
+    },
+    {
+      "unidade": "CO TUPA 02",
+      "codigo": "000001975"
+    },
+    {
+      "unidade": "CO UBA 01",
+      "codigo": "000000374"
+    },
+    {
+      "unidade": "CO UBERABA 01",
+      "codigo": "000000068"
+    },
+    {
+      "unidade": "CO UBERLANDIA",
+      "codigo": "000001718"
+    },
+    {
+      "unidade": "CO UBERLANDIA 01",
+      "codigo": "000002662"
+    },
+    {
+      "unidade": "CO UMUARAMA 01",
+      "codigo": "000000294"
+    },
+    {
+      "unidade": "CO UNIAO DA VITORIA 01",
+      "codigo": "000000371"
+    },
+    {
+      "unidade": "CO URUGUAIANA 02",
+      "codigo": "000001283"
+    },
+    {
+      "unidade": "CO VALENCA",
+      "codigo": "000002569"
+    },
+    {
+      "unidade": "CO VALINHOS 02",
+      "codigo": "000001426"
+    },
+    {
+      "unidade": "CO VARGEM GRANDE DO SUL 01",
+      "codigo": "000000061"
+    },
+    {
+      "unidade": "CO VARGINHA 01",
+      "codigo": "000000539"
+    },
+    {
+      "unidade": "CO VARZEA PAULISTA",
+      "codigo": "000001085"
+    },
+    {
+      "unidade": "CO VICOSA 02",
+      "codigo": "000001681"
+    },
+    {
+      "unidade": "CO VIDEIRA 01",
+      "codigo": "000001242"
+    },
+    {
+      "unidade": "CO VILA VELHA 02",
+      "codigo": "000001313"
+    },
+    {
+      "unidade": "CO VILHENA",
+      "codigo": "000001724"
+    },
+    {
+      "unidade": "CO VILHENA 01",
+      "codigo": "000002489"
+    },
+    {
+      "unidade": "CO VINHEDO 01",
+      "codigo": "000000857"
+    },
+    {
+      "unidade": "CO VITORIA",
+      "codigo": "000002535"
+    },
+    {
+      "unidade": "CO VITORIA DA CONQUISTA 01",
+      "codigo": "000001008"
+    },
+    {
+      "unidade": "CO VOLTA REDONDA 01",
+      "codigo": "000000339"
+    },
+    {
+      "unidade": "CO VOTORANTIM 01",
+      "codigo": "000001860"
+    },
+    {
+      "unidade": "CO VOTUPORANGA 01",
+      "codigo": "000000342"
+    },
+    {
+      "unidade": "CO XANXERE 01",
+      "codigo": "000000566"
+    },
+    {
+      "unidade": "DEPOT MILKRUN I",
+      "codigo": "000002703"
+    },
+    {
+      "unidade": "DEPOT MILKRUN II",
+      "codigo": "000002704"
+    },
+    {
+      "unidade": "DLM BELEM 04",
+      "codigo": "000001515"
+    },
+    {
+      "unidade": "DLM BELEM 05",
+      "codigo": "000001516"
+    },
+    {
+      "unidade": "DLM BELEM 10",
+      "codigo": "000001563"
+    },
+    {
+      "unidade": "DLM BELO HORIZONTE 04",
+      "codigo": "000001506"
+    },
+    {
+      "unidade": "DLM CAMPO GRANDE",
+      "codigo": "000001931"
+    },
+    {
+      "unidade": "DLM CAMPO GRANDE 03",
+      "codigo": "000002463"
+    },
+    {
+      "unidade": "DLM CUIABA 03",
+      "codigo": "000001502"
+    },
+    {
+      "unidade": "DLM CUIABA 04",
+      "codigo": "000002087"
+    },
+    {
+      "unidade": "DLM CURITIBA 03",
+      "codigo": "000002214"
+    },
+    {
+      "unidade": "DLM FLORIANOPOLIS 04",
+      "codigo": "000002138"
+    },
+    {
+      "unidade": "DLM FORTALEZA 05",
+      "codigo": "000001783"
+    },
+    {
+      "unidade": "DLM GOIANIA 02",
+      "codigo": "000001487"
+    },
+    {
+      "unidade": "DLM GOIANIA 03",
+      "codigo": "000001488"
+    },
+    {
+      "unidade": "DLM GOIANIA 04",
+      "codigo": "000001489"
+    },
+    {
+      "unidade": "DLM GOIANIA 05",
+      "codigo": "000001490"
+    },
+    {
+      "unidade": "DLM GOIANIA 06",
+      "codigo": "000001491"
+    },
+    {
+      "unidade": "DLM GOIANIA 07",
+      "codigo": "000001492"
+    },
+    {
+      "unidade": "DLM GOIANIA 08",
+      "codigo": "000001493"
+    },
+    {
+      "unidade": "DLM GOIANIA 09",
+      "codigo": "000001494"
+    },
+    {
+      "unidade": "DLM GOIANIA 10",
+      "codigo": "000001495"
+    },
+    {
+      "unidade": "DLM GOIANIA 11",
+      "codigo": "000001496"
+    },
+    {
+      "unidade": "DLM GOIANIA 13",
+      "codigo": "000001673"
+    },
+    {
+      "unidade": "DLM GOIANIA 14",
+      "codigo": "000001711"
+    },
+    {
+      "unidade": "DLM GOIANIA 15",
+      "codigo": "000001717"
+    },
+    {
+      "unidade": "DLM GOIANIA 18",
+      "codigo": "000002225"
+    },
+    {
+      "unidade": "DLM GRAVATAI 02",
+      "codigo": "000002415"
+    },
+    {
+      "unidade": "DLM GUARULHOS 02",
+      "codigo": "000001161"
+    },
+    {
+      "unidade": "DLM GUARULHOS 03",
+      "codigo": "000002472"
+    },
+    {
+      "unidade": "DLM IMPERATRIZ 02",
+      "codigo": "000001940"
+    },
+    {
+      "unidade": "DLM ITAPEVI 01",
+      "codigo": "000001469"
+    },
+    {
+      "unidade": "DLM JABOATAO DOS GUARARAPES 01",
+      "codigo": "000001819"
+    },
+    {
+      "unidade": "DLM JACAREI 01",
+      "codigo": "000001952"
+    },
+    {
+      "unidade": "DLM MACEIO 02",
+      "codigo": "000001540"
+    },
+    {
+      "unidade": "DLM MANAUS",
+      "codigo": "000001304"
+    },
+    {
+      "unidade": "DLM MANAUS 02",
+      "codigo": "000002097"
+    },
+    {
+      "unidade": "DLM MANAUS 03",
+      "codigo": "000001305"
+    },
+    {
+      "unidade": "DLM MANAUS 04",
+      "codigo": "000001306"
+    },
+    {
+      "unidade": "DLM MANAUS 07",
+      "codigo": "000001340"
+    },
+    {
+      "unidade": "DLM MANAUS 08",
+      "codigo": "000001498"
+    },
+    {
+      "unidade": "DLM MANAUS 09",
+      "codigo": "000001519"
+    },
+    {
+      "unidade": "DLM MANAUS 13",
+      "codigo": "000001570"
+    },
+    {
+      "unidade": "DLM MARICA",
+      "codigo": "000001628"
+    },
+    {
+      "unidade": "DLM NITEROI 01",
+      "codigo": "000001955"
+    },
+    {
+      "unidade": "DLM NOVO PROGRESSO 01",
+      "codigo": "000001750"
+    },
+    {
+      "unidade": "DLM PETROLINA",
+      "codigo": "000002306"
+    },
+    {
+      "unidade": "DLM PETROPOLIS 01",
+      "codigo": "000001957"
+    },
+    {
+      "unidade": "DLM PORTO ALEGRE 07",
+      "codigo": "000001513"
+    },
+    {
+      "unidade": "DLM PORTO VELHO 02",
+      "codigo": "000001473"
+    },
+    {
+      "unidade": "DLM RECIFE 02",
+      "codigo": "000001963"
+    },
+    {
+      "unidade": "DLM RECIFE 04",
+      "codigo": "000001972"
+    },
+    {
+      "unidade": "DLM RIO BRANCO",
+      "codigo": "000001061"
+    },
+    {
+      "unidade": "DLM RIO DE JANEIRO 21",
+      "codigo": "000001932"
+    },
+    {
+      "unidade": "DLM RIO DE JANEIRO 22",
+      "codigo": "000001522"
+    },
+    {
+      "unidade": "DLM RIO DE JANEIRO 24",
+      "codigo": "000001954"
+    },
+    {
+      "unidade": "DLM SALVADOR",
+      "codigo": "000001793"
+    },
+    {
+      "unidade": "DLM SALVADOR 02",
+      "codigo": "000001945"
+    },
+    {
+      "unidade": "DLM SAO LUIS",
+      "codigo": "000001827"
+    },
+    {
+      "unidade": "DLM SAO PAULO 03",
+      "codigo": "000001961"
+    },
+    {
+      "unidade": "DLM SAO PAULO 04",
+      "codigo": "000001960"
+    },
+    {
+      "unidade": "DLM SAO PAULO 06",
+      "codigo": "000002488"
+    },
+    {
+      "unidade": "DLM SAO PAULO 12",
+      "codigo": "000001564"
+    },
+    {
+      "unidade": "DLM SAO PAULO 14",
+      "codigo": "000002497"
+    },
+    {
+      "unidade": "DLM SAO PAULO 25",
+      "codigo": "000001776"
+    },
+    {
+      "unidade": "DLM STO ANTONIO DA PATRULHA 01",
+      "codigo": "000001970"
+    },
+    {
+      "unidade": "DLM TEOFILO OTONI 03",
+      "codigo": "000002043"
+    },
+    {
+      "unidade": "DLM TERESOPOLIS 01",
+      "codigo": "000001948"
+    },
+    {
+      "unidade": "DLM VARZEA GRANDE 01",
+      "codigo": "000002228"
+    },
+    {
+      "unidade": "EMISSAO TECA",
+      "codigo": "000002621"
+    },
+    {
+      "unidade": "FL BELEM",
+      "codigo": "000000002"
+    },
+    {
+      "unidade": "FL BELO HORIZONTE",
+      "codigo": "000000003"
+    },
+    {
+      "unidade": "FL BELO HORIZONTE - DEVOLUCAO",
+      "codigo": "000002693"
+    },
+    {
+      "unidade": "FL BRASILIA",
+      "codigo": "000002638"
+    },
+    {
+      "unidade": "FL BRASILIA",
+      "codigo": "000000004"
+    },
+    {
+      "unidade": "FL BRASILIA - DEVOLUCAO",
+      "codigo": "000002689"
+    },
+    {
+      "unidade": "FL CAMPO GRANDE",
+      "codigo": "000001258"
+    },
+    {
+      "unidade": "FL CUIABA",
+      "codigo": "000001215"
+    },
+    {
+      "unidade": "FL FORTALEZA",
+      "codigo": "000001041"
+    },
+    {
+      "unidade": "FL FORTALEZA - DEVOLUCAO",
+      "codigo": "000002695"
+    },
+    {
+      "unidade": "FL GOIANIA",
+      "codigo": "000000058"
+    },
+    {
+      "unidade": "FL JOINVILLE 02",
+      "codigo": "000002473"
+    },
+    {
+      "unidade": "FL MACEIO",
+      "codigo": "000001111"
+    },
+    {
+      "unidade": "FL MANAUS - DEVOLUCAO",
+      "codigo": "000002691"
+    },
+    {
+      "unidade": "FL MANAUS JAD",
+      "codigo": "000000005"
+    },
+    {
+      "unidade": "FL PALMAS",
+      "codigo": "000001023"
+    },
+    {
+      "unidade": "FL PORTO ALEGRE",
+      "codigo": "000002341"
+    },
+    {
+      "unidade": "FL PORTO ALEGRE - DEVOLUCAO",
+      "codigo": "000002692"
+    },
+    {
+      "unidade": "FL RECIFE",
+      "codigo": "000000979"
+    },
+    {
+      "unidade": "FL RECIFE - DEVOLUCAO",
+      "codigo": "000002694"
+    },
+    {
+      "unidade": "FL RIO BRANCO",
+      "codigo": "000001691"
+    },
+    {
+      "unidade": "FL RIO DE JANEIRO",
+      "codigo": "000000007"
+    },
+    {
+      "unidade": "FL RIO DEVOLUCAO",
+      "codigo": "000002687"
+    },
+    {
+      "unidade": "FL SALVADOR",
+      "codigo": "000000008"
+    },
+    {
+      "unidade": "FL SALVADOR",
+      "codigo": "000002656"
+    },
+    {
+      "unidade": "FL SALVADOR - DEVOLUCAO",
+      "codigo": "000002690"
+    },
+    {
+      "unidade": "FL SAO LUIS",
+      "codigo": "000001188"
+    },
+    {
+      "unidade": "FL SSA VULNERAVEL",
+      "codigo": "000002504"
+    },
+    {
+      "unidade": "FL TERESINA",
+      "codigo": "000001468"
+    },
+    {
+      "unidade": "FL VITORIA",
+      "codigo": "000000946"
+    },
+    {
+      "unidade": "FL VITORIA - DEVOLUCAO",
+      "codigo": "000002696"
+    },
+    {
+      "unidade": "HB IPATINGA 02",
+      "codigo": "000001803"
+    },
+    {
+      "unidade": "HB SAO JOSE DOS PINHAIS",
+      "codigo": "000002643"
+    },
+    {
+      "unidade": "HB VICOSA 01",
+      "codigo": "000002685"
+    },
+    {
+      "unidade": "JE ADAMANTINA 01",
+      "codigo": "000001829"
+    },
+    {
+      "unidade": "JE AGUDOS 01",
+      "codigo": "000002168"
+    },
+    {
+      "unidade": "JE ALFREDO VASCONCELOS 01",
+      "codigo": "000001927"
+    },
+    {
+      "unidade": "JE ANDRADINA 02",
+      "codigo": "000002682"
+    },
+    {
+      "unidade": "JE ANDRELANDIA 01",
+      "codigo": "000002607"
+    },
+    {
+      "unidade": "JE ARACOIABA DA SERRA 01",
+      "codigo": "000001824"
+    },
+    {
+      "unidade": "JE ARAUJOS",
+      "codigo": "000002314"
+    },
+    {
+      "unidade": "JE ARCOS 03",
+      "codigo": "000002669"
+    },
+    {
+      "unidade": "JE ASCURRA 01",
+      "codigo": "000002395"
+    },
+    {
+      "unidade": "JE BAEPENDI",
+      "codigo": "000002091"
+    },
+    {
+      "unidade": "JE BAEPENDI 02",
+      "codigo": "000002380"
+    },
+    {
+      "unidade": "JE BALNEARIO BARRA DO SUL 01",
+      "codigo": "000002112"
+    },
+    {
+      "unidade": "JE BILAC 01",
+      "codigo": "000001916"
+    },
+    {
+      "unidade": "JE BURITAMA 02",
+      "codigo": "000002688"
+    },
+    {
+      "unidade": "JE CACAPAVA 05",
+      "codigo": "000002619"
+    },
+    {
+      "unidade": "JE CAFELANDIA 02",
+      "codigo": "000002106"
+    },
+    {
+      "unidade": "JE CAJATI 02",
+      "codigo": "000002534"
+    },
+    {
+      "unidade": "JE CAMPOS DO JORDAO",
+      "codigo": "000001888"
+    },
+    {
+      "unidade": "JE CAPAO BONITO 02",
+      "codigo": "000002487"
+    },
+    {
+      "unidade": "JE CAPELA DO ALTO 01",
+      "codigo": "000001825"
+    },
+    {
+      "unidade": "JE CAPELINHA 01",
+      "codigo": "000002409"
+    },
+    {
+      "unidade": "JE CAPIVARI 01",
+      "codigo": "000002041"
+    },
+    {
+      "unidade": "JE CARMO DO RIO CLARO 01",
+      "codigo": "000002672"
+    },
+    {
+      "unidade": "JE CASSIA 01",
+      "codigo": "000002366"
+    },
+    {
+      "unidade": "JE CHA GRANDE 01",
+      "codigo": "000002211"
+    },
+    {
+      "unidade": "JE CHAVANTES 01",
+      "codigo": "000002235"
+    },
+    {
+      "unidade": "JE CONCEICAO DO COITE 02",
+      "codigo": "000002608"
+    },
+    {
+      "unidade": "JE CONSELHEIRO PENA 02",
+      "codigo": "000002516"
+    },
+    {
+      "unidade": "JE CORUPA 01",
+      "codigo": "000002070"
+    },
+    {
+      "unidade": "JE CRAVINHOS 02",
+      "codigo": "000002533"
+    },
+    {
+      "unidade": "JE CRUZ DAS ALMAS 01",
+      "codigo": "000002090"
+    },
+    {
+      "unidade": "JE CRUZ DAS ALMAS 03",
+      "codigo": "000002628"
+    },
+    {
+      "unidade": "JE DORES DE CAMPOS 01",
+      "codigo": "000002288"
+    },
+    {
+      "unidade": "JE ESTRELA DOESTE",
+      "codigo": "000002540"
+    },
+    {
+      "unidade": "JE FAMA 01",
+      "codigo": "000002081"
+    },
+    {
+      "unidade": "JE GRAVATA 01",
+      "codigo": "000002213"
+    },
+    {
+      "unidade": "JE GUARAMIRIM 02",
+      "codigo": "000002570"
+    },
+    {
+      "unidade": "JE GUARANI DAS MISSOES 01",
+      "codigo": "000001905"
+    },
+    {
+      "unidade": "JE IBIRÁ 01",
+      "codigo": "000002519"
+    },
+    {
+      "unidade": "JE IBIUNA 01",
+      "codigo": "000002003"
+    },
+    {
+      "unidade": "JE INDIANA 01",
+      "codigo": "000001841"
+    },
+    {
+      "unidade": "JE IRACEMAPOLIS 01",
+      "codigo": "000002024"
+    },
+    {
+      "unidade": "JE ITACARAMBI 01",
+      "codigo": "000002135"
+    },
+    {
+      "unidade": "JE ITAIÓPOLIS 01",
+      "codigo": "000002510"
+    },
+    {
+      "unidade": "JE ITAMOGI 01",
+      "codigo": "000002580"
+    },
+    {
+      "unidade": "JE ITAMONTE 02",
+      "codigo": "000002518"
+    },
+    {
+      "unidade": "JE ITANHAEM 03",
+      "codigo": "000002474"
+    },
+    {
+      "unidade": "JE ITAPEMA 01",
+      "codigo": "000002639"
+    },
+    {
+      "unidade": "JE ITAPEMIRIM 01",
+      "codigo": "000002272"
+    },
+    {
+      "unidade": "JE ITAPORANGA 01",
+      "codigo": "000002040"
+    },
+    {
+      "unidade": "JE ITAQUI 02",
+      "codigo": "000002223"
+    },
+    {
+      "unidade": "JE JACAREPAGUA 01",
+      "codigo": "000002357"
+    },
+    {
+      "unidade": "JE JAGUARIAIVA 02",
+      "codigo": "000002614"
+    },
+    {
+      "unidade": "JE JALES 02",
+      "codigo": "000002567"
+    },
+    {
+      "unidade": "JE JAMBEIRO 01",
+      "codigo": "000002104"
+    },
+    {
+      "unidade": "JE JANAUBA 01",
+      "codigo": "000001882"
+    },
+    {
+      "unidade": "JE JEQUIE 04",
+      "codigo": "000002613"
+    },
+    {
+      "unidade": "JE JEQUITINHONHA 01",
+      "codigo": "000002178"
+    },
+    {
+      "unidade": "JE JOANOPOLIS 01",
+      "codigo": "000001818"
+    },
+    {
+      "unidade": "JE JOSE BONIFACIO 02",
+      "codigo": "000002509"
+    },
+    {
+      "unidade": "JE JUNQUEIROPOLIS 02",
+      "codigo": "000002566"
+    },
+    {
+      "unidade": "JE LARANJAL PAULISTA 02",
+      "codigo": "000002506"
+    },
+    {
+      "unidade": "JE LEME 01",
+      "codigo": "000002418"
+    },
+    {
+      "unidade": "JE MASSARANDUBA 01",
+      "codigo": "000002053"
+    },
+    {
+      "unidade": "JE MATIAS BARBOSA 01",
+      "codigo": "000002094"
+    },
+    {
+      "unidade": "JE MIRACATU 01",
+      "codigo": "000002336"
+    },
+    {
+      "unidade": "JE MIRANDA 01",
+      "codigo": "000002215"
+    },
+    {
+      "unidade": "JE MOGI GUACU 02",
+      "codigo": "000002537"
+    },
+    {
+      "unidade": "JE MONTE SANTO 01",
+      "codigo": "000002048"
+    },
+    {
+      "unidade": "JE NANUQUE",
+      "codigo": "000002179"
+    },
+    {
+      "unidade": "JE NAZARE PAULISTA 01",
+      "codigo": "000002074"
+    },
+    {
+      "unidade": "JE NOVA CAMPINA 01",
+      "codigo": "000002103"
+    },
+    {
+      "unidade": "JE NOVA IGUACU 01",
+      "codigo": "000002009"
+    },
+    {
+      "unidade": "JE OIAPOQUE 01",
+      "codigo": "000001918"
+    },
+    {
+      "unidade": "JE OLIMPIA 02",
+      "codigo": "000002629"
+    },
+    {
+      "unidade": "JE OSWALDO CRUZ 01",
+      "codigo": "000002378"
+    },
+    {
+      "unidade": "JE PALMAS 01",
+      "codigo": "000002071"
+    },
+    {
+      "unidade": "JE PALMEIRA DAS MISSOES 01",
+      "codigo": "000002085"
+    },
+    {
+      "unidade": "JE PALMITAL 01",
+      "codigo": "000002321"
+    },
+    {
+      "unidade": "JE PALMITAL 02",
+      "codigo": "000002604"
+    },
+    {
+      "unidade": "JE PANORAMA 01",
+      "codigo": "000001836"
+    },
+    {
+      "unidade": "JE PARIQUERA-ACU 01",
+      "codigo": "000002346"
+    },
+    {
+      "unidade": "JE PAULICEIA 01",
+      "codigo": "000002394"
+    },
+    {
+      "unidade": "JE PEDRO LEOPOLDO 01",
+      "codigo": "000002300"
+    },
+    {
+      "unidade": "JE PEREIRA BARRETO 02",
+      "codigo": "000002547"
+    },
+    {
+      "unidade": "JE PERUIBE 01",
+      "codigo": "000001868"
+    },
+    {
+      "unidade": "JE PIRAJUI 01",
+      "codigo": "000002175"
+    },
+    {
+      "unidade": "JE PIRES DO RIO 01",
+      "codigo": "000001928"
+    },
+    {
+      "unidade": "JE PITANGUEIRAS 02",
+      "codigo": "000002507"
+    },
+    {
+      "unidade": "JE POMPEIA 01",
+      "codigo": "000002347"
+    },
+    {
+      "unidade": "JE PONTAL 02",
+      "codigo": "000002000"
+    },
+    {
+      "unidade": "JE PRADOS 02",
+      "codigo": "000002648"
+    },
+    {
+      "unidade": "JE PRAIA GRANDE 02",
+      "codigo": "000002624"
+    },
+    {
+      "unidade": "JE PRESIDENTE EPITACIO 01",
+      "codigo": "000001830"
+    },
+    {
+      "unidade": "JE PRESIDENTE EPITACIO 02",
+      "codigo": "000002038"
+    },
+    {
+      "unidade": "JE PRESIDENTE EPITACIO 03",
+      "codigo": "000002238"
+    },
+    {
+      "unidade": "JE PRESIDENTE VENCESLAU 01",
+      "codigo": "000001831"
+    },
+    {
+      "unidade": "JE REDENCAO DA SERRA 01",
+      "codigo": "000002139"
+    },
+    {
+      "unidade": "JE RESENDE 04",
+      "codigo": "000002200"
+    },
+    {
+      "unidade": "JE RIBEIRAO BRANCO 01",
+      "codigo": "000002109"
+    },
+    {
+      "unidade": "JE ROCINHA - RIO 01",
+      "codigo": "000002358"
+    },
+    {
+      "unidade": "JE SANTA BARBARA DO PARA 02",
+      "codigo": "000002552"
+    },
+    {
+      "unidade": "JE SANTA FE DO SUL 04",
+      "codigo": "000002674"
+    },
+    {
+      "unidade": "JE SANTA GERTRUDES 02",
+      "codigo": "000002525"
+    },
+    {
+      "unidade": "JE SANTA ISABEL 01",
+      "codigo": "000002045"
+    },
+    {
+      "unidade": "JE SANTA RITA DO PASSA QUATRO 02",
+      "codigo": "000002517"
+    },
+    {
+      "unidade": "JE SANTIAGO 01",
+      "codigo": "000001992"
+    },
+    {
+      "unidade": "JE SANTO AMARO 01",
+      "codigo": "000001985"
+    },
+    {
+      "unidade": "JE SANTOS DUMONT 01",
+      "codigo": "000002089"
+    },
+    {
+      "unidade": "JE SAO FRANCISCO XAVIER 01",
+      "codigo": "000002250"
+    },
+    {
+      "unidade": "JE SAO JOSE DA COROA GRANDE 01",
+      "codigo": "000002216"
+    },
+    {
+      "unidade": "JE SAO MATEUS DO SUL 01",
+      "codigo": "000001998"
+    },
+    {
+      "unidade": "JE SAO PAULO 01",
+      "codigo": "000002069"
+    },
+    {
+      "unidade": "JE SAO PAULO 02",
+      "codigo": "000002202"
+    },
+    {
+      "unidade": "JE SARZEDO 01",
+      "codigo": "000002080"
+    },
+    {
+      "unidade": "JE SENGES 01",
+      "codigo": "000002098"
+    },
+    {
+      "unidade": "JE SERRINHA 01",
+      "codigo": "000002123"
+    },
+    {
+      "unidade": "JE SOBRADINHO 01",
+      "codigo": "000002348"
+    },
+    {
+      "unidade": "JE SOCORRO 02",
+      "codigo": "000002548"
+    },
+    {
+      "unidade": "JE TAMANDARE 01",
+      "codigo": "000002206"
+    },
+    {
+      "unidade": "JE TANABI 01",
+      "codigo": "000001869"
+    },
+    {
+      "unidade": "JE TARTARUGALZINHO 01",
+      "codigo": "000002010"
+    },
+    {
+      "unidade": "JE URUPES 02",
+      "codigo": "000002597"
+    },
+    {
+      "unidade": "JE VALENTIM GENTIL 01",
+      "codigo": "000002652"
+    },
+    {
+      "unidade": "JE VALPARAISO 02",
+      "codigo": "000002571"
+    },
+    {
+      "unidade": "JE VARGEM GRANDE PAULISTA 02",
+      "codigo": "000002578"
+    },
+    {
+      "unidade": "JE VILA EDE 01",
+      "codigo": "000002403"
+    },
+    {
+      "unidade": "JE VITORIA DO JARI 01",
+      "codigo": "000001864"
+    },
+    {
+      "unidade": "JE WENCESLAU BRAZ 01",
+      "codigo": "000002623"
+    },
+    {
+      "unidade": "LJ BARUERI 03",
+      "codigo": "000001432"
+    },
+    {
+      "unidade": "LJ BARUERI 04",
+      "codigo": "000000829"
+    },
+    {
+      "unidade": "LJ BELO HORIZONTE",
+      "codigo": "000001849"
+    },
+    {
+      "unidade": "LJ BELO HORIZONTE 01",
+      "codigo": "000001100"
+    },
+    {
+      "unidade": "LJ BELO HORIZONTE 03",
+      "codigo": "000001420"
+    },
+    {
+      "unidade": "LJ BELO HORIZONTE 04",
+      "codigo": "000001657"
+    },
+    {
+      "unidade": "LJ BELO HORIZONTE 05",
+      "codigo": "000001653"
+    },
+    {
+      "unidade": "LJ BERTIOGA 01",
+      "codigo": "000002461"
+    },
+    {
+      "unidade": "LJ BLUMENAU 01",
+      "codigo": "000001645"
+    },
+    {
+      "unidade": "LJ BORDA DA MATA 01",
+      "codigo": "000001328"
+    },
+    {
+      "unidade": "LJ CAMPINA GRANDE 01",
+      "codigo": "000000051"
+    },
+    {
+      "unidade": "LJ CAMPINAS 01",
+      "codigo": "000002047"
+    },
+    {
+      "unidade": "LJ CAMPINAS 02",
+      "codigo": "000001877"
+    },
+    {
+      "unidade": "LJ CARUARU 01",
+      "codigo": "000002381"
+    },
+    {
+      "unidade": "LJ CAXIAS DO SUL 01",
+      "codigo": "000000821"
+    },
+    {
+      "unidade": "LJ CAXIAS DO SUL 03",
+      "codigo": "000001562"
+    },
+    {
+      "unidade": "LJ CHAPECO 02",
+      "codigo": "000001146"
+    },
+    {
+      "unidade": "LJ CORONEL FABRICIANO 01",
+      "codigo": "000001756"
+    },
+    {
+      "unidade": "LJ CRICIUMA 01",
+      "codigo": "000002400"
+    },
+    {
+      "unidade": "LJ CURITIBA",
+      "codigo": "000001601"
+    },
+    {
+      "unidade": "LJ CURITIBA 02",
+      "codigo": "000001429"
+    },
+    {
+      "unidade": "LJ CURITIBA 03 FL",
+      "codigo": "000000029"
+    },
+    {
+      "unidade": "LJ EMBU DAS ARTES 01",
+      "codigo": "000000668"
+    },
+    {
+      "unidade": "LJ EXTREMA 01",
+      "codigo": "000001189"
+    },
+    {
+      "unidade": "LJ EXTREMA 02",
+      "codigo": "000002609"
+    },
+    {
+      "unidade": "LJ FLORIANOPOLIS 01",
+      "codigo": "000001373"
+    },
+    {
+      "unidade": "LJ FORTALEZA 01",
+      "codigo": "000001708"
+    },
+    {
+      "unidade": "LJ FORTALEZA 02",
+      "codigo": "000001437"
+    },
+    {
+      "unidade": "LJ FORTALEZA 03",
+      "codigo": "000002563"
+    },
+    {
+      "unidade": "LJ FRANCA 02",
+      "codigo": "000002083"
+    },
+    {
+      "unidade": "LJ GARIBALDI 01",
+      "codigo": "000000475"
+    },
+    {
+      "unidade": "LJ GASPAR 01",
+      "codigo": "000001560"
+    },
+    {
+      "unidade": "LJ GOIANIA 01",
+      "codigo": "000000098"
+    },
+    {
+      "unidade": "LJ GOIANIA 02",
+      "codigo": "000001677"
+    },
+    {
+      "unidade": "LJ GOIANIA 04",
+      "codigo": "000001943"
+    },
+    {
+      "unidade": "LJ GOIANIA 06",
+      "codigo": "000001686"
+    },
+    {
+      "unidade": "LJ GUARULHOS 02",
+      "codigo": "000001356"
+    },
+    {
+      "unidade": "LJ GUARULHOS 03",
+      "codigo": "000001372"
+    },
+    {
+      "unidade": "LJ HOLAMBRA 01",
+      "codigo": "000002453"
+    },
+    {
+      "unidade": "LJ JARAGUA DO SUL 01",
+      "codigo": "000001315"
+    },
+    {
+      "unidade": "LJ JAU 01",
+      "codigo": "000002595"
+    },
+    {
+      "unidade": "LJ JOAO PESSOA 01",
+      "codigo": "000001935"
+    },
+    {
+      "unidade": "LJ JOINVILLE 01",
+      "codigo": "000001694"
+    },
+    {
+      "unidade": "LJ JOINVILLE 03",
+      "codigo": "000001400"
+    },
+    {
+      "unidade": "LJ JUNDIAI 01",
+      "codigo": "000002501"
+    },
+    {
+      "unidade": "LJ JURUAIA 01",
+      "codigo": "000001551"
+    },
+    {
+      "unidade": "LJ LOUVEIRA 01",
+      "codigo": "000002602"
+    },
+    {
+      "unidade": "LJ MANAUS",
+      "codigo": "000001731"
+    },
+    {
+      "unidade": "LJ MOGI GUACU",
+      "codigo": "000002205"
+    },
+    {
+      "unidade": "LJ OSASCO 01",
+      "codigo": "000002280"
+    },
+    {
+      "unidade": "LJ PORTO ALEGRE 01",
+      "codigo": "000002451"
+    },
+    {
+      "unidade": "LJ PORTO ALEGRE 02",
+      "codigo": "000002183"
+    },
+    {
+      "unidade": "LJ RECIFE 01",
+      "codigo": "000001576"
+    },
+    {
+      "unidade": "LJ RIO DAS OSTRAS 01",
+      "codigo": "000001294"
+    },
+    {
+      "unidade": "LJ RIO DE JANEIRO 01",
+      "codigo": "000002269"
+    },
+    {
+      "unidade": "LJ RIO DE JANEIRO 02",
+      "codigo": "000001291"
+    },
+    {
+      "unidade": "LJ RIO DE JANEIRO 03",
+      "codigo": "000001627"
+    },
+    {
+      "unidade": "LJ RIO DE JANEIRO 04",
+      "codigo": "000000442"
+    },
+    {
+      "unidade": "LJ RIO DE JANEIRO 06",
+      "codigo": "000001771"
+    },
+    {
+      "unidade": "LJ RIO DE JANEIRO 08",
+      "codigo": "000001344"
+    },
+    {
+      "unidade": "LJ RIO DE JANEIRO 10",
+      "codigo": "000002663"
+    },
+    {
+      "unidade": "LJ SALVADOR 01",
+      "codigo": "000002152"
+    },
+    {
+      "unidade": "LJ SALVADOR 02",
+      "codigo": "000001999"
+    },
+    {
+      "unidade": "LJ SANTA CRUZ DO CAPIBARIBE 01",
+      "codigo": "000001773"
+    },
+    {
+      "unidade": "LJ SANTO ANDRE 02",
+      "codigo": "000002031"
+    },
+    {
+      "unidade": "LJ SANTOS 01",
+      "codigo": "000000501"
+    },
+    {
+      "unidade": "LJ SAO BERNARDO DO CAMPO 02",
+      "codigo": "000002036"
+    },
+    {
+      "unidade": "LJ SAO CAETANO DO SUL 01",
+      "codigo": "000001809"
+    },
+    {
+      "unidade": "LJ SAO CARLOS 01",
+      "codigo": "000000557"
+    },
+    {
+      "unidade": "LJ SAO JOSE DOS CAMPOS 02",
+      "codigo": "000002241"
+    },
+    {
+      "unidade": "LJ SAO JOSE DOS PINHAIS 01",
+      "codigo": "000001646"
+    },
+    {
+      "unidade": "LJ SAO PAULO",
+      "codigo": "000000916"
+    },
+    {
+      "unidade": "LJ SAO PAULO",
+      "codigo": "000001086"
+    },
+    {
+      "unidade": "LJ SAO PAULO 01",
+      "codigo": "000001371"
+    },
+    {
+      "unidade": "LJ SAO PAULO 02",
+      "codigo": "000001598"
+    },
+    {
+      "unidade": "LJ SAO PAULO 03",
+      "codigo": "000001850"
+    },
+    {
+      "unidade": "LJ SAO PAULO 04",
+      "codigo": "000000213"
+    },
+    {
+      "unidade": "LJ SAO PAULO 05",
+      "codigo": "000001131"
+    },
+    {
+      "unidade": "LJ SAO PAULO 06",
+      "codigo": "000001150"
+    },
+    {
+      "unidade": "LJ SAO PAULO 07",
+      "codigo": "000002151"
+    },
+    {
+      "unidade": "LJ SAO PAULO 09",
+      "codigo": "000000938"
+    },
+    {
+      "unidade": "LJ SAO PAULO 10",
+      "codigo": "000001780"
+    },
+    {
+      "unidade": "LJ SAO PAULO 11",
+      "codigo": "000000773"
+    },
+    {
+      "unidade": "LJ SAO PAULO 12",
+      "codigo": "000001763"
+    },
+    {
+      "unidade": "LJ SAO PAULO 13",
+      "codigo": "000002625"
+    },
+    {
+      "unidade": "LJ SAO PAULO 14",
+      "codigo": "000002033"
+    },
+    {
+      "unidade": "LJ SAO PAULO 16",
+      "codigo": "000001225"
+    },
+    {
+      "unidade": "LJ SAO PAULO 17",
+      "codigo": "000001083"
+    },
+    {
+      "unidade": "LJ SAO PAULO 18",
+      "codigo": "000001643"
+    },
+    {
+      "unidade": "LJ SAO PAULO 20",
+      "codigo": "000000502"
+    },
+    {
+      "unidade": "LJ SAO PAULO 22",
+      "codigo": "000002429"
+    },
+    {
+      "unidade": "LJ SAO PAULO 23",
+      "codigo": "000000352"
+    },
+    {
+      "unidade": "LJ SAO PAULO 24",
+      "codigo": "000002032"
+    },
+    {
+      "unidade": "LJ SAO PAULO 25",
+      "codigo": "000002462"
+    },
+    {
+      "unidade": "LJ SAO PAULO 26",
+      "codigo": "000000347"
+    },
+    {
+      "unidade": "LJ SAO PAULO 29",
+      "codigo": "000001667"
+    },
+    {
+      "unidade": "LJ SAO PAULO 35",
+      "codigo": "000000647"
+    },
+    {
+      "unidade": "LJ SUMARE 01",
+      "codigo": "000001527"
+    },
+    {
+      "unidade": "LJ TABOAO DA SERRA 01",
+      "codigo": "000000373"
+    },
+    {
+      "unidade": "LJ TORITAMA 01",
+      "codigo": "000001749"
+    },
+    {
+      "unidade": "LJ VIANA 01",
+      "codigo": "000001363"
+    },
+    {
+      "unidade": "LM / CB / TL  CHAPECO 01",
+      "codigo": "000001139"
+    },
+    {
+      "unidade": "LM / CB / TL  JOACABA 01",
+      "codigo": "000001136"
+    },
+    {
+      "unidade": "LM / CB / TL  JOINVILLE 01",
+      "codigo": "000001137"
+    },
+    {
+      "unidade": "LM / CB / TL  LAGES 01",
+      "codigo": "000001138"
+    },
+    {
+      "unidade": "LM / CB / TL  PASSO FUNDO 01",
+      "codigo": "000001485"
+    },
+    {
+      "unidade": "LM / CB / TL  PATO BRANCO 01",
+      "codigo": "000001142"
+    },
+    {
+      "unidade": "LM / CB / TL  PONTA GROSSA 01",
+      "codigo": "000001140"
+    },
+    {
+      "unidade": "LM / CB / TL  SAO LUIS 01",
+      "codigo": "000001323"
+    },
+    {
+      "unidade": "LM / CB / TL  UMUARAMA 01",
+      "codigo": "000001141"
+    },
+    {
+      "unidade": "LM / CB / TL BELEM 01",
+      "codigo": "000001047"
+    },
+    {
+      "unidade": "LM / CB / TL FEIRA DE SANTANA 01",
+      "codigo": "000001685"
+    },
+    {
+      "unidade": "LM / CB / TL GOVERNADOR VALADARES",
+      "codigo": "000001132"
+    },
+    {
+      "unidade": "LM / CB / TL IPATINGA",
+      "codigo": "000001134"
+    },
+    {
+      "unidade": "LM / CB / TL RECIFE 01",
+      "codigo": "000001048"
+    },
+    {
+      "unidade": "LM / CB / TL SANTAREM 01",
+      "codigo": "000001326"
+    },
+    {
+      "unidade": "LM / CB / TL SAO RAIMUNDO NONATO 01",
+      "codigo": "000001676"
+    },
+    {
+      "unidade": "LM / CB FLORIANOPOLIS 02",
+      "codigo": "000001425"
+    },
+    {
+      "unidade": "LM ARACAJU 02",
+      "codigo": "000001448"
+    },
+    {
+      "unidade": "LM ARACATUBA 02",
+      "codigo": "000001741"
+    },
+    {
+      "unidade": "LM BAURU 02",
+      "codigo": "000001742"
+    },
+    {
+      "unidade": "LM BELEM 08",
+      "codigo": "000001520"
+    },
+    {
+      "unidade": "LM BELEM 09",
+      "codigo": "000001550"
+    },
+    {
+      "unidade": "LM BELO HORIZONTE",
+      "codigo": "000001951"
+    },
+    {
+      "unidade": "LM BELO HORIZONTE 01",
+      "codigo": "000001421"
+    },
+    {
+      "unidade": "LM CAMPINAS 01",
+      "codigo": "000001744"
+    },
+    {
+      "unidade": "LM CHAPECO 02",
+      "codigo": "000001900"
+    },
+    {
+      "unidade": "LM CUIABA 05",
+      "codigo": "000002399"
+    },
+    {
+      "unidade": "LM FEIRA DE SANTANA 03",
+      "codigo": "000002008"
+    },
+    {
+      "unidade": "LM FORTALEZA",
+      "codigo": "000002470"
+    },
+    {
+      "unidade": "LM FORTALEZA 03",
+      "codigo": "000001779"
+    },
+    {
+      "unidade": "LM FORTALEZA 07",
+      "codigo": "000002465"
+    },
+    {
+      "unidade": "LM GASPAR",
+      "codigo": "000002448"
+    },
+    {
+      "unidade": "LM GUARATINGUETA 01",
+      "codigo": "000001747"
+    },
+    {
+      "unidade": "LM IGUATU 01",
+      "codigo": "000001615"
+    },
+    {
+      "unidade": "LM IRECE 01",
+      "codigo": "000001687"
+    },
+    {
+      "unidade": "LM ITUPEVA 01",
+      "codigo": "000001390"
+    },
+    {
+      "unidade": "LM MANAUS 03",
+      "codigo": "000002545"
+    },
+    {
+      "unidade": "LM MANAUS 05",
+      "codigo": "000002646"
+    },
+    {
+      "unidade": "LM MANAUS 06",
+      "codigo": "000001339"
+    },
+    {
+      "unidade": "LM MANAUS 10",
+      "codigo": "000001554"
+    },
+    {
+      "unidade": "LM MANAUS 16",
+      "codigo": "000001800"
+    },
+    {
+      "unidade": "LM MONTES CLAROS 01",
+      "codigo": "000002063"
+    },
+    {
+      "unidade": "LM MONTES CLAROS 04",
+      "codigo": "000001482"
+    },
+    {
+      "unidade": "LM NATAL 02",
+      "codigo": "000002208"
+    },
+    {
+      "unidade": "LM NATAL 03",
+      "codigo": "000002555"
+    },
+    {
+      "unidade": "LM OURINHOS 02",
+      "codigo": "000001740"
+    },
+    {
+      "unidade": "LM PEDRA BRANCA 01",
+      "codigo": "000001616"
+    },
+    {
+      "unidade": "LM PORTO VELHO 05",
+      "codigo": "000002237"
+    },
+    {
+      "unidade": "LM PRESIDENTE PRUDENTE 02",
+      "codigo": "000001743"
+    },
+    {
+      "unidade": "LM RECIFE 03",
+      "codigo": "000001529"
+    },
+    {
+      "unidade": "LM REGISTRO",
+      "codigo": "000001028"
+    },
+    {
+      "unidade": "LM RIBEIRAO PRETO 01",
+      "codigo": "000001029"
+    },
+    {
+      "unidade": "LM RIBEIRAO PRETO 03",
+      "codigo": "000001589"
+    },
+    {
+      "unidade": "LM RIO BRANCO 04",
+      "codigo": "000002543"
+    },
+    {
+      "unidade": "LM RIO DE JANEIRO 05",
+      "codigo": "000002557"
+    },
+    {
+      "unidade": "LM SALVADOR 05",
+      "codigo": "000002481"
+    },
+    {
+      "unidade": "LM SALVADOR 06",
+      "codigo": "000002553"
+    },
+    {
+      "unidade": "LM SAO JOAO DE MERITI 02",
+      "codigo": "000002029"
+    },
+    {
+      "unidade": "LM SAO JOSE DO RIO PRETO 02",
+      "codigo": "000001745"
+    },
+    {
+      "unidade": "LM SAO JOSE DOS CAMPOS 01",
+      "codigo": "000001746"
+    },
+    {
+      "unidade": "LM SAO LUIS 01",
+      "codigo": "000002585"
+    },
+    {
+      "unidade": "LM SAO LUIS 05",
+      "codigo": "000002425"
+    },
+    {
+      "unidade": "LM SAO LUIS 06",
+      "codigo": "000002437"
+    },
+    {
+      "unidade": "LM SAO PAULO 01",
+      "codigo": "000002655"
+    },
+    {
+      "unidade": "LM SAO PAULO 08",
+      "codigo": "000001222"
+    },
+    {
+      "unidade": "LM SAO PAULO 10",
+      "codigo": "000001878"
+    },
+    {
+      "unidade": "LM SEABRA 01",
+      "codigo": "000001683"
+    },
+    {
+      "unidade": "LM SOROCABA",
+      "codigo": "000001030"
+    },
+    {
+      "unidade": "LM TEOFILO OTONI 02",
+      "codigo": "000001805"
+    },
+    {
+      "unidade": "LM UBERLANDIA 02",
+      "codigo": "000001481"
+    },
+    {
+      "unidade": "LM/CB/TL IMPERATRIZ 01",
+      "codigo": "000001322"
+    },
+    {
+      "unidade": "LM/CB/TL MARABA 01",
+      "codigo": "000001325"
+    },
+    {
+      "unidade": "LM/CB/TL SALVADOR 01",
+      "codigo": "000001057"
+    },
+    {
+      "unidade": "MILK RUN GUARATINGUETA",
+      "codigo": "000002679"
+    },
+    {
+      "unidade": "MILK RUN SAO JOSE DOS CAMPOS",
+      "codigo": "000002680"
+    },
+    {
+      "unidade": "MILK RUN TAU",
+      "codigo": "000002678"
+    },
+    {
+      "unidade": "MILKRUN MCZ",
+      "codigo": "000002705"
+    },
+    {
+      "unidade": "ML / CB / TL  FLORIANOPOLIS 01",
+      "codigo": "000001039"
+    },
+    {
+      "unidade": "ML / CB / TL  SINOP 01",
+      "codigo": "000001040"
+    },
+    {
+      "unidade": "ML / CB / TL BLUMENAU 01",
+      "codigo": "000001452"
+    },
+    {
+      "unidade": "ML / CB / TL CAMPO GRANDE 01",
+      "codigo": "000001088"
+    },
+    {
+      "unidade": "ML / CB / TL JAD RIO DE JANEIRO",
+      "codigo": "000001230"
+    },
+    {
+      "unidade": "ML / CB / TL LARANJEIRAS DO SUL 01",
+      "codigo": "000001461"
+    },
+    {
+      "unidade": "ML / CB / TL LONDRINA 01",
+      "codigo": "000001454"
+    },
+    {
+      "unidade": "ML / CB / TL VARGINHA 01",
+      "codigo": "000001483"
+    },
+    {
+      "unidade": "ML / CB CRICIUMA 01",
+      "codigo": "000001486"
+    },
+    {
+      "unidade": "ML / LM / CB / TL BOA VISTA 01",
+      "codigo": "000001064"
+    },
+    {
+      "unidade": "ML / LM / CB / TL CAMPINA GRANDE 01",
+      "codigo": "000001298"
+    },
+    {
+      "unidade": "ML / LM / CB / TL CASCAVEL 01",
+      "codigo": "000001143"
+    },
+    {
+      "unidade": "ML / LM / CB / TL CURITIBA 02",
+      "codigo": "000001014"
+    },
+    {
+      "unidade": "ML / LM / CB / TL CURITIBANOS 01",
+      "codigo": "000001462"
+    },
+    {
+      "unidade": "ML / LM / CB / TL FORTALEZA 01",
+      "codigo": "000001049"
+    },
+    {
+      "unidade": "ML / LM / CB / TL GOIANIA 17",
+      "codigo": "000001908"
+    },
+    {
+      "unidade": "ML / LM / CB / TL JOAO PESSOA 01",
+      "codigo": "000001297"
+    },
+    {
+      "unidade": "ML / LM / CB / TL MACEIO 01",
+      "codigo": "000001296"
+    },
+    {
+      "unidade": "ML / LM / CB / TL MARINGA 02",
+      "codigo": "000001144"
+    },
+    {
+      "unidade": "ML / LM / CB / TL MOSSORO 01",
+      "codigo": "000001302"
+    },
+    {
+      "unidade": "ML / LM / CB / TL NATAL 01",
+      "codigo": "000001300"
+    },
+    {
+      "unidade": "ML / LM / CB / TL PATOS 01",
+      "codigo": "000001299"
+    },
+    {
+      "unidade": "ML / LM / CB / TL RONDONOPOLIS 01",
+      "codigo": "000001089"
+    },
+    {
+      "unidade": "ML / LM / CB GOIANIA 12",
+      "codigo": "000001497"
+    },
+    {
+      "unidade": "ML / LM FERNANDO DE NORONHA 01",
+      "codigo": "000001663"
+    },
+    {
+      "unidade": "ML BALSAS 01",
+      "codigo": "000001674"
+    },
+    {
+      "unidade": "ML BELFORD ROXO 01",
+      "codigo": "000002459"
+    },
+    {
+      "unidade": "ML DUQUE DE CAXIAS 02",
+      "codigo": "000002027"
+    },
+    {
+      "unidade": "ML JI-PARANA 01",
+      "codigo": "000002515"
+    },
+    {
+      "unidade": "ML MOGI DAS CRUZES 01",
+      "codigo": "000002441"
+    },
+    {
+      "unidade": "ML RIO BRANCO 03",
+      "codigo": "000002494"
+    },
+    {
+      "unidade": "ML/CB MACAPA",
+      "codigo": "000002596"
+    },
+    {
+      "unidade": "ML/CB/TL GOIANIA 01",
+      "codigo": "000001038"
+    },
+    {
+      "unidade": "ML/LM APARECIDA DE GOIANIA 01",
+      "codigo": "000001117"
+    },
+    {
+      "unidade": "ML/LM/CB/TL MANAUS 01",
+      "codigo": "000001063"
+    },
+    {
+      "unidade": "MT JADLOG SEDE",
+      "codigo": "000002593"
+    },
+    {
+      "unidade": "MT JADLOG SEDE",
+      "codigo": "000000001"
+    },
+    {
+      "unidade": "MT NEXUS 87 – AEREO",
+      "codigo": "000002634"
+    },
+    {
+      "unidade": "MT NEXUS 87 - EMISSAO",
+      "codigo": "000002645"
+    },
+    {
+      "unidade": "MT NEXUS 87 - OVERSIZE",
+      "codigo": "000002637"
+    },
+    {
+      "unidade": "MT NEXUS 87 – PERECIVEL",
+      "codigo": "000002636"
+    },
+    {
+      "unidade": "MT NEXUS 87 – VULNERAVEL",
+      "codigo": "000002635"
+    },
+    {
+      "unidade": "MT NEXUS 87 PERUS",
+      "codigo": "000002631"
+    },
+    {
+      "unidade": "NEXUS REV. DAFITI",
+      "codigo": "000002698"
+    },
+    {
+      "unidade": "NEXUS REV. ICOMM",
+      "codigo": "000002701"
+    },
+    {
+      "unidade": "NEXUS REV. KABUM",
+      "codigo": "000002708"
+    },
+    {
+      "unidade": "NEXUS REV. RENNER",
+      "codigo": "000002702"
+    },
+    {
+      "unidade": "NEXUS REV. RIACHUELO",
+      "codigo": "000002699"
+    },
+    {
+      "unidade": "NEXUS REV. ZARA",
+      "codigo": "000002700"
+    },
+    {
+      "unidade": "PA ALHANDRA 01",
+      "codigo": "000001453"
+    },
+    {
+      "unidade": "PA AMERICANAS",
+      "codigo": "000002261"
+    },
+    {
+      "unidade": "PA ARAÇARIGUAMA",
+      "codigo": "000002640"
+    },
+    {
+      "unidade": "PA ARCOS 02",
+      "codigo": "000001984"
+    },
+    {
+      "unidade": "PA ARMAZEM/BANCOS 01",
+      "codigo": "000001466"
+    },
+    {
+      "unidade": "PA ARUJA 01",
+      "codigo": "000001162"
+    },
+    {
+      "unidade": "PA ATIBAIA 01",
+      "codigo": "000001380"
+    },
+    {
+      "unidade": "PA ATIBAIA 02",
+      "codigo": "000001704"
+    },
+    {
+      "unidade": "PA BARUERI 01",
+      "codigo": "000002584"
+    },
+    {
+      "unidade": "PA BARUERI 02",
+      "codigo": "000001625"
+    },
+    {
+      "unidade": "PA BARUERI 04",
+      "codigo": "000000695"
+    },
+    {
+      "unidade": "PA BARUERI 06",
+      "codigo": "000001204"
+    },
+    {
+      "unidade": "PA BARUERI 07",
+      "codigo": "000000056"
+    },
+    {
+      "unidade": "PA BARUERI 08",
+      "codigo": "000001290"
+    },
+    {
+      "unidade": "PA BARUERI 09",
+      "codigo": "000001737"
+    },
+    {
+      "unidade": "PA BELO HORIZONTE 01",
+      "codigo": "000000062"
+    },
+    {
+      "unidade": "PA BELO HORIZONTE 02",
+      "codigo": "000000634"
+    },
+    {
+      "unidade": "PA BELO HORIZONTE 03",
+      "codigo": "000001157"
+    },
+    {
+      "unidade": "PA BOTICARIO",
+      "codigo": "000002262"
+    },
+    {
+      "unidade": "PA CAJAMAR 02",
+      "codigo": "000001309"
+    },
+    {
+      "unidade": "PA CAMICADO",
+      "codigo": "000002263"
+    },
+    {
+      "unidade": "PA CAMPINAS 04",
+      "codigo": "000001155"
+    },
+    {
+      "unidade": "PA CAMPINAS 05",
+      "codigo": "000001276"
+    },
+    {
+      "unidade": "PA CARIACICA 01",
+      "codigo": "000001596"
+    },
+    {
+      "unidade": "PA CARREFOUR",
+      "codigo": "000002265"
+    },
+    {
+      "unidade": "PA COTIA",
+      "codigo": "000001608"
+    },
+    {
+      "unidade": "PA COTIA 04",
+      "codigo": "000001668"
+    },
+    {
+      "unidade": "PA DOIS CORREGOS 01",
+      "codigo": "000002546"
+    },
+    {
+      "unidade": "PA DUQUE CAXIAS 01",
+      "codigo": "000000231"
+    },
+    {
+      "unidade": "PA EMBU DAS ARTES 01",
+      "codigo": "000002686"
+    },
+    {
+      "unidade": "PA EXTREMA 01",
+      "codigo": "000001268"
+    },
+    {
+      "unidade": "PA EXTREMA 02",
+      "codigo": "000002562"
+    },
+    {
+      "unidade": "PA EXTREMA 03",
+      "codigo": "000001438"
+    },
+    {
+      "unidade": "PA EXTREMA 05",
+      "codigo": "000001725"
+    },
+    {
+      "unidade": "PA EXTREMA 06",
+      "codigo": "000001910"
+    },
+    {
+      "unidade": "PA EXTREMA 07",
+      "codigo": "000002391"
+    },
+    {
+      "unidade": "PA EXTREMA 08",
+      "codigo": "000002565"
+    },
+    {
+      "unidade": "PA FERRAZ DE VASCONSELOS 01",
+      "codigo": "000001699"
+    },
+    {
+      "unidade": "PA FRANCO DA ROCHA 02",
+      "codigo": "000001726"
+    },
+    {
+      "unidade": "PA GASPAR 01",
+      "codigo": "000001239"
+    },
+    {
+      "unidade": "PA GOIANIA 01",
+      "codigo": "000000542"
+    },
+    {
+      "unidade": "PA GOIANIA 02",
+      "codigo": "000001237"
+    },
+    {
+      "unidade": "PA GOIANIA 03",
+      "codigo": "000001632"
+    },
+    {
+      "unidade": "PA GUARULHOS 01",
+      "codigo": "000001727"
+    },
+    {
+      "unidade": "PA INDAIATUBA 01",
+      "codigo": "000000226"
+    },
+    {
+      "unidade": "PA ITAQUA",
+      "codigo": "000002641"
+    },
+    {
+      "unidade": "PA JABOATAO DOS GUARARAPES 02",
+      "codigo": "000001411"
+    },
+    {
+      "unidade": "PA JACUTINGA 01",
+      "codigo": "000001368"
+    },
+    {
+      "unidade": "PA JAD ADM",
+      "codigo": "000001377"
+    },
+    {
+      "unidade": "PA JAD BRASILIA",
+      "codigo": "000001200"
+    },
+    {
+      "unidade": "PA JAD PICKUP",
+      "codigo": "000001378"
+    },
+    {
+      "unidade": "PA JADLOG 02",
+      "codigo": "000001774"
+    },
+    {
+      "unidade": "PA JANDIRA 01",
+      "codigo": "000001728"
+    },
+    {
+      "unidade": "PA JOAO PESSOA 01",
+      "codigo": "000001672"
+    },
+    {
+      "unidade": "PA JOINVILLE 01",
+      "codigo": "000001216"
+    },
+    {
+      "unidade": "PA JUNDIAI 01",
+      "codigo": "000000868"
+    },
+    {
+      "unidade": "PA JUNDIAI 02",
+      "codigo": "000001178"
+    },
+    {
+      "unidade": "PA LEITURINHA",
+      "codigo": "000001341"
+    },
+    {
+      "unidade": "PA LOUVEIRA 01",
+      "codigo": "000000652"
+    },
+    {
+      "unidade": "PA MACEIO 01",
+      "codigo": "000001775"
+    },
+    {
+      "unidade": "PA MELI",
+      "codigo": "000001090"
+    },
+    {
+      "unidade": "PA MELI CWB 01",
+      "codigo": "000001600"
+    },
+    {
+      "unidade": "PA MELI 02",
+      "codigo": "000001504"
+    },
+    {
+      "unidade": "PA NAZARE PAULISTA 01",
+      "codigo": "000001705"
+    },
+    {
+      "unidade": "PA NETSHOES 02",
+      "codigo": "000001190"
+    },
+    {
+      "unidade": "PA OSASCO 01",
+      "codigo": "000001099"
+    },
+    {
+      "unidade": "PA OSASCO 02",
+      "codigo": "000001587"
+    },
+    {
+      "unidade": "PA OSASCO 03",
+      "codigo": "000001760"
+    },
+    {
+      "unidade": "PA PINHAIS 01",
+      "codigo": "000000929"
+    },
+    {
+      "unidade": "PA RENNER",
+      "codigo": "000002264"
+    },
+    {
+      "unidade": "PA RENNER TC",
+      "codigo": "000002630"
+    },
+    {
+      "unidade": "PA RIBEIRAO PIRES 01",
+      "codigo": "000001263"
+    },
+    {
+      "unidade": "PA RIBEIRAO PRETO 01",
+      "codigo": "000000577"
+    },
+    {
+      "unidade": "PA RIO DE JANEIRO 02",
+      "codigo": "000000823"
+    },
+    {
+      "unidade": "PA RIO JAD",
+      "codigo": "000001397"
+    },
+    {
+      "unidade": "PA SANTANA DE PARNAIBA 03",
+      "codigo": "000001730"
+    },
+    {
+      "unidade": "PA SANTOS 01",
+      "codigo": "000001467"
+    },
+    {
+      "unidade": "PA SAO BERNARDO DO CAMPO 01",
+      "codigo": "000000683"
+    },
+    {
+      "unidade": "PA SAO CARLOS 01",
+      "codigo": "000001965"
+    },
+    {
+      "unidade": "PA SAO PAULO",
+      "codigo": "000001113"
+    },
+    {
+      "unidade": "PA SAO PAULO 01",
+      "codigo": "000002428"
+    },
+    {
+      "unidade": "PA SAO PAULO 02",
+      "codigo": "000001693"
+    },
+    {
+      "unidade": "PA SAO PAULO 03",
+      "codigo": "000000134"
+    },
+    {
+      "unidade": "PA SAO PAULO 04",
+      "codigo": "000002589"
+    },
+    {
+      "unidade": "PA SAO PAULO 05",
+      "codigo": "000001822"
+    },
+    {
+      "unidade": "PA SAO PAULO 07",
+      "codigo": "000000454"
+    },
+    {
+      "unidade": "PA SAO PAULO 08",
+      "codigo": "000001729"
+    },
+    {
+      "unidade": "PA SAO PAULO 09",
+      "codigo": "000001388"
+    },
+    {
+      "unidade": "PA SAO PAULO 10",
+      "codigo": "000000141"
+    },
+    {
+      "unidade": "PA SAO PAULO 21",
+      "codigo": "000000355"
+    },
+    {
+      "unidade": "PA SAO PAULO 22",
+      "codigo": "000001208"
+    },
+    {
+      "unidade": "PA SAO PAULO 23",
+      "codigo": "000001223"
+    },
+    {
+      "unidade": "PA SAO PAULO 26",
+      "codigo": "000000489"
+    },
+    {
+      "unidade": "PA SAO PAULO 27",
+      "codigo": "000000523"
+    },
+    {
+      "unidade": "PA SAO PAULO 28",
+      "codigo": "000001610"
+    },
+    {
+      "unidade": "PA SAO PAULO 30",
+      "codigo": "000000500"
+    },
+    {
+      "unidade": "PA SERRA",
+      "codigo": "000001639"
+    },
+    {
+      "unidade": "PA SERRA 03",
+      "codigo": "000001641"
+    },
+    {
+      "unidade": "PA SHEIN - NAVE A",
+      "codigo": "000002231"
+    },
+    {
+      "unidade": "PA SHOPEE",
+      "codigo": "000001789"
+    },
+    {
+      "unidade": "PA SIQUEIRA CAMPOS",
+      "codigo": "000001785"
+    },
+    {
+      "unidade": "PA SIQUEIRA CAMPOS 02",
+      "codigo": "000002492"
+    },
+    {
+      "unidade": "PA SUMARE 01",
+      "codigo": "000002100"
+    },
+    {
+      "unidade": "PA TABOÃO DA SERRA",
+      "codigo": "000002642"
+    },
+    {
+      "unidade": "PA UBA 01",
+      "codigo": "000002095"
+    },
+    {
+      "unidade": "PA UBERLANDIA 01",
+      "codigo": "000002520"
+    },
+    {
+      "unidade": "PA VIA VAREJO",
+      "codigo": "000002266"
+    },
+    {
+      "unidade": "PA VIANA 01",
+      "codigo": "000001716"
+    },
+    {
+      "unidade": "PA VINHEDO 04",
+      "codigo": "000001229"
+    },
+    {
+      "unidade": "PA-JAD-PICKUP-CWB",
+      "codigo": "000002270"
+    },
+    {
+      "unidade": "TC / FL RIO DE JANEIRO 02",
+      "codigo": "000001794"
+    },
+    {
+      "unidade": "TC AEREO TECA",
+      "codigo": "000001170"
+    },
+    {
+      "unidade": "TC ARM FIAT BHZ",
+      "codigo": "000001536"
+    },
+    {
+      "unidade": "TC BANCOS BHZ",
+      "codigo": "000001798"
+    },
+    {
+      "unidade": "TC BLACK FRIDAY",
+      "codigo": "000001458"
+    },
+    {
+      "unidade": "TC CDA SAO JAD",
+      "codigo": "000001736"
+    },
+    {
+      "unidade": "TC CLICK RETIRE RIO 01",
+      "codigo": "000001017"
+    },
+    {
+      "unidade": "TC CLICK RETIRE SAO 05",
+      "codigo": "000001648"
+    },
+    {
+      "unidade": "TC CLUBE DE COMPRAS CDA",
+      "codigo": "000002511"
+    },
+    {
+      "unidade": "TC DEPOT 01 - FREGUESIA DO O",
+      "codigo": "000000122"
+    },
+    {
+      "unidade": "TC DEPOT 02 - VILA LEOPOLDINA",
+      "codigo": "000002439"
+    },
+    {
+      "unidade": "TC DEPOT 1 - FREGUESIA",
+      "codigo": "000002618"
+    },
+    {
+      "unidade": "TC EMISSAO TECA",
+      "codigo": "000000159"
+    },
+    {
+      "unidade": "TC HANGAR JAD",
+      "codigo": "000000561"
+    },
+    {
+      "unidade": "TC JAD INTERNACIONAL",
+      "codigo": "000001393"
+    },
+    {
+      "unidade": "TC JAD LINE HAUL",
+      "codigo": "000002406"
+    },
+    {
+      "unidade": "TC JAD MALOTE",
+      "codigo": "000002513"
+    },
+    {
+      "unidade": "TC JAD SALVADOS",
+      "codigo": "000001395"
+    },
+    {
+      "unidade": "TC JADLOG SEDE",
+      "codigo": "000001001"
+    },
+    {
+      "unidade": "TC JOI MECANIZAVEL",
+      "codigo": "000001796"
+    },
+    {
+      "unidade": "TC NAO MECANIZAVEL",
+      "codigo": "000001799"
+    },
+    {
+      "unidade": "TC N/NE TECA",
+      "codigo": "000000009"
+    },
+    {
+      "unidade": "TC PA VINHEDO 02",
+      "codigo": "000000537"
+    },
+    {
+      "unidade": "TC REVERSAS-JAD-SAO",
+      "codigo": "000000037"
+    },
+    {
+      "unidade": "TC RIO CONFINADOS",
+      "codigo": "000001183"
+    },
+    {
+      "unidade": "TC SAO CONFINADOS CPA",
+      "codigo": "000000855"
+    },
+    {
+      "unidade": "TC TECA MATRIZ",
+      "codigo": "000000050"
+    },
+    {
+      "unidade": "TC TECA NAO MECANIZAVEL",
+      "codigo": "000001169"
+    },
+    {
+      "unidade": "TC TESTE 3",
+      "codigo": "000002375"
+    },
+    {
+      "unidade": "TC TR BELO HORIZONTE 02",
+      "codigo": "000001174"
+    },
+    {
+      "unidade": "TC TR BRASILIA 02",
+      "codigo": "000001172"
+    },
+    {
+      "unidade": "TC TR RECIFE 02",
+      "codigo": "000001175"
+    },
+    {
+      "unidade": "TC TR RIO DE JANEIRO 02",
+      "codigo": "000001173"
+    },
+    {
+      "unidade": "TC TR SALVADOR 02",
+      "codigo": "000001171"
+    },
+    {
+      "unidade": "TC VULNERAVEIS BHZ",
+      "codigo": "000001792"
+    },
+    {
+      "unidade": "TC VULNERAVEIS RIO",
+      "codigo": "000001382"
+    },
+    {
+      "unidade": "TC VULNERAVEL",
+      "codigo": "000001797"
+    },
+    {
+      "unidade": "TC VULNERAVEL",
+      "codigo": "000001795"
+    },
+    {
+      "unidade": "TC VULNERAVEL TECA",
+      "codigo": "000001177"
+    },
+    {
+      "unidade": "TC 1",
+      "codigo": "000002240"
+    },
+    {
+      "unidade": "TECA MATRIZ 2",
+      "codigo": "000001892"
+    },
+    {
+      "unidade": "TL ARACATUBA",
+      "codigo": "000001033"
+    },
+    {
+      "unidade": "TL BAURU",
+      "codigo": "000001035"
+    },
+    {
+      "unidade": "TL OSASCO 01",
+      "codigo": "000002587"
+    },
+    {
+      "unidade": "TL OURINHOS",
+      "codigo": "000001031"
+    },
+    {
+      "unidade": "TL PORTO VELHO 04",
+      "codigo": "000002482"
+    },
+    {
+      "unidade": "TL PRESIDENTE PRUDENTE",
+      "codigo": "000001032"
+    },
+    {
+      "unidade": "TL SAO BERNARDO DO CAMPO 05",
+      "codigo": "000002574"
+    },
+    {
+      "unidade": "TL SAO CARLOS 01",
+      "codigo": "000001597"
+    },
+    {
+      "unidade": "TL SAO JOSE DO RIO PRETO 01",
+      "codigo": "000001034"
+    },
+    {
+      "unidade": "TR EXTREMA 04",
+      "codigo": "000002568"
+    },
+    {
+      "unidade": "UML SAO PAULO 20",
+      "codigo": "000001575"
+    },
+    {
+      "unidade": "4B CO FRANCISCO BELTRAO 02",
+      "codigo": "000002647"
+    },
+    {
+      "unidade": "4B CO LIMEIRA 01",
+      "codigo": "000002676"
+    },
+    {
+      "unidade": "4B CO UBERLANDIA 04",
+      "codigo": "000002673"
+    },
+    {
+      "unidade": "4B CO URUGUAIANA 01",
+      "codigo": "000002675"
+    },
+    {
+      "unidade": "4B LJ SAO PAULO 15",
+      "codigo": "000002677"
+    },
+    {
+      "unidade": "5B CO ITUPEVA 02",
+      "codigo": "000002706"
+    },
+    {
+      "unidade": "5B CO VALENCA 01",
+      "codigo": "000002684"
+    }
+  ]
+}

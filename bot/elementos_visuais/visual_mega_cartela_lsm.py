@@ -28,6 +28,9 @@ CHAVE_LOGS_UPDATE = (
 CHAVE_ARQUIVO_LOG_UPDATE = (
     "mega_cartela_lsm_arquivo_log_update"
 )
+CHAVE_AVISO_CREDENCIAIS = (
+    "mega_cartela_lsm_aviso_credenciais_fraction"
+)
 
 PASTA_LOGS = (
     Path(__file__).resolve().parents[2]
@@ -229,6 +232,7 @@ def renderizar_mega_cartela_lsm() -> None:
         )
 
     if iniciar_update:
+        st.session_state[CHAVE_AVISO_CREDENCIAIS] = False
         st.session_state[
             CHAVE_LOGS_UPDATE
         ] = []
@@ -291,9 +295,13 @@ def renderizar_mega_cartela_lsm() -> None:
                 width="stretch",
             )
 
+            credenciais_recusadas = any(
+                "Warning: O Fraction informou 'Login ou senha inválidos.'" in str(linha)
+                for linha in st.session_state.get(CHAVE_LOGS_UPDATE, [])
+            )
             if resultado_update[
                 "rastreios_sem_retorno"
-            ]:
+            ] and not credenciais_recusadas:
                 mensagem_sem_retorno = (
                     f"{resultado_update['rastreios_sem_retorno']} "
                     "Rastreio(s) ficaram sem retorno. "
@@ -331,6 +339,17 @@ def renderizar_mega_cartela_lsm() -> None:
                 width=LARGURA_UPLOAD,
             )
 
+        st.session_state[CHAVE_AVISO_CREDENCIAIS] = any(
+            "Warning: O Fraction informou 'Login ou senha inválidos.'" in str(linha)
+            for linha in st.session_state.get(CHAVE_LOGS_UPDATE, [])
+        )
+
+    if st.session_state.get(CHAVE_AVISO_CREDENCIAIS):
+        st.warning(
+            "O Fraction recusou o login. Confira o usuário e a senha em bot/.env.",
+            width=LARGURA_UPLOAD,
+        )
+
     # Exportação fixa: sempre lê a versão mais atual da cartela,
     # incluindo abas recém-adicionadas e dados atualizados.
     caminho_exportacao = (
@@ -352,4 +371,3 @@ def renderizar_mega_cartela_lsm() -> None:
             key="mega_cartela_lsm_download_fixo",
             width=LARGURA_BOTAO,
         )
-

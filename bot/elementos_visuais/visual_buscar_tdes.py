@@ -1,6 +1,7 @@
 import streamlit as st
 
 from automacoes.buscar_tdes import executar_busca_tdes
+from servicos.fraction import CredenciaisFractionInvalidasError
 from utils.interface import (
     LARGURA_BOTAO,
     avisar_variaveis_faltantes,
@@ -55,7 +56,20 @@ def renderizar_buscar_tdes(
 
         arquivo.seek(0)
 
-        if resultado.get("arquivo_erros"):
+        erro_fraction = str(resultado.get("erro_fraction", ""))
+        credenciais_invalidas = (
+            "CredenciaisFractionInvalidasError" in erro_fraction
+            or "Login ou senha inválidos." in erro_fraction
+        )
+
+        if credenciais_invalidas:
+            feedback.warning(
+                "O Fraction recusou o login. Confira o usuário e a senha "
+                "em bot/.env.",
+                width="stretch",
+            )
+
+        elif resultado.get("arquivo_erros"):
             feedback.warning(
                 "Busca concluída com pendências. "
                 f"{resultado['total_erros']} pedido(s) não puderam ser "
@@ -80,6 +94,11 @@ def renderizar_buscar_tdes(
                 width="stretch",
             )
 
+    except CredenciaisFractionInvalidasError as erro_credenciais:
+        feedback.warning(
+            str(erro_credenciais),
+            width="stretch",
+        )
     except Exception as erro:
         log(
             f"Erro: {type(erro).__name__}: {erro}"
