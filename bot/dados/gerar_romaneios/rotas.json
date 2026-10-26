@@ -2751,6 +2751,14 @@
     {
       "origem": "FL VITORIA",
       "destino": "MT NEXUS 87 PERUS"
+    },
+    {
+       "origem": "LM/CB/TL MARABA 01",
+       "destino": "CO ALTAMIRA 01"
+    },
+    {
+       "origem": "CO MIRASSOL",
+       "destino": "CO SAO JOSE DO RIO PRETO 01"
     }
   ]
 }

@@ -9,7 +9,7 @@ import streamlit as st
 from automacoes.dar_entrada_pedidos import (
     AdicaoRecebimentoIndeterminadaError,
     adicionar_ctes_ao_recebimento_fraction,
-    agrupar_etiquetas,
+    agrupar_etiquetas_importadas,
     baixar_bases_por_romaneios,
     completar_pedidos_fora_romaneios,
     coletar_ctes_liberados_para_entrada,
@@ -57,20 +57,26 @@ def renderizar_dar_entrada_pedidos() -> None:
             warning(erro_romaneios)
 
     arquivo_etiquetas = st.file_uploader(
-        "Etiquetas bipadas (TXT)",
-        type=["txt"],
+        "Etiquetas bipadas (TXT ou ZIP de TXT)",
+        type=["txt", "zip"],
         key="dar_entrada_pedidos_txt",
+        help=(
+            "Aceita TXT simples ou estruturado do Coletor Evelog. O ZIP pode conter "
+            "vários TXT; o programa extrai e reúne somente as etiquetas de todos eles."
+        ),
         width="stretch",
     )
 
     arquivo_pronto = arquivo_etiquetas is not None
     if not arquivo_pronto:
-        st.info("Selecione o TXT de etiquetas bipadas.")
+        st.info("Selecione um TXT ou ZIP com as etiquetas bipadas.")
     conteudo_etiquetas = arquivo_etiquetas.getvalue() if arquivo_etiquetas else b""
     identificador_arquivos = None
     if arquivo_pronto and numeros_romaneio and not erro_romaneios:
         identificador_arquivos = sha256(
             "\n".join(numeros_romaneio).encode("utf-8")
+            + b"\0"
+            + arquivo_etiquetas.name.encode("utf-8")
             + b"\0"
             + conteudo_etiquetas
         ).hexdigest()
@@ -101,12 +107,16 @@ def renderizar_dar_entrada_pedidos() -> None:
                 f"Iniciando consulta para {len(numeros_romaneio)} romaneio(s): "
                 + ", ".join(numeros_romaneio)
             )
-            pedidos = agrupar_etiquetas(conteudo_etiquetas)
+            pedidos = agrupar_etiquetas_importadas(
+                conteudo_etiquetas,
+                arquivo_etiquetas.name,
+                log=log,
+            )
             total_etiquetas = sum(
                 int(pedido["VOLUMES_ETIQUETAS"]) for pedido in pedidos
             )
             log(
-                f"TXT: {total_etiquetas} etiqueta(s) em "
+                f"Etiquetas reunidas: {total_etiquetas} etiqueta(s) em "
                 f"{len(pedidos)} ShipmentId(s)."
             )
             with st.spinner(

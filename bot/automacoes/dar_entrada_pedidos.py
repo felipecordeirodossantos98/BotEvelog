@@ -3,10 +3,11 @@ from __future__ import annotations
 from collections import OrderedDict, defaultdict
 from datetime import datetime
 from io import BytesIO
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 import unicodedata
 from typing import Callable
+from zipfile import BadZipFile, ZipFile
 
 import pandas as pd
 from playwright.sync_api import (
@@ -44,6 +45,11 @@ COLUNAS_RESULTADO = [
     "Manifesto",
 ]
 PADRAO_ETIQUETA = re.compile(r"^(\d{14})\$(\d{3})(\S*)\s*$")
+PADRAO_BLOCO_SHIPMENT_TXT = re.compile(
+    r"^Shipment\s+ID\s*:\s*(\d{14})"
+    r"(?:\s*\(\s*(\d+)\s+etiqueta\(s\)\s*\))?\s*$",
+    flags=re.IGNORECASE,
+)
 PADRAO_VOLUME_TOTAL = re.compile(r"^0*1\s*/\s*0*(\d+)\s*$")
 PADRAO_NUMEROS_ROMANEIO = re.compile(r"\s*[,;\n\r]+\s*|\s+")
 MAX_TENTATIVAS_CONSULTA_ROMANEIOS = 3
@@ -969,14 +975,26 @@ def _localizar_coluna(df: pd.DataFrame, nome: str) -> object | None:
 
 
 def agrupar_etiquetas(texto: str | bytes) -> list[dict[str, object]]:
-    """Agrupa etiquetas pelo ShipmentId formado pelos primeiros 14 dígitos."""
+    """Agrupa etiquetas em TXT simples ou na exportação estruturada do Coletor."""
     if isinstance(texto, bytes):
         texto = texto.decode("utf-8-sig")
+
+    linhas = texto.splitlines()
+    secoes_exportadas = [
+        encontrado
+        for linha in linhas
+        if (encontrado := PADRAO_BLOCO_SHIPMENT_TXT.fullmatch(linha.strip()))
+    ]
+    if secoes_exportadas or any(
+        linha.strip().casefold().startswith("coletor evelog")
+        for linha in linhas
+    ):
+        return _agrupar_etiquetas_export_coletor(linhas)
 
     pedidos: OrderedDict[str, list[str]] = OrderedDict()
     linhas_invalidas: list[int] = []
 
-    for numero_linha, linha in enumerate(texto.splitlines(), start=1):
+    for numero_linha, linha in enumerate(linhas, start=1):
         etiqueta = linha.strip()
         if not etiqueta:
             continue
@@ -998,6 +1016,192 @@ def agrupar_etiquetas(texto: str | bytes) -> list[dict[str, object]]:
             f"Linha(s): {linhas}{sufixo}."
         )
     if not pedidos:
+        raise ValueError("O TXT não contém etiquetas válidas para consultar.")
+
+    return [
+        {
+            "ShipmentId": shipment_id,
+            "ETIQUETAS": etiquetas,
+            "VOLUMES_ETIQUETAS": len(etiquetas),
+        }
+        for shipment_id, etiquetas in pedidos.items()
+    ]
+
+
+def agrupar_etiquetas_importadas(
+    conteudo: bytes,
+    nome_arquivo: str,
+    *,
+    log: Callable[[str], None] | None = None,
+) -> list[dict[str, object]]:
+    """Lê um TXT ou reúne as etiquetas extraídas de todos os TXT de um ZIP."""
+    if not nome_arquivo.casefold().endswith(".zip"):
+        return agrupar_etiquetas(conteudo)
+
+    try:
+        with ZipFile(BytesIO(conteudo)) as arquivo_zip:
+            arquivos_txt = [
+                membro
+                for membro in arquivo_zip.infolist()
+                if not membro.is_dir()
+                and PurePosixPath(membro.filename).suffix.casefold() == ".txt"
+                and "__macosx" not in {
+                    parte.casefold()
+                    for parte in PurePosixPath(membro.filename).parts
+                }
+            ]
+            if not arquivos_txt:
+                raise ValueError("O ZIP não contém arquivos TXT de etiquetas.")
+
+            etiquetas_por_shipment: OrderedDict[str, list[str]] = OrderedDict()
+            total_etiquetas = 0
+            for membro in arquivos_txt:
+                try:
+                    pedidos_arquivo = agrupar_etiquetas(arquivo_zip.read(membro))
+                except Exception as erro:
+                    raise ValueError(
+                        f"Não foi possível processar '{membro.filename}' dentro do ZIP: "
+                        f"{erro}"
+                    ) from erro
+
+                for pedido in pedidos_arquivo:
+                    shipment_id = str(pedido["ShipmentId"])
+                    etiquetas = list(pedido["ETIQUETAS"])
+                    etiquetas_por_shipment.setdefault(shipment_id, []).extend(etiquetas)
+                    total_etiquetas += len(etiquetas)
+
+    except BadZipFile as erro:
+        raise ValueError(
+            f"O arquivo '{nome_arquivo}' não é um ZIP válido ou está corrompido."
+        ) from erro
+    except (OSError, RuntimeError) as erro:
+        raise ValueError(
+            f"Não foi possível ler o ZIP '{nome_arquivo}': {erro}"
+        ) from erro
+
+    pedidos = [
+        {
+            "ShipmentId": shipment_id,
+            "ETIQUETAS": etiquetas,
+            "VOLUMES_ETIQUETAS": len(etiquetas),
+        }
+        for shipment_id, etiquetas in etiquetas_por_shipment.items()
+    ]
+    if log is not None:
+        log(
+            f"ZIP de etiquetas '{nome_arquivo}': {len(arquivos_txt)} TXT(s), "
+            f"{len(pedidos)} ShipmentId(s) e {total_etiquetas} etiqueta(s) reunidos."
+        )
+    return pedidos
+
+
+def _agrupar_etiquetas_export_coletor(
+    linhas: list[str],
+) -> list[dict[str, object]]:
+    secoes: list[tuple[str, int | None, list[str], int]] = []
+    secao_atual: tuple[str, int | None, list[str], int] | None = None
+    quantidade_shipments_declarada: int | None = None
+    quantidade_etiquetas_declarada: int | None = None
+    linhas_invalidas: list[int] = []
+    linhas_fora_de_secao: list[int] = []
+
+    for numero_linha, linha in enumerate(linhas, start=1):
+        texto_linha = linha.strip()
+        if not texto_linha:
+            continue
+
+        encontrado_secao = PADRAO_BLOCO_SHIPMENT_TXT.fullmatch(texto_linha)
+        if encontrado_secao:
+            secao_atual = (
+                encontrado_secao.group(1),
+                int(encontrado_secao.group(2))
+                if encontrado_secao.group(2) is not None
+                else None,
+                [],
+                numero_linha,
+            )
+            secoes.append(secao_atual)
+            continue
+
+        encontrado_total = re.fullmatch(
+            r"(?:Shipment\s+IDs|Etiquetas)\s*:\s*(\d+)",
+            texto_linha,
+            flags=re.IGNORECASE,
+        )
+        if encontrado_total:
+            if texto_linha.casefold().startswith("shipment"):
+                quantidade_shipments_declarada = int(encontrado_total.group(1))
+            else:
+                quantidade_etiquetas_declarada = int(encontrado_total.group(1))
+            continue
+
+        etiqueta = PADRAO_ETIQUETA.fullmatch(texto_linha)
+        if etiqueta is not None and etiqueta.group(2) != "000":
+            if secao_atual is None:
+                linhas_fora_de_secao.append(numero_linha)
+                continue
+            if etiqueta.group(1) != secao_atual[0]:
+                raise ValueError(
+                    f"A etiqueta da linha {numero_linha} pertence ao ShipmentId "
+                    f"{etiqueta.group(1)}, mas o bloco atual é {secao_atual[0]}."
+                )
+            secao_atual[2].append(texto_linha)
+            continue
+
+        if re.match(r"^\d{14}\$", texto_linha):
+            linhas_invalidas.append(numero_linha)
+
+    pedidos: OrderedDict[str, list[str]] = OrderedDict()
+    divergencias_secoes: list[str] = []
+    for shipment_id, quantidade_declarada, etiquetas, linha_secao in secoes:
+        pedidos.setdefault(shipment_id, []).extend(etiquetas)
+        if quantidade_declarada is not None and len(etiquetas) != quantidade_declarada:
+            divergencias_secoes.append(
+                f"ShipmentId {shipment_id}, bloco na linha {linha_secao}: "
+                f"esperadas {quantidade_declarada} etiqueta(s), encontradas {len(etiquetas)}"
+            )
+
+    if linhas_invalidas:
+        linhas_texto = ", ".join(str(numero) for numero in linhas_invalidas[:10])
+        sufixo = "..." if len(linhas_invalidas) > 10 else ""
+        raise ValueError(
+            "O TXT contém etiqueta(s) fora do formato esperado nas linha(s): "
+            f"{linhas_texto}{sufixo}."
+        )
+    if linhas_fora_de_secao:
+        linhas_texto = ", ".join(str(numero) for numero in linhas_fora_de_secao[:10])
+        sufixo = "..." if len(linhas_fora_de_secao) > 10 else ""
+        raise ValueError(
+            "O TXT estruturado contém etiqueta(s) fora de um bloco Shipment ID, "
+            f"na(s) linha(s): {linhas_texto}{sufixo}."
+        )
+    if divergencias_secoes:
+        raise ValueError(
+            "A quantidade de etiqueta(s) declarada nos blocos não confere: "
+            + "; ".join(divergencias_secoes[:5])
+            + ("; ..." if len(divergencias_secoes) > 5 else ".")
+        )
+
+    total_etiquetas = sum(len(etiquetas) for etiquetas in pedidos.values())
+    if (
+        quantidade_shipments_declarada is not None
+        and quantidade_shipments_declarada != len(pedidos)
+    ):
+        raise ValueError(
+            "O total de Shipment IDs informado no cabeçalho do TXT "
+            f"({quantidade_shipments_declarada}) difere dos blocos encontrados "
+            f"({len(pedidos)})."
+        )
+    if (
+        quantidade_etiquetas_declarada is not None
+        and quantidade_etiquetas_declarada != total_etiquetas
+    ):
+        raise ValueError(
+            "O total de etiquetas informado no cabeçalho do TXT "
+            f"({quantidade_etiquetas_declarada}) difere das etiquetas extraídas "
+            f"({total_etiquetas})."
+        )
+    if not total_etiquetas:
         raise ValueError("O TXT não contém etiquetas válidas para consultar.")
 
     return [

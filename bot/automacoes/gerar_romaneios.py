@@ -4,11 +4,13 @@ import base64
 from datetime import datetime
 import json
 from io import BytesIO
+import os
 from pathlib import Path
 import re
 import time
 import traceback
 import unicodedata
+from threading import Event
 from urllib.parse import unquote_to_bytes
 
 import pandas as pd
@@ -197,6 +199,158 @@ def _capturar_resposta_pdf(response, arquivos_pdf: list[tuple[str, bytes]], *, l
         _log(log, f"PDF capturado do Fraction ({len(conteudo)} bytes).")
 
 
+def _salvar_conteudo_pdf_romaneio(
+    conteudo: bytes,
+    unidade: str,
+    *,
+    log=None,
+) -> Path:
+    if not conteudo.startswith(b"%PDF"):
+        raise RuntimeError(
+            f"O arquivo recebido do Fraction para a unidade '{unidade}' "
+            "não é um PDF válido."
+        )
+
+    nome_unidade = re.sub(r"[^A-Za-z0-9._-]+", "_", unidade).strip("_.") or "unidade"
+    RESULTADOS_ROMANEIOS.mkdir(parents=True, exist_ok=True)
+    caminho = RESULTADOS_ROMANEIOS / (
+        f"Romaneio_{nome_unidade}_{datetime.now():%Y-%m-%d_%H-%M-%S-%f}.pdf"
+    )
+    caminho.write_bytes(conteudo)
+    _log(log, f"Romaneio salvo em {caminho} ({len(conteudo)} bytes).")
+    return caminho
+
+
+def preparar_lote_impressao_romaneios(
+    arquivos_pdf: list[str | Path],
+    *,
+    log=None,
+) -> Path:
+    """Valida todos os PDFs e cria um arquivo único para a impressão em lote."""
+    from pypdf import PdfReader, PdfWriter
+
+    caminhos = [Path(caminho) for caminho in arquivos_pdf]
+    if not caminhos:
+        raise ValueError("Não há PDFs de romaneio para imprimir.")
+
+    RESULTADOS_ROMANEIOS.mkdir(parents=True, exist_ok=True)
+    caminho_lote = RESULTADOS_ROMANEIOS / (
+        f"Romaneios_Emissao_impressao_{datetime.now():%Y-%m-%d_%H-%M-%S-%f}.pdf"
+    )
+    escritor = PdfWriter()
+    arquivos_abertos = []
+    total_paginas = 0
+
+    try:
+        for caminho in caminhos:
+            if not caminho.is_file():
+                raise FileNotFoundError(f"PDF de romaneio não encontrado: {caminho}.")
+            arquivo = caminho.open("rb")
+            arquivos_abertos.append(arquivo)
+            try:
+                leitor = PdfReader(arquivo, strict=True)
+                paginas = len(leitor.pages)
+            except Exception as erro:
+                raise ValueError(
+                    f"O PDF '{caminho.name}' não pôde ser validado: {erro}"
+                ) from erro
+            if paginas <= 0:
+                raise ValueError(f"O PDF '{caminho.name}' não possui páginas.")
+            escritor.append(leitor)
+            total_paginas += paginas
+
+        with caminho_lote.open("wb") as destino:
+            escritor.write(destino)
+
+        with caminho_lote.open("rb") as arquivo_lote:
+            leitor_lote = PdfReader(arquivo_lote, strict=True)
+            paginas_lote = len(leitor_lote.pages)
+        if paginas_lote != total_paginas:
+            raise RuntimeError(
+                "A validação do PDF combinado encontrou uma quantidade de páginas "
+                f"inesperada ({paginas_lote} de {total_paginas})."
+            )
+    except Exception:
+        caminho_lote.unlink(missing_ok=True)
+        raise
+    finally:
+        escritor.close()
+        for arquivo in arquivos_abertos:
+            arquivo.close()
+
+    _log(
+        log,
+        f"Lote de impressão preparado: {len(caminhos)} PDF(s), "
+        f"{total_paginas} página(s), arquivo {caminho_lote}.",
+    )
+    return caminho_lote
+
+
+def enviar_pdf_para_impressora_padrao(
+    caminho_pdf: str | Path,
+    *,
+    log=None,
+) -> None:
+    """Envia um PDF único ao aplicativo padrão do Windows para impressão."""
+    arquivo = Path(caminho_pdf)
+    if not arquivo.is_file():
+        raise FileNotFoundError(f"PDF do lote de impressão não encontrado: {arquivo}.")
+    if os.name != "nt" or not hasattr(os, "startfile"):
+        raise RuntimeError(
+            "O envio direto para a impressora padrão está disponível somente no Windows."
+        )
+
+    with arquivo.open("rb") as entrada:
+        if entrada.read(4) != b"%PDF":
+            raise ValueError(f"O arquivo '{arquivo.name}' não é um PDF válido.")
+
+    try:
+        os.startfile(str(arquivo), "print")
+    except OSError as erro:
+        raise RuntimeError(
+            "O Windows não conseguiu enviar o PDF ao aplicativo padrão. "
+            "Verifique o leitor de PDF associado e a impressora padrão."
+        ) from erro
+
+    _log(
+        log,
+        f"Lote {arquivo.name} enviado ao aplicativo PDF padrão para a impressora padrão.",
+    )
+
+
+def _salvar_download_romaneio(
+    download,
+    unidade: str,
+    *,
+    log=None,
+) -> Path:
+    nome_unidade = re.sub(r"[^A-Za-z0-9._-]+", "_", unidade).strip("_.") or "unidade"
+    RESULTADOS_ROMANEIOS.mkdir(parents=True, exist_ok=True)
+    caminho = RESULTADOS_ROMANEIOS / (
+        f"Romaneio_{nome_unidade}_{datetime.now():%Y-%m-%d_%H-%M-%S-%f}.pdf"
+    )
+
+    try:
+        download.save_as(caminho)
+        with caminho.open("rb") as arquivo:
+            assinatura = arquivo.read(4)
+        if assinatura != b"%PDF":
+            raise RuntimeError(
+                "O Fraction iniciou um download, mas o arquivo recebido "
+                f"não é um PDF. Nome informado pelo navegador: "
+                f"{download.suggested_filename!r}."
+            )
+    except Exception:
+        caminho.unlink(missing_ok=True)
+        raise
+
+    _log(
+        log,
+        f"Download do romaneio ({download.suggested_filename}) salvo em {caminho}.",
+    )
+    return caminho
+
+
 def _salvar_pdf_romaneio(
     popup,
     arquivos_pdf: list[tuple[str, bytes]],
@@ -230,15 +384,11 @@ def _salvar_pdf_romaneio(
             "O Fraction abriu uma nova guia, mas não foi possível capturar o PDF "
             f"do romaneio da unidade '{unidade}'. URL da guia: {popup.url}"
         )
-
-    nome_unidade = re.sub(r"[^A-Za-z0-9._-]+", "_", unidade).strip("_.") or "unidade"
-    RESULTADOS_ROMANEIOS.mkdir(parents=True, exist_ok=True)
-    caminho = RESULTADOS_ROMANEIOS / (
-        f"Romaneio_{nome_unidade}_{datetime.now():%Y-%m-%d_%H-%M-%S-%f}.pdf"
+    return _salvar_conteudo_pdf_romaneio(
+        conteudo,
+        unidade,
+        log=log,
     )
-    caminho.write_bytes(conteudo)
-    _log(log, f"Romaneio salvo em {caminho} ({len(conteudo)} bytes).")
-    return caminho
 
 
 def associar_destinos_fraction(
@@ -441,26 +591,69 @@ def processar_manifestos(
         contexto = page.context
         contexto.on("response", capturar_pdf)
         popup = None
+        download_recebido = None
+        saida_recebida = Event()
+
+        def registrar_download(download) -> None:
+            nonlocal download_recebido
+            download_recebido = download
+            saida_recebida.set()
+
+        def registrar_popup(nova_pagina) -> None:
+            nonlocal popup
+            popup = nova_pagina
+            nova_pagina.on("download", registrar_download)
+            saida_recebida.set()
+
+        page.on("download", registrar_download)
+        page.on("popup", registrar_popup)
         try:
-            with page.expect_popup(timeout=600_000) as popup_info:
-                page.get_by_role("button", name="Processar lista").click(
-                    timeout=120_000
-                )
-            popup = popup_info.value
-            _log(log, "Nova guia do romaneio aberta pelo Fraction.")
-            try:
-                popup.wait_for_load_state("load", timeout=120_000)
-            except TimeoutError:
-                _log(log, "A guia do PDF não sinalizou load; usando a resposta capturada.")
-            caminho_pdf = _salvar_pdf_romaneio(
-                popup,
-                arquivos_pdf,
-                rota_unidade,
-                log=log,
+            page.get_by_role("button", name="Processar lista").click(
+                timeout=120_000
             )
+
+            prazo = time.monotonic() + 600
+            while not saida_recebida.is_set():
+                restante = prazo - time.monotonic()
+                if restante <= 0:
+                    raise TimeoutError(
+                        "O Fraction não iniciou o download do PDF nem abriu "
+                        f"uma nova guia para a unidade '{rota_unidade}'."
+                    )
+                page.wait_for_timeout(min(250, max(1, int(restante * 1000))))
+
+            if download_recebido is not None:
+                _log(log, "Download automático do PDF do romaneio detectado.")
+                caminho_pdf = _salvar_download_romaneio(
+                    download_recebido,
+                    rota_unidade,
+                    log=log,
+                )
+            else:
+                _log(log, "Nova guia do romaneio aberta pelo Fraction.")
+                try:
+                    popup.wait_for_load_state("load", timeout=120_000)
+                except TimeoutError:
+                    _log(log, "A guia do PDF não sinalizou load; usando a resposta capturada.")
+                if download_recebido is not None:
+                    _log(log, "Download automático do PDF detectado na nova guia.")
+                    caminho_pdf = _salvar_download_romaneio(
+                        download_recebido,
+                        rota_unidade,
+                        log=log,
+                    )
+                else:
+                    caminho_pdf = _salvar_pdf_romaneio(
+                        popup,
+                        arquivos_pdf,
+                        rota_unidade,
+                        log=log,
+                    )
             arquivos_romaneios.append(str(caminho_pdf))
             _log(log, f"Remessa da unidade {rota_unidade} processada e PDF salvo.")
         finally:
+            page.remove_listener("download", registrar_download)
+            page.remove_listener("popup", registrar_popup)
             contexto.remove_listener("response", capturar_pdf)
             if popup is not None and not popup.is_closed():
                 popup.close()
@@ -557,7 +750,7 @@ def executar_manifestos_romaneios(
     try:
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch(headless=HEADLESS, slow_mo=SLOW_MO_MS)
-            context = browser.new_context()
+            context = browser.new_context(accept_downloads=True)
             page = context.new_page()
             page.on("pageerror", lambda erro: _log(log, f"Erro JavaScript na página: {erro}"))
             try:

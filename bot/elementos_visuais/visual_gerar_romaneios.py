@@ -13,6 +13,9 @@ from elementos_visuais.visual_baixar_relatorios_analitico import (
 from elementos_visuais.visual_dar_entrada_pedidos import (
     renderizar_dar_entrada_pedidos,
 )
+from elementos_visuais.visual_gerar_romaneios_emissao import (
+    renderizar_gerar_romaneios_emissao,
+)
 from servicos.fraction import CredenciaisFractionInvalidasError
 from utils.config import RESULTADOS_ENTRADA_PEDIDOS, RESULTADOS_ROMANEIOS
 from utils.interface import (
@@ -34,8 +37,13 @@ CHAVE_MANIFESTOS_CONCLUIDOS = "visual_gerar_romaneios_manifestos_concluidos"
 
 
 def renderizar_menu_automacoes_operacao() -> None:
-    tab_dar_entrada, tab_romaneios, tab_analitico = st.tabs(
-        ["Dar entrada em pedidos", "Gerar romaneios", "Relatório Analítico"]
+    tab_dar_entrada, tab_romaneios, tab_emissao, tab_analitico = st.tabs(
+        [
+            "Dar entrada em pedidos",
+            "Gerar romaneios",
+            "Gerar romaneios de Emissão",
+            "Relatório Analítico",
+        ]
     )
 
     with tab_dar_entrada:
@@ -43,6 +51,9 @@ def renderizar_menu_automacoes_operacao() -> None:
 
     with tab_romaneios:
         renderizar_gerar_romaneios()
+
+    with tab_emissao:
+        renderizar_gerar_romaneios_emissao()
 
     with tab_analitico:
         renderizar_baixar_relatorios_analitico()

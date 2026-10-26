@@ -362,6 +362,7 @@ call :EXIGIR_ARQUIVO "%BOT_DIR%\automacoes\baixar_danfes.py" "bot\automacoes\bai
 call :EXIGIR_ARQUIVO "%BOT_DIR%\automacoes\baixar_relatorios_performance.py" "bot\automacoes\baixar_relatorios_performance.py"
 call :EXIGIR_ARQUIVO "%BOT_DIR%\automacoes\buscar_tdes.py" "bot\automacoes\buscar_tdes.py"
 call :EXIGIR_ARQUIVO "%BOT_DIR%\automacoes\baixar_relatorios_analitico.py" "bot\automacoes\baixar_relatorios_analitico.py"
+call :EXIGIR_ARQUIVO "%BOT_DIR%\automacoes\gerar_romaneios_emissao.py" "bot\automacoes\gerar_romaneios_emissao.py"
 
 rem ----- Estrutura V2: elementos visuais -----
 call :EXIGIR_ARQUIVO "%BOT_DIR%\elementos_visuais\visual_gerar_ordens_de_coleta_equipamentos.py" "bot\elementos_visuais\visual_gerar_ordens_de_coleta_equipamentos.py"
@@ -371,6 +372,7 @@ call :EXIGIR_ARQUIVO "%BOT_DIR%\elementos_visuais\visual_baixar_danfes.py" "bot\
 call :EXIGIR_ARQUIVO "%BOT_DIR%\elementos_visuais\visual_baixar_relatorios_performance.py" "bot\elementos_visuais\visual_baixar_relatorios_performance.py"
 call :EXIGIR_ARQUIVO "%BOT_DIR%\elementos_visuais\visual_buscar_tdes.py" "bot\elementos_visuais\visual_buscar_tdes.py"
 call :EXIGIR_ARQUIVO "%BOT_DIR%\elementos_visuais\visual_baixar_relatorios_analitico.py" "bot\elementos_visuais\visual_baixar_relatorios_analitico.py"
+call :EXIGIR_ARQUIVO "%BOT_DIR%\elementos_visuais\visual_gerar_romaneios_emissao.py" "bot\elementos_visuais\visual_gerar_romaneios_emissao.py"
 
 rem ----- Estrutura V2: serviços e utilitários -----
 call :EXIGIR_ARQUIVO "%BOT_DIR%\servicos\fraction.py" "bot\servicos\fraction.py"

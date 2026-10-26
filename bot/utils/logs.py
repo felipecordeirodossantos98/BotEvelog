@@ -79,6 +79,7 @@ def criar_logger_execucao(
         sequencia += 1
 
     lock = Lock()
+    falha_painel_visual_registrada = [False]
 
     cabecalho = (
         "Bot Evelog\n"
@@ -110,7 +111,25 @@ def criar_logger_execucao(
                 arquivo.write(linha)
 
         if log_visual is not None:
-            log_visual(texto)
+            try:
+                log_visual(texto)
+            except Exception as erro_visual:
+                # Eventos do Playwright podem chamar o logger fora do contexto
+                # do ScriptRunner do Streamlit. A falha do painel não pode
+                # interromper a automação nem a captura da página.
+                with lock:
+                    if not falha_painel_visual_registrada[0]:
+                        falha_painel_visual_registrada[0] = True
+                        aviso_horario = datetime.now().strftime(
+                            "%d/%m/%Y %H:%M:%S"
+                        )
+                        aviso = (
+                            f"[{aviso_horario}] Painel visual de logs não atualizado "
+                            f"por falta de contexto Streamlit: {type(erro_visual).__name__}: "
+                            f"{erro_visual}. A automação continua; consulte este arquivo.\n"
+                        )
+                        with caminho.open("a", encoding="utf-8") as arquivo:
+                            arquivo.write(aviso)
 
     log(
         f"Arquivo de log: {caminho}"
