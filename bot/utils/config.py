@@ -67,11 +67,14 @@ def _caminho_configuravel(
 # -----------------------------------------------------------------------------
 
 URL_FRACTION = _env("URL_FRACTION")
+URL_DRIVE = _env("URL_DRIVE")
 FRACTION_USER = _env("FRACTION_USER")
 FRACTION_PASSWORD = _env("FRACTION_PASSWORD")
 
 FRACTION_USER_ANALYTIC = _env("FRACTION_USER_ANALYTIC")
 FRACTION_PASSWORD_ANALYTIC = _env("FRACTION_PASSWORD_ANALYTIC")
+FRACTION_USER_PERFORMANCE = _env("FRACTION_USER_PERFORMANCE")
+FRACTION_PASSWORD_PERFORMANCE = _env("FRACTION_PASSWORD_PERFORMANCE")
 
 URL_ZENDESK = _env("URL_ZENDESK")
 ZENDESK_USER = _env("ZENDESK_USER")
@@ -136,6 +139,7 @@ DADOS_ORDENS = PASTA_DADOS / "gerar_ordens_de_coleta"
 ARQUIVO_BASE_CNPJS = DADOS_ORDENS / "base_cnpjs.json"
 ARQUIVO_EMAILS_UNIDADES = DADOS_ORDENS / "emails_unidades.json"
 ARQUIVO_ROTAS_ROMANEIOS = PASTA_DADOS / "gerar_romaneios" / "rotas.json"
+ARQUIVO_REGRAS_ROTAS_EMISSAO = ARQUIVO_ROTAS_ROMANEIOS
 ARQUIVO_UNIDADES_FRACTION = (
     PASTA_DADOS / "gerar_romaneios" / "unidades.json"
 )
@@ -186,6 +190,14 @@ VARIAVEIS_POR_FLUXO: dict[str, tuple[str, ...]] = {
         "URL_FRACTION",
         "FRACTION_USER_ANALYTIC",
         "FRACTION_PASSWORD_ANALYTIC",
+    ),
+    "extrair_performance_emissao": (
+        "URL_FRACTION",
+        "FRACTION_USER_PERFORMANCE",
+        "FRACTION_PASSWORD_PERFORMANCE",
+    ),
+    "importar_etiquetas_drive": (
+        "URL_DRIVE",
     ),
     "gerar_romaneios": (
         "URL_FRACTION",

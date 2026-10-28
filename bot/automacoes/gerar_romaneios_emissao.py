@@ -1,12 +1,20 @@
 from __future__ import annotations
 
+from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from io import BytesIO
+import json
+from pathlib import Path, PurePosixPath
 import re
+import tempfile
+import time
 import unicodedata
 from typing import Callable
+from zipfile import BadZipFile, ZipFile
 
 import pandas as pd
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+from playwright.sync_api import sync_playwright
 
 from automacoes.baixar_relatorios_performance import executar_extracao
 from automacoes.dar_entrada_pedidos import (
@@ -17,7 +25,18 @@ from automacoes.dar_entrada_pedidos import (
     gerar_ctes_para_entrada,
     gerar_etiquetas_faltantes,
 )
-from automacoes.gerar_romaneios import carregar_rotas_destino_origem
+from automacoes.gerar_romaneios import (
+    carregar_codigos_preferenciais_unidades,
+    carregar_regras_rotas_localidade,
+)
+from utils.config import (
+    FRACTION_PASSWORD_PERFORMANCE,
+    FRACTION_USER_PERFORMANCE,
+    HEADLESS,
+    SLOW_MO_MS,
+    URL_DRIVE,
+    URL_FRACTION,
+)
 
 
 CABECALHOS_OBRIGATORIOS = {
@@ -50,6 +69,43 @@ ALIAS_STATUS_RELATORIO = {
     "SITUACAO",
     "SITUACAOPEDIDO",
 }
+ALIAS_UF_RELATORIO = {"UF", "ESTADO"}
+ALIAS_CIDADE_RELATORIO = {"CIDADE", "MUNICIPIO"}
+NOMES_UF = {
+    "ACRE": "AC",
+    "ALAGOAS": "AL",
+    "AMAPA": "AP",
+    "AMAZONAS": "AM",
+    "BAHIA": "BA",
+    "CEARA": "CE",
+    "DISTRITO FEDERAL": "DF",
+    "ESPIRITO SANTO": "ES",
+    "GOIAS": "GO",
+    "MARANHAO": "MA",
+    "MATO GROSSO": "MT",
+    "MATO GROSSO DO SUL": "MS",
+    "MINAS GERAIS": "MG",
+    "PARA": "PA",
+    "PARAIBA": "PB",
+    "PARANA": "PR",
+    "PERNAMBUCO": "PE",
+    "PIAUI": "PI",
+    "RIO DE JANEIRO": "RJ",
+    "RIO GRANDE DO NORTE": "RN",
+    "RIO GRANDE DO SUL": "RS",
+    "RONDONIA": "RO",
+    "RORAIMA": "RR",
+    "SANTA CATARINA": "SC",
+    "SAO PAULO": "SP",
+    "SERGIPE": "SE",
+    "TOCANTINS": "TO",
+}
+SELETOR_DATA_INICIAL_PERFORMANCE = '[id="formPerfEntFiltro:dtini_input"]'
+SELETOR_DATA_FINAL_PERFORMANCE = '[id="formPerfEntFiltro:dtfim_input"]'
+TIMEOUT_DOWNLOAD_PERFORMANCE_MS = 600_000
+TIMEOUT_DOWNLOAD_DRIVE_MS = 300_000
+MAX_TENTATIVAS_DOWNLOAD_DRIVE = 3
+LIMITE_DIAS_PERFORMANCE_EMISSAO = 31
 
 
 def _normalizar_cabecalho(valor: object) -> str:
@@ -70,6 +126,19 @@ def _normalizar_rota(valor: object) -> str:
         if not unicodedata.combining(caractere)
     )
     return " ".join(texto.upper().split())
+
+
+def _normalizar_uf(valor: object) -> str:
+    texto = _normalizar_valor(valor)
+    if not texto:
+        return ""
+    uf = _normalizar_rota(texto)
+    uf_sem_acento = "".join(
+        caractere
+        for caractere in unicodedata.normalize("NFKD", uf)
+        if not unicodedata.combining(caractere)
+    )
+    return NOMES_UF.get(uf_sem_acento, uf_sem_acento)
 
 
 def _normalizar_valor(valor: object) -> str:
@@ -210,6 +279,14 @@ def _ler_base_performance(conteudo: bytes) -> tuple[pd.DataFrame, str, int]:
             + "."
         )
 
+    coluna_uf = _localizar_coluna_normalizada(
+        list(base.columns),
+        ALIAS_UF_RELATORIO,
+    )
+    coluna_cidade = _localizar_coluna_normalizada(
+        list(base.columns),
+        ALIAS_CIDADE_RELATORIO,
+    )
     colunas = {
         nome: colunas_por_chave[chave][0]
         for chave, nome in CABECALHOS_OBRIGATORIOS.items()
@@ -225,23 +302,48 @@ def _ler_base_performance(conteudo: bytes) -> tuple[pd.DataFrame, str, int]:
                 if colunas_status
                 else ""
             ),
+            "UF": (
+                base[coluna_uf].map(_normalizar_uf)
+                if coluna_uf is not None
+                else ""
+            ),
+            "Cidade": (
+                base[coluna_cidade].map(_normalizar_valor)
+                if coluna_cidade is not None
+                else ""
+            ),
         }
     )
     dados = dados[dados["ShipmentId"] != ""].reset_index(drop=True)
     return dados, nome_aba, indice_cabecalho + 1
 
 
+def ler_base_performance(conteudo: bytes) -> tuple[pd.DataFrame, str, int]:
+    """Lê e normaliza a tabela Performance para os fluxos de Emissão."""
+    return _ler_base_performance(conteudo)
+
+
+def carregar_codigos_preferenciais_unidades_emissao() -> dict[str, str]:
+    """Retorna o código preferencial da unidade quando o nome não é único."""
+    return carregar_codigos_preferenciais_unidades()
+
+
 def _adicionar_rota(tabela: pd.DataFrame) -> pd.DataFrame:
-    mapa_rotas, destinos_ambiguos = carregar_rotas_destino_origem()
+    rotas_por_uf, rotas_por_cidade = carregar_regras_rotas_localidade()
     resultado = tabela.copy()
 
-    def resolver(destino: object) -> str:
-        chave = _normalizar_rota(destino)
-        if chave in destinos_ambiguos:
-            return "Rota ambígua"
-        return mapa_rotas.get(chave, "Sem rota")
+    def resolver(linha: pd.Series) -> str:
+        uf = _normalizar_uf(linha.get("UF", ""))
+        cidade = _normalizar_rota(_normalizar_valor(linha.get("Cidade", "")))
+        rota_cidade = rotas_por_cidade.get(cidade, "")
+        if rota_cidade:
+            return rota_cidade
+        rota_uf = rotas_por_uf.get(uf, "")
+        if rota_uf:
+            return rota_uf
+        return "Sem rota"
 
-    resultado["Rota"] = resultado["Destino"].map(resolver)
+    resultado["Rota"] = resultado.apply(resolver, axis=1)
     return resultado
 
 
@@ -273,8 +375,17 @@ def _registrar_texto_unico(
 
 def _ler_destinos_relatorio_performance(
     caminho: str,
-) -> tuple[dict[str, str], dict[str, str], dict[str, str], dict[str, str]]:
-    """Indexa Destino e Status do relatório por CTE e ShipmentId."""
+) -> tuple[
+    dict[str, str],
+    dict[str, str],
+    dict[str, str],
+    dict[str, str],
+    dict[str, str],
+    dict[str, str],
+    dict[str, str],
+    dict[str, str],
+]:
+    """Indexa Destino, Status, UF e Cidade por CTE e ShipmentId."""
     partes: list[pd.DataFrame] = []
     with pd.ExcelFile(caminho, engine="openpyxl") as planilha:
         for nome_aba in planilha.sheet_names:
@@ -338,21 +449,47 @@ def _ler_destinos_relatorio_performance(
         list(dados.columns),
         ALIAS_STATUS_RELATORIO,
     )
+    coluna_uf = _localizar_coluna_normalizada(
+        list(dados.columns),
+        ALIAS_UF_RELATORIO,
+    )
+    coluna_cidade = _localizar_coluna_normalizada(
+        list(dados.columns),
+        ALIAS_CIDADE_RELATORIO,
+    )
 
     destinos_por_cte: dict[str, str] = {}
     destinos_por_shipment: dict[str, str] = {}
     status_por_cte: dict[str, str] = {}
     status_por_shipment: dict[str, str] = {}
+    uf_por_cte: dict[str, str] = {}
+    uf_por_shipment: dict[str, str] = {}
+    cidade_por_cte: dict[str, str] = {}
+    cidade_por_shipment: dict[str, str] = {}
     ctes_ambiguos: set[str] = set()
     shipments_ambiguos: set[str] = set()
     ctes_status_ambiguos: set[str] = set()
     shipments_status_ambiguos: set[str] = set()
+    ctes_uf_ambiguos: set[str] = set()
+    shipments_uf_ambiguos: set[str] = set()
+    ctes_cidade_ambiguos: set[str] = set()
+    shipments_cidade_ambiguos: set[str] = set()
     for _, linha in dados.iterrows():
         destino = _normalizar_valor(linha[coluna_destino])
         cte = _normalizar_valor(linha[coluna_cte]) if coluna_cte is not None else ""
         status = (
             _normalizar_valor(linha[coluna_status])
             if coluna_status is not None
+            else ""
+        )
+        uf = (
+            _normalizar_uf(linha[coluna_uf])
+            if coluna_uf is not None
+            else ""
+        )
+        cidade = (
+            _normalizar_valor(linha[coluna_cidade])
+            if coluna_cidade is not None
             else ""
         )
         shipment_id = (
@@ -384,12 +521,40 @@ def _ler_destinos_relatorio_performance(
             shipment_id,
             status,
         )
+        _registrar_texto_unico(
+            uf_por_cte,
+            ctes_uf_ambiguos,
+            cte,
+            uf,
+        )
+        _registrar_texto_unico(
+            uf_por_shipment,
+            shipments_uf_ambiguos,
+            shipment_id,
+            uf,
+        )
+        _registrar_texto_unico(
+            cidade_por_cte,
+            ctes_cidade_ambiguos,
+            cte,
+            cidade,
+        )
+        _registrar_texto_unico(
+            cidade_por_shipment,
+            shipments_cidade_ambiguos,
+            shipment_id,
+            cidade,
+        )
 
     return (
         destinos_por_cte,
         destinos_por_shipment,
         status_por_cte,
         status_por_shipment,
+        uf_por_cte,
+        uf_por_shipment,
+        cidade_por_cte,
+        cidade_por_shipment,
     )
 
 
@@ -397,6 +562,7 @@ def _consultar_dados_performance_shipmentids(
     ctes_por_shipment: dict[str, str],
     *,
     log: Callable[[str], None] | None,
+    pasta_temporaria: Path | None = None,
 ) -> dict[str, dict[str, str]]:
     """Gera relatório para todos os CTEs da fila e associa Destino e Status."""
     ctes_por_shipment = {
@@ -423,7 +589,11 @@ def _consultar_dados_performance_shipmentids(
     )
 
     try:
-        resultado = executar_extracao(escrever_relatorio, log=registrar_log)
+        resultado = executar_extracao(
+            escrever_relatorio,
+            log=registrar_log,
+            pasta_destino=pasta_temporaria,
+        )
         caminho_relatorio = resultado.get("arquivo")
         if not caminho_relatorio:
             registrar_log(
@@ -438,6 +608,10 @@ def _consultar_dados_performance_shipmentids(
             destinos_por_shipment,
             status_por_cte,
             status_por_shipment,
+            uf_por_cte,
+            uf_por_shipment,
+            cidade_por_cte,
+            cidade_por_shipment,
         ) = _ler_destinos_relatorio_performance(str(caminho_relatorio))
     except Exception as erro:
         registrar_log(
@@ -454,10 +628,18 @@ def _consultar_dados_performance_shipmentids(
         status = status_por_shipment.get(shipment_id, "") or (
             status_por_cte.get(cte, "") if cte else ""
         )
-        if destino or status:
+        uf = uf_por_shipment.get(shipment_id, "") or (
+            uf_por_cte.get(cte, "") if cte else ""
+        )
+        cidade = cidade_por_shipment.get(shipment_id, "") or (
+            cidade_por_cte.get(cte, "") if cte else ""
+        )
+        if destino or status or uf or cidade:
             dados_por_shipment[shipment_id] = {
                 "Destino": destino,
                 "Status": status,
+                "UF": uf,
+                "Cidade": cidade,
             }
 
     registrar_log(
@@ -479,6 +661,7 @@ def montar_fila_emissao(
     *,
     nome_arquivo_etiquetas: str = "etiquetas.txt",
     log: Callable[[str], None] | None = None,
+    pasta_temporaria: Path | None = None,
 ) -> dict[str, object]:
     """Cruza etiquetas e Performance e monta a fila de envio dos romaneios."""
     base, nome_aba, linha_cabecalho = _ler_base_performance(conteudo_performance)
@@ -497,6 +680,8 @@ def montar_fila_emissao(
                 "Destino": str(linha["Destino"]),
                 "Volume": linha["Volume"],
                 "Status": str(linha["Status"]),
+                "UF": str(linha["UF"]),
+                "Cidade": str(linha["Cidade"]),
             }
         )
 
@@ -522,14 +707,16 @@ def montar_fila_emissao(
                 str(registro["Codigo"]),
                 str(registro["Destino"]),
                 _normalizar_valor(registro["Volume"]),
+                _normalizar_uf(registro.get("UF", "")),
+                _normalizar_rota(registro.get("Cidade", "")),
             ): registro
             for registro in candidatos
         }
         if len(registros_unicos) > 1:
             raise ValueError(
                 f"ShipmentId {shipment_id} aparece com mais de um Codigo, "
-                "Destino ou Volume na planilha Performance. Corrija a base "
-                "antes de montar a fila."
+                "Destino, Volume, UF ou Cidade na planilha Performance. "
+                "Corrija a base antes de montar a fila."
             )
 
         registro = next(iter(registros_unicos.values()))
@@ -561,6 +748,8 @@ def montar_fila_emissao(
                 etiquetas,
                 volume_sistema,
             ),
+            "UF": str(registro["UF"]),
+            "Cidade": str(registro["Cidade"]),
             "Destino": destino,
             "Manifesto": "",
             "Origem": "Base",
@@ -610,6 +799,8 @@ def montar_fila_emissao(
                     volume_sistema,
                 ),
                 "CTEs para dar entrada": ctes_para_entrada,
+                "UF": "",
+                "Cidade": "",
                 "Destino": "",
                 "Manifesto": "",
                 "Origem": "Consulta",
@@ -631,6 +822,7 @@ def montar_fila_emissao(
     dados_performance_consultados = _consultar_dados_performance_shipmentids(
         ctes_por_shipment,
         log=log,
+        pasta_temporaria=pasta_temporaria,
     )
     for shipment_id in shipment_ids_fila:
         dados_performance = dados_performance_consultados.get(
@@ -642,6 +834,10 @@ def montar_fila_emissao(
             linha_fila["Destino"] = dados_performance["Destino"]
         if dados_performance.get("Status"):
             linha_fila["Status"] = dados_performance["Status"]
+        if dados_performance.get("UF"):
+            linha_fila["UF"] = dados_performance["UF"]
+        if dados_performance.get("Cidade"):
+            linha_fila["Cidade"] = dados_performance["Cidade"]
 
     linhas = [
         linhas_por_shipment[str(pedido["ShipmentId"])]
@@ -649,16 +845,24 @@ def montar_fila_emissao(
         if str(pedido["ShipmentId"]) in linhas_por_shipment
     ]
 
-    colunas_fila = COLUNAS_RESULTADO + ["Origem", "Status"]
+    colunas_fila = COLUNAS_RESULTADO + ["UF", "Cidade", "Origem", "Status"]
     tabela_completa = pd.DataFrame(linhas, columns=colunas_fila)
     tabela_completa = _adicionar_rota(tabela_completa)
-    tabela_completa = tabela_completa[
-        COLUNAS_RESULTADO + ["Rota", "Origem", "Status"]
-    ]
+    colunas_base_completa = [
+        coluna
+        for coluna in COLUNAS_RESULTADO
+        if coluna not in {"Destino", "Manifesto"}
+    ] + ["UF", "Cidade", "Destino", "Rota", "Manifesto", "Origem", "Status"]
+    tabela_completa = tabela_completa[colunas_base_completa]
     status_final_emissao = tabela_completa["Status"].map(
         lambda valor: _normalizar_cabecalho(valor) == "EMISSAO"
     )
-    tabela = tabela_completa.loc[status_final_emissao].reset_index(drop=True)
+    tabela_base_completa = tabela_completa.reset_index(drop=True)
+    colunas_fila_emissao = COLUNAS_RESULTADO + ["Rota", "Origem", "Status"]
+    tabela = tabela_completa.loc[
+        status_final_emissao,
+        colunas_fila_emissao,
+    ].reset_index(drop=True)
     shipment_ids_fora_emissao = tabela_completa.loc[
         ~status_final_emissao,
         "ShipmentId",
@@ -721,6 +925,7 @@ def montar_fila_emissao(
 
     return {
         "tabela": tabela,
+        "tabela_completa": tabela_base_completa,
         "shipment_ids_sem_match": shipment_ids_sem_match,
         "shipment_ids_sem_retorno_fraction": sem_retorno,
         "shipment_ids_sem_destino_performance": sem_destino,
@@ -728,4 +933,639 @@ def montar_fila_emissao(
         "shipment_ids_fora_emissao": shipment_ids_fora_emissao,
         "shipment_ids_etiquetas": len(tabela),
         "total_etiquetas": int(tabela["Volumes Etiquetas"].sum()),
+    }
+
+
+def _log_performance_emissao(log, mensagem: str) -> None:
+    if log is None:
+        print(mensagem)
+    else:
+        log(mensagem)
+
+
+def _localizar_acao_drive(page, padrao: re.Pattern):
+    for papel in ("button", "menuitem", "link"):
+        controles = page.get_by_role(papel, name=padrao)
+        for indice in range(controles.count()):
+            controle = controles.nth(indice)
+            if controle.is_visible() and controle.is_enabled():
+                return controle
+    return None
+
+
+def _fechar_previa_txt_drive(page, *, log=None) -> None:
+    dialogo_previa = page.get_by_role(
+        "dialog",
+        name=re.compile(r"^(texto|text),", re.IGNORECASE),
+    )
+    for _ in range(2):
+        dialogo_visivel = next(
+            (
+                dialogo_previa.nth(indice)
+                for indice in range(dialogo_previa.count())
+                if dialogo_previa.nth(indice).is_visible()
+            ),
+            None,
+        )
+        if dialogo_visivel is None:
+            return
+
+        _log_performance_emissao(
+            log,
+            "Prévia de TXT aberta no Drive; fechando antes de selecionar os arquivos.",
+        )
+        page.keyboard.press("Escape")
+        try:
+            dialogo_visivel.wait_for(state="hidden", timeout=5_000)
+            return
+        except PlaywrightTimeoutError:
+            botao_fechar = dialogo_visivel.get_by_role(
+                "button",
+                name=re.compile(r"close|fechar|voltar", re.IGNORECASE),
+            )
+            if botao_fechar.count() and botao_fechar.first.is_visible():
+                botao_fechar.first.click(timeout=5_000, force=True)
+                dialogo_visivel.wait_for(state="hidden", timeout=5_000)
+                return
+
+    raise RuntimeError(
+        "A prévia de um TXT permaneceu aberta no Google Drive e bloqueou a lista."
+    )
+
+
+def _localizar_download_drive_apos_selecao(
+    page,
+    padrao_download: re.Pattern,
+    padrao_mais_acoes: re.Pattern,
+):
+    acao_download = _localizar_acao_drive(page, padrao_download)
+    if acao_download is not None:
+        return acao_download
+
+    mais_acoes = _localizar_acao_drive(page, padrao_mais_acoes)
+    if mais_acoes is not None:
+        mais_acoes.click(timeout=10_000)
+        page.wait_for_timeout(300)
+        _fechar_previa_txt_drive(page)
+        return _localizar_acao_drive(page, padrao_download)
+    return None
+
+
+def baixar_etiquetas_drive(
+    *,
+    pasta_destino: Path | None = None,
+    log=None,
+) -> Path:
+    """Baixa a pasta compartilhada do Drive como um ZIP."""
+    if not URL_DRIVE:
+        raise RuntimeError("Configure URL_DRIVE no arquivo bot/.env.")
+
+    pasta_destino = (
+        Path(pasta_destino)
+        if pasta_destino is not None
+        else Path(tempfile.mkdtemp(prefix="botevelog_etiquetas_emissao_"))
+    )
+    pasta_destino.mkdir(parents=True, exist_ok=True)
+    identificador = datetime.now().strftime("%Y-%m-%d_%H-%M-%S-%f")
+    caminho_zip = pasta_destino / f"etiquetas_drive_{identificador}.zip"
+    padrao_download = re.compile(r"download|baixar", re.IGNORECASE)
+    padrao_mais_acoes = re.compile(
+        r"more actions|mais ações|mais opcoes|mais opções",
+        re.IGNORECASE,
+    )
+
+    with sync_playwright() as playwright:
+        ultimo_erro: Exception | None = None
+        for tentativa in range(1, MAX_TENTATIVAS_DOWNLOAD_DRIVE + 1):
+            browser = None
+            contexto = None
+            try:
+                _log_performance_emissao(
+                    log,
+                    f"Abrindo o Google Drive para baixar etiquetas "
+                    f"(tentativa {tentativa}/{MAX_TENTATIVAS_DOWNLOAD_DRIVE}).",
+                )
+                browser = playwright.chromium.launch(
+                    headless=HEADLESS,
+                    slow_mo=SLOW_MO_MS,
+                )
+                contexto = browser.new_context(accept_downloads=True)
+                page = contexto.new_page()
+                page.goto(
+                    URL_DRIVE,
+                    wait_until="domcontentloaded",
+                    timeout=90_000,
+                )
+                page.wait_for_timeout(1_500)
+                _fechar_previa_txt_drive(page, log=log)
+                texto_pagina = page.locator("body").inner_text().casefold()
+                if any(
+                    frase in texto_pagina
+                    for frase in (
+                        "you need access",
+                        "request access",
+                        "solicitar acesso",
+                        "pedir acesso",
+                    )
+                ):
+                    raise PermissionError(
+                        "O link do Google Drive não permite acesso à pasta. "
+                        "Compartilhe-a com acesso pelo link e permissão de leitura."
+                    )
+
+                acao_download = _localizar_acao_drive(page, padrao_download)
+                if acao_download is None:
+                    grades = page.get_by_role("grid")
+                    try:
+                        grades.first.wait_for(state="visible", timeout=60_000)
+                    except PlaywrightTimeoutError as erro:
+                        raise RuntimeError(
+                            "O link abriu, mas a pasta do Google Drive não exibiu "
+                            "a lista de arquivos. Confirme a permissão de leitura."
+                        ) from erro
+
+                    for indice in range(grades.count()):
+                        grade = grades.nth(indice)
+                        if not grade.is_visible():
+                            continue
+                        _fechar_previa_txt_drive(page, log=log)
+                        try:
+                            grade.focus(timeout=5_000)
+                        except PlaywrightTimeoutError:
+                            _log_performance_emissao(
+                                log,
+                                "A grade não aceitou foco direto; tentando selecionar "
+                                "os arquivos pelo teclado.",
+                            )
+                        page.keyboard.press("Control+A")
+                        page.wait_for_timeout(500)
+                        acao_download = _localizar_download_drive_apos_selecao(
+                            page,
+                            padrao_download,
+                            padrao_mais_acoes,
+                        )
+                        if acao_download is not None:
+                            break
+
+                        linhas = grade.get_by_role("row")
+                        for indice_linha in range(min(linhas.count(), 5)):
+                            linha = linhas.nth(indice_linha)
+                            try:
+                                linha.hover(timeout=3_000)
+                            except PlaywrightTimeoutError:
+                                continue
+                            seletores = linha.get_by_role("checkbox")
+                            if not seletores.count() or not seletores.first.is_visible():
+                                continue
+                            seletores.first.click(timeout=5_000)
+                            page.keyboard.press("Control+A")
+                            page.wait_for_timeout(500)
+                            acao_download = _localizar_download_drive_apos_selecao(
+                                page,
+                                padrao_download,
+                                padrao_mais_acoes,
+                            )
+                            if acao_download is not None:
+                                break
+                        if acao_download is not None:
+                            break
+
+                if acao_download is None:
+                    raise RuntimeError(
+                        "A pasta abriu, mas não localizei a ação Download após "
+                        "tentar selecionar os arquivos pelo teclado e pela caixa "
+                        "de seleção."
+                    )
+
+                _log_performance_emissao(
+                    log,
+                    "Ação Download localizada; aguardando o ZIP da pasta.",
+                )
+                try:
+                    with page.expect_download(
+                        timeout=TIMEOUT_DOWNLOAD_DRIVE_MS
+                    ) as informacao_download:
+                        acao_download.click(timeout=20_000)
+                    download = informacao_download.value
+                except PlaywrightTimeoutError:
+                    _fechar_previa_txt_drive(page, log=log)
+                    acao_download = _localizar_acao_drive(
+                        page,
+                        padrao_download,
+                    )
+                    if acao_download is None:
+                        raise RuntimeError(
+                            "A ação Download desapareceu antes de iniciar o ZIP."
+                        )
+                    _log_performance_emissao(
+                        log,
+                        "O clique normal foi bloqueado; repetindo a ação Download "
+                        "com verificação de elemento e clique de contingência.",
+                    )
+                    with page.expect_download(
+                        timeout=TIMEOUT_DOWNLOAD_DRIVE_MS
+                    ) as informacao_download:
+                        acao_download.click(timeout=20_000, force=True)
+                    download = informacao_download.value
+
+                download.save_as(caminho_zip)
+                try:
+                    with ZipFile(caminho_zip) as arquivo_zip:
+                        if not any(
+                            not membro.is_dir()
+                            and PurePosixPath(membro.filename).suffix.casefold() == ".txt"
+                            for membro in arquivo_zip.infolist()
+                        ):
+                            raise ValueError(
+                                "O ZIP baixado do Drive não contém arquivos TXT."
+                            )
+                except BadZipFile as erro:
+                    raise ValueError(
+                        "O Google Drive não retornou um ZIP válido para a pasta."
+                    ) from erro
+
+                _log_performance_emissao(
+                    log,
+                    f"Pasta do Drive baixada como {caminho_zip.name}; "
+                    f"nome original: {download.suggested_filename}.",
+                )
+                return caminho_zip
+            except PermissionError:
+                raise
+            except Exception as erro:
+                ultimo_erro = erro
+                caminho_zip.unlink(missing_ok=True)
+                _log_performance_emissao(
+                    log,
+                    f"Falha na tentativa {tentativa}/"
+                    f"{MAX_TENTATIVAS_DOWNLOAD_DRIVE}: "
+                    f"{type(erro).__name__}: {erro}",
+                )
+                if tentativa < MAX_TENTATIVAS_DOWNLOAD_DRIVE:
+                    _log_performance_emissao(
+                        log,
+                        "Abrindo uma sessão nova do navegador para tentar novamente.",
+                    )
+                    time.sleep(min(2 * tentativa, 5))
+            finally:
+                if contexto is not None:
+                    try:
+                        contexto.close()
+                    except Exception:
+                        pass
+                if browser is not None:
+                    try:
+                        browser.close()
+                    except Exception:
+                        pass
+
+    raise RuntimeError(
+        f"Não foi possível baixar as etiquetas do Google Drive após "
+        f"{MAX_TENTATIVAS_DOWNLOAD_DRIVE} tentativas: {ultimo_erro}"
+    ) from ultimo_erro
+
+
+def _login_performance_emissao(page, token: str, *, log=None) -> None:
+    if not URL_FRACTION:
+        raise RuntimeError("URL_FRACTION não foi configurada no .env.")
+    if not FRACTION_USER_PERFORMANCE or not FRACTION_PASSWORD_PERFORMANCE:
+        raise RuntimeError(
+            "Configure FRACTION_USER_PERFORMANCE e "
+            "FRACTION_PASSWORD_PERFORMANCE no .env."
+        )
+    if not token.strip():
+        raise ValueError("Informe o Token MFA para consultar o Fraction.")
+
+    _log_performance_emissao(log, "Abrindo o Fraction para a extração da Performance.")
+    page.goto(URL_FRACTION, wait_until="domcontentloaded")
+    page.get_by_role("textbox", name="Usuário").fill(
+        FRACTION_USER_PERFORMANCE
+    )
+    page.get_by_role("textbox", name="Senha").fill(
+        FRACTION_PASSWORD_PERFORMANCE
+    )
+    page.get_by_role("button", name="Login").click()
+
+    campo_token = page.get_by_role("textbox", name="Digite o código MFA:")
+    campo_token.wait_for(state="visible", timeout=60_000)
+    campo_token.fill(token.strip())
+    page.get_by_role("button", name="Validar").click()
+    page.get_by_role("link", name="Gerencial").wait_for(
+        state="visible",
+        timeout=120_000,
+    )
+    _log_performance_emissao(log, "Login do Fraction concluído com o Token MFA.")
+
+
+def _abrir_tela_performance_emissao(page, *, log=None) -> None:
+    _log_performance_emissao(log, "Abrindo Gerencial > Performance.")
+    page.get_by_role("link", name="Gerencial").click()
+    page.get_by_role("link", name="Performance", exact=True).click()
+    page.locator(SELETOR_DATA_INICIAL_PERFORMANCE).wait_for(
+        state="visible",
+        timeout=120_000,
+    )
+    page.locator(SELETOR_DATA_FINAL_PERFORMANCE).wait_for(
+        state="visible",
+        timeout=120_000,
+    )
+
+
+def _preencher_data_performance_emissao(page, seletor: str, valor: date) -> None:
+    campo = page.locator(seletor)
+    texto = valor.strftime("%d/%m/%Y")
+    campo.click()
+    meses = page.get_by_label("select month")
+    for indice in range(meses.count()):
+        mes_visivel = meses.nth(indice)
+        if mes_visivel.is_visible():
+            mes_visivel.select_option(str(valor.month - 1))
+            break
+    anos = page.get_by_label("select year")
+    for indice in range(anos.count()):
+        ano_visivel = anos.nth(indice)
+        if ano_visivel.is_visible():
+            ano_visivel.select_option(str(valor.year))
+            break
+    dias = page.get_by_role(
+        "link",
+        name=str(valor.day),
+        exact=True,
+    )
+    dia_selecionado = False
+    for indice in range(dias.count()):
+        dia_visivel = dias.nth(indice)
+        if dia_visivel.is_visible():
+            dia_visivel.click()
+            dia_selecionado = True
+            break
+    if not dia_selecionado:
+        dias.first.wait_for(state="visible", timeout=15_000)
+        dias.first.click()
+    if campo.input_value().strip() != texto:
+        raise RuntimeError(
+            f"O Fraction não manteve a data {texto} no campo {seletor}."
+        )
+
+
+def _extrair_planilhas_performance_zip(
+    conteudo_zip: bytes,
+    data_inicial: date,
+    data_final: date,
+    pasta_planilhas: Path,
+) -> list[tuple[pd.DataFrame, Path, str, int]]:
+    try:
+        with ZipFile(BytesIO(conteudo_zip)) as arquivo_zip:
+            membros = [
+                membro
+                for membro in arquivo_zip.infolist()
+                if not membro.is_dir()
+                and PurePosixPath(membro.filename).suffix.casefold() == ".xlsx"
+                and "__macosx" not in {
+                    parte.casefold()
+                    for parte in PurePosixPath(membro.filename).parts
+                }
+            ]
+            if not membros:
+                raise ValueError(
+                    "O ZIP do Fraction não contém uma planilha .xlsx."
+                )
+
+            partes: list[tuple[pd.DataFrame, Path, str, int]] = []
+            for indice, membro in enumerate(membros, start=1):
+                conteudo_planilha = arquivo_zip.read(membro)
+                caminho_planilha = pasta_planilhas / (
+                    f"Performance_{data_inicial:%Y-%m-%d}_"
+                    f"a_{data_final:%Y-%m-%d}_{indice:02d}.xlsx"
+                )
+                caminho_planilha.write_bytes(conteudo_planilha)
+                tabela, nome_aba, linha_cabecalho = ler_base_performance(
+                    conteudo_planilha
+                )
+                tabela.insert(
+                    0,
+                    "Período da consulta",
+                    f"{data_inicial.isoformat()} a {data_final.isoformat()}",
+                )
+                tabela = _adicionar_rota(tabela)
+                partes.append(
+                    (
+                        tabela,
+                        caminho_planilha,
+                        nome_aba,
+                        linha_cabecalho,
+                    )
+                )
+    except BadZipFile as erro:
+        raise ValueError(
+            "O ZIP da Performance do período "
+            f"{data_inicial:%d/%m/%Y} a {data_final:%d/%m/%Y} está inválido."
+        ) from erro
+
+    return partes
+
+
+def _baixar_performance_periodo(
+    page,
+    pasta_zips: Path,
+    *,
+    log=None,
+) -> Path:
+    total = page.get_by_role(
+        "gridcell",
+        name="TOTAL DO PERIODO",
+        exact=True,
+    )
+    total.wait_for(state="visible", timeout=240_000)
+    linha_total = total.locator("xpath=ancestor::tr[1]")
+    celulas = linha_total.get_by_role("gridcell")
+    if celulas.count() < 2:
+        raise RuntimeError(
+            "A linha TOTAL DO PERIODO foi localizada, mas não contém a célula "
+            "dinâmica de quantidade esperada."
+        )
+
+    total.click()
+    celula_quantidade = linha_total.get_by_role("gridcell").nth(1)
+    quantidade = celula_quantidade.inner_text().strip()
+    if not quantidade:
+        raise RuntimeError(
+            "A quantidade de pedidos da linha TOTAL DO PERIODO está vazia."
+        )
+    _log_performance_emissao(
+        log,
+        "Selecionando TOTAL DO PERIODO; quantidade retornada pelo Fraction: "
+        f"{quantidade}.",
+    )
+    caminho_zip = pasta_zips / "Performance_Periodo.zip"
+    try:
+        with page.expect_download(
+            timeout=TIMEOUT_DOWNLOAD_PERFORMANCE_MS
+        ) as informacao_download:
+            linha_total.get_by_role("gridcell").nth(1).click()
+        download = informacao_download.value
+    except PlaywrightTimeoutError as erro:
+        raise TimeoutError(
+            "O Fraction mostrou a quantidade de pedidos no TOTAL DO PERIODO, "
+            "mas o clique nessa quantidade não iniciou o download ZIP."
+        ) from erro
+
+    download.save_as(caminho_zip)
+    _log_performance_emissao(
+        log,
+        f"ZIP baixado e salvo como {caminho_zip.name}; "
+        f"nome original: {download.suggested_filename}.",
+    )
+    return caminho_zip
+
+
+def extrair_performance_intervalo(
+    data_inicial: date,
+    data_final: date,
+    token: str,
+    *,
+    pasta_temporaria: Path | None = None,
+    log=None,
+) -> dict[str, object]:
+    """Baixa e processa uma única Performance para o período selecionado."""
+    if data_final < data_inicial:
+        raise ValueError("A data final precisa ser igual ou posterior à inicial.")
+    quantidade_dias = (data_final - data_inicial).days + 1
+    if quantidade_dias > LIMITE_DIAS_PERFORMANCE_EMISSAO:
+        raise ValueError(
+            "O período da Performance pode ter no máximo "
+            f"{LIMITE_DIAS_PERFORMANCE_EMISSAO} dias, contando as datas inicial "
+            "e final."
+        )
+    if not token.strip():
+        raise ValueError("Informe o Token MFA para consultar o Fraction.")
+
+    identificador = datetime.now().strftime("%Y-%m-%d_%H-%M-%S-%f")
+    raiz_temporaria = (
+        Path(pasta_temporaria)
+        if pasta_temporaria is not None
+        else Path(tempfile.mkdtemp(prefix="botevelog_performance_emissao_"))
+    )
+    pasta_execucao = raiz_temporaria / (
+        f"extracao_{data_inicial:%Y-%m-%d}_{data_final:%Y-%m-%d}_{identificador}"
+    )
+    pasta_zips = pasta_execucao / "zips"
+    pasta_planilhas = pasta_execucao / "planilhas"
+    pasta_zips.mkdir(parents=True, exist_ok=True)
+    pasta_planilhas.mkdir(parents=True, exist_ok=True)
+
+    _log_performance_emissao(
+        log,
+        "Extração isolada da Performance em uma única consulta, "
+        f"de {data_inicial:%d/%m/%Y} a {data_final:%d/%m/%Y}.",
+    )
+
+    tabelas: list[pd.DataFrame] = []
+    arquivos_zip: list[str] = []
+    planilhas_extraidas: list[str] = []
+
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(
+            headless=HEADLESS,
+            slow_mo=SLOW_MO_MS,
+        )
+        contexto = browser.new_context(accept_downloads=True)
+        page = contexto.new_page()
+        page.on(
+            "pageerror",
+            lambda erro: _log_performance_emissao(
+                log,
+                f"Erro JavaScript no Fraction: {erro}",
+            ),
+        )
+
+        try:
+            _login_performance_emissao(page, token, log=log)
+            _abrir_tela_performance_emissao(page, log=log)
+            _preencher_data_performance_emissao(
+                page,
+                SELETOR_DATA_INICIAL_PERFORMANCE,
+                data_inicial,
+            )
+            _preencher_data_performance_emissao(
+                page,
+                SELETOR_DATA_FINAL_PERFORMANCE,
+                data_final,
+            )
+            _log_performance_emissao(
+                log,
+                "Processando o relatório do período selecionado.",
+            )
+            page.get_by_role("button", name="Processar").click(
+                timeout=120_000
+            )
+            caminho_zip = _baixar_performance_periodo(
+                page,
+                pasta_zips,
+                log=log,
+            )
+            arquivos_zip.append(str(caminho_zip))
+
+            partes_periodo = _extrair_planilhas_performance_zip(
+                caminho_zip.read_bytes(),
+                data_inicial,
+                data_final,
+                pasta_planilhas,
+            )
+            for (
+                tabela_periodo,
+                caminho_planilha,
+                nome_aba,
+                linha_cabecalho,
+            ) in partes_periodo:
+                tabelas.append(tabela_periodo)
+                planilhas_extraidas.append(str(caminho_planilha))
+                _log_performance_emissao(
+                    log,
+                    f"Planilha do período extraída como {caminho_planilha.name}; "
+                    f"aba {nome_aba}, cabeçalho na linha {linha_cabecalho}, "
+                    f"{len(tabela_periodo)} linha(s).",
+                )
+
+        finally:
+            _log_performance_emissao(
+                log,
+                "Encerrando o navegador da extração de Performance.",
+            )
+            contexto.close()
+            browser.close()
+
+    if not tabelas:
+        raise ValueError("Nenhuma planilha foi extraída para o período.")
+
+    tabela_consolidada = pd.concat(tabelas, ignore_index=True)
+    caminho_consolidado = pasta_execucao / (
+        f"Performance_Emissao_{data_inicial:%Y-%m-%d}_"
+        f"{data_final:%Y-%m-%d}.xlsx"
+    )
+    colunas_rota = ["UF", "Cidade", "Destino", "Rota"]
+    with pd.ExcelWriter(caminho_consolidado, engine="openpyxl") as escritor:
+        tabela_consolidada.to_excel(
+            escritor,
+            index=False,
+            sheet_name="Performance",
+        )
+        tabela_consolidada[colunas_rota].to_excel(
+            escritor,
+            index=False,
+            sheet_name="Rotas",
+        )
+    _log_performance_emissao(
+        log,
+        f"Consolidação salva em {caminho_consolidado}: "
+        f"{len(tabela_consolidada)} linha(s) e abas Performance/Rotas, "
+        f"{len(tabela_consolidada.columns)} coluna(s).",
+    )
+
+    return {
+        "tabela": tabela_consolidada,
+        "arquivo_consolidado": str(caminho_consolidado),
+        "arquivos_zip": arquivos_zip,
+        "planilhas_extraidas": planilhas_extraidas,
+        "pasta_execucao": str(pasta_execucao),
     }

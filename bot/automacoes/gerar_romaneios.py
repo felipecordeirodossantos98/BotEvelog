@@ -7,6 +7,8 @@ from io import BytesIO
 import os
 from pathlib import Path
 import re
+import shutil
+import subprocess
 import time
 import traceback
 import unicodedata
@@ -50,46 +52,98 @@ def _normalizar_rota(valor: object) -> str:
     return " ".join(texto.upper().split())
 
 
-def carregar_rotas_destino_origem(
-    caminho: Path = ARQUIVO_ROTAS_ROMANEIOS,
-) -> tuple[dict[str, str], set[str]]:
-    if not caminho.exists():
-        raise FileNotFoundError(
-            "Base de rotas não encontrada. Coloque o JSON em "
-            f"'{caminho}'."
-        )
+def _normalizar_unidade_fraction(valor: object) -> str:
+    nome = _normalizar_rota(valor)
+    aliases_catalogo = {"FL MANAUS": "FL MANAUS JAD"}
+    return aliases_catalogo.get(nome, nome)
 
+
+def _normalizar_uf(valor: object) -> str:
+    if valor is None or pd.isna(valor):
+        return ""
+    uf = _normalizar_rota(valor)
+    nomes = {
+        "ACRE": "AC",
+        "ALAGOAS": "AL",
+        "AMAPA": "AP",
+        "AMAZONAS": "AM",
+        "BAHIA": "BA",
+        "CEARA": "CE",
+        "DISTRITO FEDERAL": "DF",
+        "ESPIRITO SANTO": "ES",
+        "GOIAS": "GO",
+        "MARANHAO": "MA",
+        "MATO GROSSO": "MT",
+        "MATO GROSSO DO SUL": "MS",
+        "MINAS GERAIS": "MG",
+        "PARA": "PA",
+        "PARAIBA": "PB",
+        "PARANA": "PR",
+        "PERNAMBUCO": "PE",
+        "PIAUI": "PI",
+        "RIO DE JANEIRO": "RJ",
+        "RIO GRANDE DO NORTE": "RN",
+        "RIO GRANDE DO SUL": "RS",
+        "RONDONIA": "RO",
+        "RORAIMA": "RR",
+        "SANTA CATARINA": "SC",
+        "SAO PAULO": "SP",
+        "SERGIPE": "SE",
+        "TOCANTINS": "TO",
+    }
+    return nomes.get(uf, uf)
+
+
+def carregar_regras_rotas_localidade(
+    caminho: Path = ARQUIVO_ROTAS_ROMANEIOS,
+) -> tuple[dict[str, str], dict[str, str]]:
+    """Carrega as unidades atendentes por UF e por cidade normalizada."""
+    if not caminho.exists():
+        raise FileNotFoundError(f"Base de rotas não encontrada: '{caminho}'.")
     with caminho.open("r", encoding="utf-8-sig") as arquivo:
         dados = json.load(arquivo)
+    if not isinstance(dados, dict):
+        raise ValueError("A base de rotas precisa ser um objeto JSON.")
+    if "por_uf" not in dados or "por_cidade" not in dados:
+        raise ValueError(
+            "A base de rotas precisa conter as listas 'por_uf' e 'por_cidade'."
+        )
 
-    registros = dados.get("rotas") if isinstance(dados, dict) else None
-    if not isinstance(registros, list):
-        raise ValueError("A base de rotas precisa conter uma lista 'rotas'.")
+    regras_uf = dados["por_uf"]
+    regras_cidade = dados["por_cidade"]
+    if not isinstance(regras_uf, list) or not isinstance(regras_cidade, list):
+        raise ValueError("'por_uf' e 'por_cidade' precisam ser listas.")
 
-    origens_por_destino: dict[str, set[str]] = {}
-    for registro in registros:
-        if not isinstance(registro, dict):
-            raise ValueError("Cada rota precisa conter 'origem' e 'destino'.")
-        origem = str(registro.get("origem") or "").strip()
-        destino = str(registro.get("destino") or "").strip()
-        if not origem or not destino:
-            continue
-        origens_por_destino.setdefault(_normalizar_rota(destino), set()).add(origem)
+    rotas_por_uf: dict[str, str] = {}
+    rotas_por_cidade: dict[str, str] = {}
 
-    mapa = {
-        destino: next(iter(origens))
-        for destino, origens in origens_por_destino.items()
-        if len(origens) == 1
-    }
-    ambiguos = {
-        destino for destino, origens in origens_por_destino.items() if len(origens) > 1
-    }
-    return mapa, ambiguos
+    for regra in regras_uf:
+        if not isinstance(regra, dict):
+            raise ValueError("Cada item de 'por_uf' precisa ser um objeto JSON.")
+        uf = _normalizar_uf(regra.get("uf") or "")
+        unidade = str(regra.get("unidade") or "").strip()
+        if not uf or not unidade:
+            raise ValueError("Cada regra de 'por_uf' precisa de 'uf' e 'unidade'.")
+        existente = rotas_por_uf.get(uf)
+        if existente and _normalizar_rota(existente) != _normalizar_rota(unidade):
+            raise ValueError(f"Mais de uma unidade foi definida para a UF {uf}.")
+        rotas_por_uf[uf] = unidade
 
+    for regra in regras_cidade:
+        if not isinstance(regra, dict):
+            raise ValueError("Cada item de 'por_cidade' precisa ser um objeto JSON.")
+        cidade = _normalizar_rota(regra.get("cidade") or "")
+        unidade = str(regra.get("unidade") or "").strip()
+        if not cidade or not unidade:
+            raise ValueError(
+                "Cada regra de 'por_cidade' precisa de 'cidade' e 'unidade'."
+            )
+        existente = rotas_por_cidade.get(cidade)
+        if existente and _normalizar_rota(existente) != _normalizar_rota(unidade):
+            raise ValueError(f"Mais de uma unidade foi definida para a cidade {cidade}.")
+        rotas_por_cidade[cidade] = unidade
 
-def carregar_mapa_rotas(caminho: Path = ARQUIVO_ROTAS_ROMANEIOS) -> dict[str, str]:
-    """Retorna destino final → origem, omitindo destinos com mais de uma origem."""
-    return carregar_rotas_destino_origem(caminho)[0]
+    return rotas_por_uf, rotas_por_cidade
 
 
 def carregar_destinos_fraction(
@@ -104,10 +158,34 @@ def carregar_destinos_fraction(
         raise ValueError("O catálogo de unidades precisa conter uma lista 'unidades'.")
     resultado = []
     for destino in destinos:
-        if not isinstance(destino, dict) or not destino.get("unidade") or not destino.get("codigo"):
+        if not isinstance(destino, dict):
+            raise ValueError("Cada unidade precisa ser um objeto JSON.")
+        if destino.get("ativo", True) is False:
+            continue
+        if not destino.get("unidade") or not destino.get("codigo"):
             raise ValueError("Cada unidade precisa ter 'unidade' e 'codigo'.")
         resultado.append({"nome": str(destino["unidade"]).strip(), "codigo": str(destino["codigo"]).strip()})
     return resultado
+
+
+def carregar_codigos_preferenciais_unidades(
+    caminho: Path = ARQUIVO_UNIDADES_FRACTION,
+) -> dict[str, str]:
+    """Carrega desempates de código junto ao catálogo de unidades do Fraction."""
+    if not caminho.exists():
+        raise FileNotFoundError(f"Arquivo de unidades Fraction não encontrado: '{caminho}'.")
+    with caminho.open("r", encoding="utf-8-sig") as arquivo:
+        dados = json.load(arquivo)
+    if not isinstance(dados, dict):
+        raise ValueError("O catálogo de unidades precisa ser um objeto JSON.")
+    preferencias = dados.get("codigo_preferencial_por_unidade", {})
+    if not isinstance(preferencias, dict):
+        raise ValueError("'codigo_preferencial_por_unidade' precisa ser um objeto.")
+    return {
+        _normalizar_unidade_fraction(unidade): str(codigo).strip()
+        for unidade, codigo in preferencias.items()
+        if str(unidade).strip() and str(codigo).strip()
+    }
 
 
 def selecionar_rota_manifesto(page, *, log=None) -> str:
@@ -224,6 +302,7 @@ def _salvar_conteudo_pdf_romaneio(
 def preparar_lote_impressao_romaneios(
     arquivos_pdf: list[str | Path],
     *,
+    pasta_temporaria: str | Path | None = None,
     log=None,
 ) -> Path:
     """Valida todos os PDFs e cria um arquivo único para a impressão em lote."""
@@ -233,8 +312,9 @@ def preparar_lote_impressao_romaneios(
     if not caminhos:
         raise ValueError("Não há PDFs de romaneio para imprimir.")
 
-    RESULTADOS_ROMANEIOS.mkdir(parents=True, exist_ok=True)
-    caminho_lote = RESULTADOS_ROMANEIOS / (
+    pasta_lote = Path(pasta_temporaria) if pasta_temporaria else RESULTADOS_ROMANEIOS
+    pasta_lote.mkdir(parents=True, exist_ok=True)
+    caminho_lote = pasta_lote / (
         f"Romaneios_Emissao_impressao_{datetime.now():%Y-%m-%d_%H-%M-%S-%f}.pdf"
     )
     escritor = PdfWriter()
@@ -286,16 +366,66 @@ def preparar_lote_impressao_romaneios(
     return caminho_lote
 
 
+def _localizar_sumatra_pdf() -> Path | None:
+    candidatos: list[Path] = []
+    encontrado_no_path = shutil.which("SumatraPDF.exe") or shutil.which("SumatraPDF")
+    if encontrado_no_path:
+        candidatos.append(Path(encontrado_no_path))
+
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if local_app_data:
+        candidatos.append(Path(local_app_data) / "SumatraPDF" / "SumatraPDF.exe")
+
+    for variavel in ("ProgramFiles", "ProgramFiles(x86)", "ProgramW6432"):
+        pasta_programas = os.environ.get(variavel)
+        if pasta_programas:
+            candidatos.append(Path(pasta_programas) / "SumatraPDF" / "SumatraPDF.exe")
+
+    if os.name == "nt":
+        try:
+            import winreg
+
+            locais = (
+                (
+                    winreg.HKEY_CURRENT_USER,
+                    r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\SumatraPDF.exe",
+                ),
+                (
+                    winreg.HKEY_LOCAL_MACHINE,
+                    r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\SumatraPDF.exe",
+                ),
+            )
+            for raiz, subchave in locais:
+                try:
+                    with winreg.OpenKey(raiz, subchave) as chave:
+                        caminho, _ = winreg.QueryValueEx(chave, "")
+                    candidatos.append(Path(str(caminho).strip('"')))
+                except OSError:
+                    continue
+        except ImportError:
+            pass
+
+    vistos: set[str] = set()
+    for candidato in candidatos:
+        chave = os.path.normcase(str(candidato))
+        if chave in vistos:
+            continue
+        vistos.add(chave)
+        if candidato.is_file() and candidato.name.lower() == "sumatrapdf.exe":
+            return candidato
+    return None
+
+
 def enviar_pdf_para_impressora_padrao(
     caminho_pdf: str | Path,
     *,
     log=None,
 ) -> None:
-    """Envia um PDF único ao aplicativo padrão do Windows para impressão."""
+    """Envia o PDF ao SumatraPDF para impressão e aguarda o resultado do comando."""
     arquivo = Path(caminho_pdf)
     if not arquivo.is_file():
         raise FileNotFoundError(f"PDF do lote de impressão não encontrado: {arquivo}.")
-    if os.name != "nt" or not hasattr(os, "startfile"):
+    if os.name != "nt":
         raise RuntimeError(
             "O envio direto para a impressora padrão está disponível somente no Windows."
         )
@@ -304,17 +434,45 @@ def enviar_pdf_para_impressora_padrao(
         if entrada.read(4) != b"%PDF":
             raise ValueError(f"O arquivo '{arquivo.name}' não é um PDF válido.")
 
+    sumatra = _localizar_sumatra_pdf()
+    if sumatra is None:
+        raise RuntimeError(
+            "Não encontrei o SumatraPDF.exe. Instale o SumatraPDF ou inclua-o no PATH; "
+            "o PDF não foi enviado à impressora."
+        )
+
     try:
-        os.startfile(str(arquivo), "print")
+        resultado = subprocess.run(
+            [str(sumatra), "-print-to-default", "-silent", str(arquivo.resolve())],
+            capture_output=True,
+            text=True,
+            timeout=180,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as erro:
+        raise RuntimeError(
+            "O SumatraPDF não confirmou o fim do envio em 180 segundos. "
+            "Confira a fila do Windows antes de tentar novamente para evitar uma "
+            "impressão duplicada."
+        ) from erro
     except OSError as erro:
         raise RuntimeError(
-            "O Windows não conseguiu enviar o PDF ao aplicativo padrão. "
-            "Verifique o leitor de PDF associado e a impressora padrão."
+            f"Não foi possível iniciar o SumatraPDF em '{sumatra}': {erro}."
         ) from erro
+
+    if resultado.returncode != 0:
+        detalhe = (resultado.stderr or resultado.stdout or "").strip()
+        sufixo = f" Detalhe: {detalhe[:1000]}" if detalhe else ""
+        raise RuntimeError(
+            "O SumatraPDF retornou erro ao enviar o lote à impressora "
+            f"(código {resultado.returncode}). Verifique o leitor e a impressora padrão."
+            f"{sufixo}"
+        )
 
     _log(
         log,
-        f"Lote {arquivo.name} enviado ao aplicativo PDF padrão para a impressora padrão.",
+        f"Lote {arquivo.name} enviado pelo SumatraPDF à impressora padrão "
+        f"(código de saída {resultado.returncode}).",
     )
 
 
@@ -394,17 +552,45 @@ def _salvar_pdf_romaneio(
 def associar_destinos_fraction(
     grupos: list[dict],
     destinos: list[dict[str, str]],
+    *,
+    codigos_preferenciais: dict[str, str] | None = None,
 ) -> tuple[list[dict], list[str]]:
-    """Liga cada origem de rota a uma unidade Fraction pelo nome exato."""
+    """Liga cada rota a uma unidade Fraction e resolve nomes duplicados por código."""
     por_nome: dict[str, list[dict[str, str]]] = {}
     for destino in destinos:
-        por_nome.setdefault(_normalizar_rota(destino["nome"]), []).append(destino)
+        por_nome.setdefault(
+            _normalizar_unidade_fraction(destino["nome"]), []
+        ).append(destino)
+    preferencias = {
+        _normalizar_unidade_fraction(nome): str(codigo).strip()
+        for nome, codigo in (codigos_preferenciais or {}).items()
+    }
     associados = []
     pendentes = []
     for grupo in grupos:
-        correspondencias = por_nome.get(_normalizar_rota(grupo["ROTA"]), [])
+        chave_unidade = _normalizar_unidade_fraction(grupo["ROTA"])
+        correspondencias = por_nome.get(chave_unidade, [])
         contexto = f"unidade '{grupo['ROTA']}'"
-        if len(correspondencias) != 1:
+        codigo_preferencial = preferencias.get(chave_unidade)
+        if codigo_preferencial:
+            correspondencias_preferenciais = [
+                destino
+                for destino in correspondencias
+                if str(destino["codigo"]).strip() == codigo_preferencial
+            ]
+            if len(correspondencias_preferenciais) != 1:
+                detalhe = (
+                    "não encontrado"
+                    if not correspondencias_preferenciais
+                    else "duplicado"
+                )
+                pendentes.append(
+                    f"{contexto}: código preferencial {codigo_preferencial} "
+                    f"{detalhe} no catálogo"
+                )
+                continue
+            correspondencias = correspondencias_preferenciais
+        elif len(correspondencias) != 1:
             detalhe = "não encontrada" if not correspondencias else "ambígua"
             pendentes.append(f"{contexto} {detalhe} no catálogo")
             continue
@@ -417,7 +603,7 @@ def associar_destinos_fraction(
 
 
 def adicionar_rotas_a_previa(tabela_base: pd.DataFrame, *, log=None) -> pd.DataFrame:
-    """Acrescenta a origem de rota correspondente à coluna Destino da base."""
+    """Resolve a unidade atendente primeiro por cidade e depois por UF."""
     tabela = tabela_base.copy()
     coluna_destino = next(
         (coluna for coluna in tabela if _normalizar_rota(coluna) == "DESTINO"),
@@ -426,32 +612,82 @@ def adicionar_rotas_a_previa(tabela_base: pd.DataFrame, *, log=None) -> pd.DataF
     if coluna_destino is None:
         raise ValueError("A base de entrada não contém a coluna 'Destino'.")
 
+    coluna_uf = next(
+        (
+            coluna
+            for coluna in tabela
+            if _normalizar_rota(coluna) in {"UF", "ESTADO"}
+        ),
+        None,
+    )
+    coluna_cidade = next(
+        (
+            coluna
+            for coluna in tabela
+            if _normalizar_rota(coluna) in {"CIDADE", "MUNICIPIO"}
+        ),
+        None,
+    )
+
+    if coluna_uf is None and coluna_cidade is None:
+        raise ValueError(
+            "A base precisa conter a coluna 'UF' ou 'Cidade' para aplicar as rotas."
+        )
+
     try:
-        mapa_rotas, destinos_ambiguos = carregar_rotas_destino_origem()
+        rotas_por_uf, rotas_por_cidade = carregar_regras_rotas_localidade()
+        codigos_preferenciais = carregar_codigos_preferenciais_unidades()
         unidades = carregar_destinos_fraction()
     except (FileNotFoundError, ValueError, json.JSONDecodeError) as erro:
         raise ValueError(f"Não foi possível carregar a base de rotas: {erro}") from erro
 
-    def resolver(destino):
-        chave = _normalizar_rota(destino) if pd.notna(destino) else ""
-        if chave in destinos_ambiguos:
-            return "Rota ambígua"
-        return mapa_rotas.get(chave, "Sem rota")
+    def resolver(linha: pd.Series) -> str:
+        uf = _normalizar_uf(linha[coluna_uf]) if coluna_uf is not None else ""
+        cidade_valor = linha[coluna_cidade] if coluna_cidade is not None else ""
+        cidade = (
+            _normalizar_rota(str(cidade_valor))
+            if pd.notna(cidade_valor)
+            else ""
+        )
+        rota_cidade = rotas_por_cidade.get(cidade, "")
+        if rota_cidade:
+            return rota_cidade
+        rota_uf = rotas_por_uf.get(uf, "")
+        if rota_uf:
+            return rota_uf
 
-    tabela["Rota"] = tabela[coluna_destino].map(resolver)
+        return "Sem rota"
+
+    tabela["Rota"] = tabela.apply(resolver, axis=1)
     unidades_por_nome: dict[str, list[dict[str, str]]] = {}
     for unidade in unidades:
-        unidades_por_nome.setdefault(_normalizar_rota(unidade["nome"]), []).append(unidade)
-    tabela["Código da rota"] = tabela["Rota"].map(
-        lambda rota: (
-            unidades_por_nome[_normalizar_rota(rota)][0]["codigo"]
-            if len(unidades_por_nome.get(_normalizar_rota(rota), [])) == 1
+        unidades_por_nome.setdefault(
+            _normalizar_unidade_fraction(unidade["nome"]), []
+        ).append(unidade)
+    def resolver_codigo_rota(rota: object) -> str:
+        chave = _normalizar_unidade_fraction(rota)
+        correspondencias = unidades_por_nome.get(chave, [])
+        codigo_preferencial = codigos_preferenciais.get(chave)
+        if codigo_preferencial:
+            correspondencias = [
+                unidade
+                for unidade in correspondencias
+                if str(unidade["codigo"]).strip() == codigo_preferencial
+            ]
+        return (
+            str(correspondencias[0]["codigo"])
+            if len(correspondencias) == 1
             else "Sem código"
         )
-    )
+
+    tabela["Código da rota"] = tabela["Rota"].map(resolver_codigo_rota)
     encontradas = int((~tabela["Rota"].isin(["Sem rota", "Rota ambígua"])).sum())
-    ambiguas = int(tabela["Rota"].eq("Rota ambígua").sum())
-    _log(log, f"Prévia de rotas: {encontradas}/{len(tabela)} destino(s) com origem única; {ambiguas} ambíguo(s).")
+    sem_rota = int(tabela["Rota"].eq("Sem rota").sum())
+    _log(
+        log,
+        f"Prévia de rotas por UF/cidade: {encontradas}/{len(tabela)} pedido(s) "
+        f"com unidade atribuída; {sem_rota} sem regra de localidade.",
+    )
     return tabela
 
 
@@ -512,6 +748,7 @@ def processar_manifestos(
     destinos, pendentes = associar_destinos_fraction(
         grupos,
         carregar_destinos_fraction(),
+        codigos_preferenciais=carregar_codigos_preferenciais_unidades(),
     )
     if pendentes:
         raise ValueError(
@@ -697,6 +934,7 @@ def executar_manifestos_romaneios(
     arquivo_base: str | Path,
     *,
     tabela_previa: pd.DataFrame | None = None,
+    codigos_preferenciais: dict[str, str] | None = None,
     log=None,
 ) -> dict:
     """Envia os grupos de uma base já conferida ao fluxo de Manifesto."""
@@ -725,9 +963,12 @@ def executar_manifestos_romaneios(
             f"Ignorando {len(rotas_ausentes)} CTE(s) sem rota única: "
             + "; ".join(rotas_ausentes),
         )
+    if codigos_preferenciais is None:
+        codigos_preferenciais = carregar_codigos_preferenciais_unidades()
     grupos, destinos_pendentes = associar_destinos_fraction(
         grupos,
         carregar_destinos_fraction(),
+        codigos_preferenciais=codigos_preferenciais,
     )
     if destinos_pendentes:
         _log(

@@ -1,5 +1,6 @@
 import re
 from datetime import datetime
+from pathlib import Path
 
 import pandas as pd
 from playwright.sync_api import (
@@ -166,10 +167,11 @@ def preparar_codigos(arquivo):
     df, _ = preparar_base_performance(arquivo)
     return df["__CODIGO_CONSULTA__"].tolist()
 
-def criar_pasta_execucao():
+def criar_pasta_execucao(pasta_destino: str | Path | None = None):
     agora = datetime.now()
     nome = agora.strftime("extracao_%Y-%m-%d_%H-%M-%S")
-    pasta = RESULTADOS_DIR / nome
+    raiz = Path(pasta_destino) if pasta_destino is not None else RESULTADOS_DIR
+    pasta = raiz / nome
     bases = pasta / "bases"
     bases.mkdir(parents=True, exist_ok=True)
     return pasta, bases
@@ -315,7 +317,12 @@ def unificar_bases(arquivos, caminho_saida, modo_data=False):
     )
 
 
-def executar_extracao(arquivo, log=lambda msg: None):
+def executar_extracao(
+    arquivo,
+    log=lambda msg: None,
+    *,
+    pasta_destino: str | Path | None = None,
+):
     validar_env()
 
     base_preparada, coluna_codigo = preparar_base_performance(
@@ -333,7 +340,7 @@ def executar_extracao(arquivo, log=lambda msg: None):
         "__CODIGO_CONSULTA__"
     ].tolist()
 
-    pasta_execucao, pasta_bases = criar_pasta_execucao()
+    pasta_execucao, pasta_bases = criar_pasta_execucao(pasta_destino)
 
     log(
         f"{len(codigos)} código(s) preparado(s) para consulta."

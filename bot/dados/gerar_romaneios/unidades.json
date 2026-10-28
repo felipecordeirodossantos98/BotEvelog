@@ -2030,7 +2030,8 @@
     },
     {
       "unidade": "FL SALVADOR",
-      "codigo": "000002656"
+      "codigo": "000002656",
+      "ativo": false
     },
     {
       "unidade": "FL SALVADOR - DEVOLUCAO",
@@ -4168,5 +4169,8 @@
       "unidade": "5B CO VALENCA 01",
       "codigo": "000002684"
     }
-  ]
+  ],
+  "codigo_preferencial_por_unidade": {
+    "FL SALVADOR": "000000008"
+  }
 }
