@@ -76,21 +76,23 @@ def avisar_variaveis_faltantes(
 
 def _conteudo_log(
     chave_logs: str,
+    max_linhas: int | None = MAX_LINHAS_LOG,
 ) -> str:
     logs = st.session_state.get(
         chave_logs,
         [],
     )
 
-    return "\n".join(
-        logs[-MAX_LINHAS_LOG:]
-    )
+    linhas = logs if max_linhas is None else logs[-max_linhas:]
+    return "\n".join(linhas)
 
 
 def criar_painel_execucao(
     chave_logs: str,
     *,
     limpar: bool = True,
+    max_linhas: int | None = MAX_LINHAS_LOG,
+    expandido: bool = False,
 ) -> tuple[object, Callable[[str], None]]:
     if limpar or chave_logs not in st.session_state:
         st.session_state[chave_logs] = []
@@ -99,14 +101,14 @@ def criar_painel_execucao(
 
     with st.expander(
         "Log da execução",
-        expanded=False,
+        expanded=expandido,
         width="stretch",
     ):
         area_log = st.empty()
 
     def atualizar_log() -> None:
         area_log.code(
-            _conteudo_log(chave_logs),
+            _conteudo_log(chave_logs, max_linhas),
             language=None,
             wrap_lines=True,
         )
@@ -126,19 +128,19 @@ def renderizar_logs(
     logs: list[str],
     *,
     titulo: str = "Log da execução",
+    max_linhas: int | None = MAX_LINHAS_LOG,
+    expandido: bool = False,
 ) -> None:
     if not logs:
         return
 
     with st.expander(
         titulo,
-        expanded=False,
+        expanded=expandido,
         width="stretch",
     ):
         st.code(
-            "\n".join(
-                logs[-MAX_LINHAS_LOG:]
-            ),
+            "\n".join(logs if max_linhas is None else logs[-max_linhas:]),
             language=None,
             wrap_lines=True,
         )

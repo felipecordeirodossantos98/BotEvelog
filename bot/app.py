@@ -8,8 +8,14 @@ from elementos_visuais.visual_baixar_danfes import (
 from elementos_visuais.visual_baixar_relatorios_performance import (
     renderizar_baixar_relatorios_performance,
 )
+from elementos_visuais.visual_baixar_relatorios_analitico import (
+    renderizar_baixar_relatorios_analitico,
+)
 from elementos_visuais.visual_buscar_tdes import (
     renderizar_buscar_tdes,
+)
+from elementos_visuais.visual_dar_entrada_pedidos import (
+    renderizar_dar_entrada_pedidos,
 )
 from elementos_visuais.visual_gerar_ordens_de_coleta_malotes import (
     renderizar_gerar_ordens_de_coleta,
@@ -20,11 +26,11 @@ from elementos_visuais.visual_gerar_ordens_de_coleta_equipamentos import (
 from elementos_visuais.visual_gerar_tickets_zendesk import (
     renderizar_gerar_tickets_zendesk,
 )
-from elementos_visuais.visual_gerar_romaneios import (
-    renderizar_menu_automacoes_operacao,
-)
 from elementos_visuais.visual_mega_cartela_lsm import (
     renderizar_mega_cartela_lsm,
+)
+from elementos_visuais.visual_gerar_romaneios_emissao import (
+    renderizar_gerar_romaneios_emissao,
 )
 
 from utils.arquivos import identificar_fluxo_automacao_sac
@@ -138,6 +144,25 @@ def renderizar_menu_automacoes_sac() -> None:
 
     with tab_mega_cartela:
         renderizar_mega_cartela_lsm()
+
+
+def renderizar_menu_automacoes_operacao() -> None:
+    tab_dar_entrada, tab_emissao, tab_analitico = st.tabs(
+        [
+            "Dar entrada e gerar romaneios",
+            "Gerar romaneios de Emissão",
+            "Relatório Analítico",
+        ]
+    )
+
+    with tab_dar_entrada:
+        renderizar_dar_entrada_pedidos()
+
+    with tab_emissao:
+        renderizar_gerar_romaneios_emissao()
+
+    with tab_analitico:
+        renderizar_baixar_relatorios_analitico()
 
 
 def main() -> None:

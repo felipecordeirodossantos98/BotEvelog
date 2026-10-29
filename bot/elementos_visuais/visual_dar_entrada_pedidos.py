@@ -37,7 +37,7 @@ CHAVE_ADICAO_RECEBIMENTO = "visual_dar_entrada_pedidos_processados_v2"
 
 
 def renderizar_dar_entrada_pedidos() -> None:
-    st.subheader("Dar entrada em pedidos")
+    st.subheader("Dar entrada e gerar romaneios")
 
     faltantes = avisar_variaveis_faltantes("dar_entrada_pedidos")
     numeros_romaneio_texto = st.text_area(

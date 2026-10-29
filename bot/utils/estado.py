@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 from threading import Lock
-from typing import Callable
+from typing import Callable, Iterable
 
 
 class RegistroTexto:
@@ -110,3 +110,43 @@ class RegistroTexto:
             )
 
             return True
+
+    def adicionar_varios(
+        self,
+        valores: Iterable[object],
+    ) -> list[str]:
+        """Acrescenta vários valores com uma única gravação sincronizada."""
+        normalizados = list(
+            dict.fromkeys(
+                normalizado
+                for valor in valores
+                if (normalizado := self._normalizar(valor))
+            )
+        )
+        if not normalizados:
+            return []
+
+        with self._lock:
+            novos = [
+                valor
+                for valor in normalizados
+                if valor not in self._valores
+            ]
+            if not novos:
+                return []
+
+            self.caminho.parent.mkdir(
+                parents=True,
+                exist_ok=True,
+            )
+            with self.caminho.open(
+                "a",
+                encoding="utf-8",
+                newline="\n",
+            ) as arquivo:
+                arquivo.writelines(valor + "\n" for valor in novos)
+                arquivo.flush()
+                os.fsync(arquivo.fileno())
+
+            self._valores.update(novos)
+            return novos

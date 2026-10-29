@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from hashlib import sha256
 from pathlib import Path
 import tempfile
@@ -9,7 +9,8 @@ import unicodedata
 import pandas as pd
 import streamlit as st
 
-from automacoes.gerar_romaneios import (
+from servicos.fraction import (
+    CredenciaisFractionInvalidasError,
     associar_destinos_fraction,
     carregar_codigos_preferenciais_unidades,
     carregar_destinos_fraction,
@@ -25,22 +26,29 @@ from automacoes.gerar_romaneios_emissao import (
     carregar_codigos_preferenciais_unidades_emissao,
     extrair_performance_intervalo,
     montar_fila_emissao,
+    preparar_estado_etiquetas_romaneio,
+    registrar_etiquetas_romaneio,
 )
-from servicos.fraction import CredenciaisFractionInvalidasError
 from utils.interface import (
     LARGURA_BOTAO,
     avisar_variaveis_faltantes,
+    criar_painel_execucao,
     error,
     renderizar_logs,
     success,
     warning,
 )
-from utils.config import ARQUIVO_ROTAS_ROMANEIOS
+from utils.config import (
+    ARQUIVO_ETIQUETAS_ROMANEIOS_EMISSAO,
+    ARQUIVO_ROTAS_ROMANEIOS,
+    RESULTADOS_ROMANEIOS,
+)
 from utils.logs import criar_logger_execucao
 
 
 CHAVE_RESULTADO = "visual_gerar_romaneios_emissao_resultado"
 CHAVE_LOGS = "visual_gerar_romaneios_emissao_logs"
+CHAVE_LOG_PAINEL_RENDERIZADO = "visual_gerar_romaneios_emissao_log_painel_renderizado"
 
 
 def _normalizar_rota(valor: object) -> str:
@@ -193,12 +201,21 @@ def _renderizar_extracao_performance() -> tuple[str, str] | None:
         else:
             st.session_state.pop(CHAVE_RESULTADO, None)
             st.session_state[CHAVE_LOGS] = []
+            _, log_visual = criar_painel_execucao(
+                CHAVE_LOGS,
+                limpar=False,
+                max_linhas=None,
+                expandido=True,
+            )
+            st.session_state[CHAVE_LOG_PAINEL_RENDERIZADO] = True
             log, _ = criar_logger_execucao(
                 "gerar_romaneios",
-                st.session_state[CHAVE_LOGS].append,
+                log_visual,
                 rotulo="processar_emissao",
             )
             try:
+                caminho_estado = preparar_estado_etiquetas_romaneio()
+                log(f"Arquivo de estado de etiquetas: {caminho_estado}.")
                 with tempfile.TemporaryDirectory(
                     prefix="botevelog_emissao_"
                 ) as diretorio_temporario:
@@ -255,12 +272,6 @@ def _renderizar_extracao_performance() -> tuple[str, str] | None:
                     "enviado": False,
                     "resumo_envio": None,
                 }
-                if dados["shipment_ids_sem_match"]:
-                    success(
-                        f"{len(dados['shipment_ids_sem_match'])} ShipmentId(s) ausentes "
-                        "da Performance foram consultados individualmente no Fraction; "
-                        "somente os que ficam com Status final EMISSAO permanecem na fila."
-                    )
                 if dados["shipment_ids_sem_retorno_fraction"]:
                     warning(
                         f"{len(dados['shipment_ids_sem_retorno_fraction'])} pedido(s) "
@@ -296,6 +307,10 @@ def _renderizar_extracao_performance() -> tuple[str, str] | None:
 
 def renderizar_gerar_romaneios_emissao() -> None:
     st.subheader("Gerar romaneios de Emissão")
+    st.caption(
+        "Etiquetas fora da fila por status e etiquetas de romaneios concluídos "
+        f"ficam registradas em {ARQUIVO_ETIQUETAS_ROMANEIOS_EMISSAO}."
+    )
 
     periodo = _renderizar_extracao_performance()
     resultado_atual = st.session_state.get(CHAVE_RESULTADO)
@@ -303,7 +318,12 @@ def renderizar_gerar_romaneios_emissao() -> None:
         st.session_state.pop(CHAVE_RESULTADO, None)
         resultado_atual = None
     if not resultado_atual:
-        renderizar_logs(st.session_state.get(CHAVE_LOGS, []))
+        if not st.session_state.pop(CHAVE_LOG_PAINEL_RENDERIZADO, False):
+            renderizar_logs(
+                st.session_state.get(CHAVE_LOGS, []),
+                max_linhas=None,
+                expandido=True,
+            )
         return
 
     identificador = resultado_atual["identificador"]
@@ -313,6 +333,7 @@ def renderizar_gerar_romaneios_emissao() -> None:
         tabela,
     )
     configuracao_colunas_fila = {
+        "Palete": st.column_config.TextColumn("Palete"),
         "CTE": st.column_config.TextColumn("CTE"),
         "ShipmentId": st.column_config.TextColumn("ShipmentId"),
         "Etiquetas do pedido": st.column_config.TextColumn(
@@ -344,10 +365,6 @@ def renderizar_gerar_romaneios_emissao() -> None:
 
     if tabela.empty:
         st.info("Nenhum pedido da base completa ficou na fila EMISSAO.")
-        sem_match = resultado_atual.get("shipment_ids_sem_match", [])
-        if sem_match:
-            with st.expander("ShipmentIds sem correspondência"):
-                st.code("\n".join(sem_match), language=None, wrap_lines=True)
         renderizar_logs(st.session_state.get(CHAVE_LOGS, []))
         return
 
@@ -372,22 +389,26 @@ def renderizar_gerar_romaneios_emissao() -> None:
             selecionados: list[str] = []
             for _, linha in divergencias.iterrows():
                 shipment_id = str(linha["ShipmentId"])
+                palete = str(linha.get("Palete", "Sem palete"))
+                token_confirmacao = f"{palete}\0{shipment_id}"
+                chave_checkbox = sha256(token_confirmacao.encode("utf-8")).hexdigest()[:16]
                 etiquetas_faltantes = str(linha["Etiquetas faltantes"] or "").strip()
                 quantidade_faltantes = (
                     len(etiquetas_faltantes.splitlines()) if etiquetas_faltantes else 0
                 )
                 autorizar = st.checkbox(
-                    f"Autorizar ShipmentId {shipment_id}: Volume na Performance "
+                    f"Autorizar palete {palete} — ShipmentId {shipment_id}: "
+                    f"Volume na Performance "
                     f"{int(linha['Volumes Sistema'])}; etiquetas bipadas "
                     f"{int(linha['Volumes Etiquetas'])}; "
                     f"{quantidade_faltantes} etiqueta(s) faltante(s).",
                     key=(
                         f"gerar_romaneios_emissao_confirmar_{identificador[:16]}_"
-                        f"{shipment_id}"
+                        f"{chave_checkbox}"
                     ),
                 )
                 if autorizar:
-                    selecionados.append(shipment_id)
+                    selecionados.append(token_confirmacao)
 
             confirmar = st.form_submit_button(
                 "Confirmar pedidos divergentes",
@@ -412,9 +433,12 @@ def renderizar_gerar_romaneios_emissao() -> None:
     tabela_envio = tabela.copy()
     confirmacoes = set(resultado_atual.get("confirmacoes", []))
     for indice, linha in tabela_envio.iterrows():
+        token_confirmacao = (
+            f"{linha.get('Palete', 'Sem palete')}\0{linha['ShipmentId']}"
+        )
         if pd.isna(linha["Volumes Sistema"]):
             tabela_envio.at[indice, "CTEs para dar entrada"] = ""
-        elif _volume_divergente(linha) and str(linha["ShipmentId"]) not in confirmacoes:
+        elif _volume_divergente(linha) and token_confirmacao not in confirmacoes:
             tabela_envio.at[indice, "CTEs para dar entrada"] = ""
 
     tem_ctes_envio = tabela_envio["CTEs para dar entrada"].fillna("").map(
@@ -428,7 +452,10 @@ def renderizar_gerar_romaneios_emissao() -> None:
     sem_rota_ou_ambigua = tabela.loc[
         rota_original.isin({"", "Sem rota", "Rota ambígua"})
     ].copy()
-    grupos, _ = mapear_rotas_para_grupos(tabela_envio)
+    grupos, _ = mapear_rotas_para_grupos(
+        tabela_envio,
+        separar_por_palete=True,
+    )
     codigos_preferenciais = carregar_codigos_preferenciais_unidades_emissao()
     grupos_validos, destinos_pendentes = associar_destinos_fraction(
         grupos,
@@ -530,11 +557,65 @@ def renderizar_gerar_romaneios_emissao() -> None:
         )
         try:
             log("Usuário confirmou a prévia e iniciou a emissão dos romaneios.")
+
+            def registrar_grupo_concluido(grupo: dict, caminho_pdf: Path) -> None:
+                palete = str(grupo.get("PALETE") or "Sem palete")
+                rota = str(grupo.get("ROTA") or "")
+                ctes_grupo = {
+                    str(cte).strip()
+                    for cte in grupo.get("LISTA_CTES", [])
+                    if str(cte).strip()
+                }
+                etiquetas_grupo: list[str] = []
+                for _, linha in tabela_envio.iterrows():
+                    if str(linha.get("Palete", "Sem palete")) != palete:
+                        continue
+                    if str(linha.get("Rota", "")) != rota:
+                        continue
+                    ctes_linha = {
+                        valor.strip()
+                        for valor in str(
+                            linha.get("CTEs para dar entrada", "")
+                        ).splitlines()
+                        if valor.strip()
+                    }
+                    if not ctes_linha.intersection(ctes_grupo):
+                        continue
+                    etiquetas_grupo.extend(
+                        valor.strip()
+                        for valor in str(
+                            linha.get("Etiquetas do pedido", "")
+                        ).splitlines()
+                        if valor.strip()
+                    )
+
+                if not etiquetas_grupo:
+                    raise RuntimeError(
+                        f"O romaneio do palete '{palete}' / rota '{rota}' foi salvo "
+                        "mas não foi possível associar suas etiquetas ao estado "
+                        "persistente. O processamento foi interrompido para evitar "
+                        "duplicidade silenciosa."
+                    )
+                registrar_etiquetas_romaneio(
+                    etiquetas_grupo,
+                    contexto=(
+                        f"romaneio gerado — Palete '{palete}', rota '{rota}', "
+                        f"PDF '{caminho_pdf}'"
+                    ),
+                    log=log,
+                )
+
+            pasta_execucao_pdf = RESULTADOS_ROMANEIOS / (
+                f"Execucao_Emissao_{datetime.now():%Y-%m-%d_%H-%M-%S-%f}"
+            )
             with st.spinner("Gerando romaneios de Emissão no Fraction..."):
                 resultado = executar_manifestos_romaneios(
                     nome_fontes,
                     tabela_previa=tabela_envio,
                     codigos_preferenciais=codigos_preferenciais,
+                    separar_por_palete=True,
+                    pasta_destino_pdf=pasta_execucao_pdf,
+                    ao_concluir_grupo=registrar_grupo_concluido,
                     log=log,
                 )
             mensagem = (
@@ -542,11 +623,13 @@ def renderizar_gerar_romaneios_emissao() -> None:
                 f"{resultado['grupos_manifesto']} grupo(s), "
                 f"{resultado['ctes_manifesto']} CTE(s) em "
                 f"{resultado['lotes_manifesto']} lote(s). "
-                f"PDFs salvos: {len(resultado['arquivos_pdf'])}."
+                f"PDFs salvos: {len(resultado['arquivos_pdf'])} em "
+                f"{resultado['pasta_pdf']}."
             )
             resultado_atual["enviado"] = True
             resultado_atual["resumo_envio"] = mensagem
             resultado_atual["arquivos_pdf"] = list(resultado["arquivos_pdf"])
+            resultado_atual["pasta_pdf"] = resultado["pasta_pdf"]
             resultado_atual["arquivo_lote_impressao"] = None
             resultado_atual["impressao_solicitada"] = False
             st.session_state[CHAVE_RESULTADO] = resultado_atual
@@ -565,6 +648,8 @@ def renderizar_gerar_romaneios_emissao() -> None:
             f"{len(arquivos_pdf)} PDF(s) já foram baixados e salvos. A impressão "
             "envia todas as páginas em um único lote para a impressora padrão."
         )
+        if resultado_atual.get("pasta_pdf"):
+            st.caption(f"Pasta desta execução: {resultado_atual['pasta_pdf']}")
         with st.expander("PDFs salvos", expanded=False):
             st.code("\n".join(arquivos_pdf), language=None, wrap_lines=True)
 
@@ -627,4 +712,9 @@ def renderizar_gerar_romaneios_emissao() -> None:
                             f"{erro_impressao}"
                         )
 
-    renderizar_logs(st.session_state.get(CHAVE_LOGS, []))
+    if not st.session_state.pop(CHAVE_LOG_PAINEL_RENDERIZADO, False):
+        renderizar_logs(
+            st.session_state.get(CHAVE_LOGS, []),
+            max_linhas=None,
+            expandido=True,
+        )

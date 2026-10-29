@@ -25,11 +25,12 @@ from automacoes.dar_entrada_pedidos import (
     gerar_ctes_para_entrada,
     gerar_etiquetas_faltantes,
 )
-from automacoes.gerar_romaneios import (
+from servicos.fraction import (
     carregar_codigos_preferenciais_unidades,
     carregar_regras_rotas_localidade,
 )
 from utils.config import (
+    ARQUIVO_ETIQUETAS_ROMANEIOS_EMISSAO,
     FRACTION_PASSWORD_PERFORMANCE,
     FRACTION_USER_PERFORMANCE,
     HEADLESS,
@@ -37,6 +38,7 @@ from utils.config import (
     URL_DRIVE,
     URL_FRACTION,
 )
+from utils.estado import RegistroTexto
 
 
 CABECALHOS_OBRIGATORIOS = {
@@ -106,6 +108,100 @@ TIMEOUT_DOWNLOAD_PERFORMANCE_MS = 600_000
 TIMEOUT_DOWNLOAD_DRIVE_MS = 300_000
 MAX_TENTATIVAS_DOWNLOAD_DRIVE = 3
 LIMITE_DIAS_PERFORMANCE_EMISSAO = 31
+REGISTRO_ETIQUETAS_ROMANEIOS_EMISSAO = RegistroTexto(
+    ARQUIVO_ETIQUETAS_ROMANEIOS_EMISSAO
+)
+
+
+def preparar_estado_etiquetas_romaneio() -> Path:
+    """Cria a pasta e o arquivo de estado sem alterar etiquetas registradas."""
+    ARQUIVO_ETIQUETAS_ROMANEIOS_EMISSAO.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+    ARQUIVO_ETIQUETAS_ROMANEIOS_EMISSAO.touch(exist_ok=True)
+    return ARQUIVO_ETIQUETAS_ROMANEIOS_EMISSAO
+
+
+def registrar_etiquetas_romaneio(
+    etiquetas: list[str],
+    *,
+    contexto: str,
+    log: Callable[[str], None] | None = None,
+) -> list[str]:
+    """Persiste etiquetas de um romaneio confirmado para evitar reenvio."""
+    novas = REGISTRO_ETIQUETAS_ROMANEIOS_EMISSAO.adicionar_varios(etiquetas)
+    _log_performance_emissao(
+        log,
+        f"Estado de etiquetas atualizado para {contexto}: "
+        f"{len(novas)} nova(s) etiqueta(s) registrada(s), "
+        f"{len(etiquetas) - len(novas)} já constavam no estado. "
+        f"Arquivo: {ARQUIVO_ETIQUETAS_ROMANEIOS_EMISSAO}.",
+    )
+    for etiqueta in novas:
+        _log_performance_emissao(log, f"Etiqueta persistida: {etiqueta}.")
+    return novas
+
+
+def _filtrar_etiquetas_ja_registradas(
+    pedidos: list[dict[str, object]],
+    *,
+    log: Callable[[str], None] | None = None,
+) -> tuple[list[dict[str, object]], int]:
+    pedidos_novos: list[dict[str, object]] = []
+    total_ignoradas = 0
+    _log_performance_emissao(
+        log,
+        f"Estado local: {len(REGISTRO_ETIQUETAS_ROMANEIOS_EMISSAO)} etiqueta(s) "
+        f"já registradas em {ARQUIVO_ETIQUETAS_ROMANEIOS_EMISSAO}.",
+    )
+
+    for pedido in pedidos:
+        shipment_id = str(pedido["ShipmentId"])
+        mapa_paletes = pedido.get("ETIQUETAS_POR_PALETE")
+        if not isinstance(mapa_paletes, dict) or not mapa_paletes:
+            mapa_paletes = {"Sem palete": pedido["ETIQUETAS"]}
+
+        etiquetas_frescas_por_palete: dict[str, list[str]] = {}
+        for palete, etiquetas in mapa_paletes.items():
+            frescas = []
+            registradas = []
+            for etiqueta in etiquetas:
+                if REGISTRO_ETIQUETAS_ROMANEIOS_EMISSAO.contem(etiqueta):
+                    registradas.append(etiqueta)
+                else:
+                    frescas.append(etiqueta)
+            total_ignoradas += len(registradas)
+            if registradas:
+                _log_performance_emissao(
+                    log,
+                    f"Ignorando {len(registradas)} etiqueta(s) já tratada(s) "
+                    f"em outra execução: Palete '{palete}', ShipmentId "
+                    f"{shipment_id}: {', '.join(registradas)}.",
+                )
+            if frescas:
+                etiquetas_frescas_por_palete[str(palete)] = frescas
+
+        etiquetas_frescas = [
+            etiqueta
+            for etiquetas in etiquetas_frescas_por_palete.values()
+            for etiqueta in etiquetas
+        ]
+        if not etiquetas_frescas:
+            _log_performance_emissao(
+                log,
+                f"ShipmentId {shipment_id} não tem etiqueta nova; removido "
+                "da consulta e da fila desta execução.",
+            )
+            continue
+
+        pedido_novo = dict(pedido)
+        pedido_novo["ETIQUETAS"] = etiquetas_frescas
+        pedido_novo["VOLUMES_ETIQUETAS"] = len(etiquetas_frescas)
+        pedido_novo["ETIQUETAS_POR_PALETE"] = etiquetas_frescas_por_palete
+        pedidos_novos.append(pedido_novo)
+
+    return pedidos_novos, total_ignoradas
 
 
 def _normalizar_cabecalho(valor: object) -> str:
@@ -344,6 +440,52 @@ def _adicionar_rota(tabela: pd.DataFrame) -> pd.DataFrame:
         return "Sem rota"
 
     resultado["Rota"] = resultado.apply(resolver, axis=1)
+    return resultado
+
+
+def _completar_rotas_por_palete(
+    tabela: pd.DataFrame,
+    *,
+    log: Callable[[str], None] | None = None,
+) -> pd.DataFrame:
+    """Aplica a rota conhecida do palete às linhas sem rota quando é única."""
+    resultado = tabela.copy()
+    if resultado.empty or "Palete" not in resultado or "Rota" not in resultado:
+        return resultado
+
+    rotas_sem_valor = {"", "SEM ROTA"}
+    rotas_nao_inferiveis = rotas_sem_valor | {"ROTA AMBIGUA"}
+    for palete, indices in resultado.groupby("Palete", sort=False, dropna=False).groups.items():
+        rotas_conhecidas: dict[str, str] = {}
+        for valor in resultado.loc[indices, "Rota"]:
+            rota = _normalizar_valor(valor)
+            chave = _normalizar_rota(rota)
+            if chave and chave not in rotas_nao_inferiveis:
+                rotas_conhecidas.setdefault(chave, rota)
+
+        faltantes = resultado.loc[indices, "Rota"].map(
+            lambda valor: _normalizar_rota(_normalizar_valor(valor))
+            in rotas_sem_valor
+        )
+        if len(rotas_conhecidas) == 1 and faltantes.any():
+            rota = next(iter(rotas_conhecidas.values()))
+            indices_faltantes = resultado.loc[indices].index[faltantes]
+            resultado.loc[indices_faltantes, "Rota"] = rota
+            _log_performance_emissao(
+                log,
+                f"Palete '{palete}': rota '{rota}' aplicada a "
+                f"{len(indices_faltantes)} pedido(s) sem rota, usando os "
+                "pedidos roteados do mesmo palete.",
+            )
+        elif len(rotas_conhecidas) > 1 and faltantes.any():
+            _log_performance_emissao(
+                log,
+                f"Palete '{palete}' tem mais de uma rota conhecida; "
+                f"{int(faltantes.sum())} pedido(s) sem rota não foram inferidos. "
+                "Rotas encontradas: "
+                + ", ".join(rotas_conhecidas.values()),
+            )
+
     return resultado
 
 
@@ -664,11 +806,57 @@ def montar_fila_emissao(
     pasta_temporaria: Path | None = None,
 ) -> dict[str, object]:
     """Cruza etiquetas e Performance e monta a fila de envio dos romaneios."""
+    preparar_estado_etiquetas_romaneio()
+    _log_performance_emissao(
+        log,
+        f"Arquivo de estado de etiquetas: "
+        f"{ARQUIVO_ETIQUETAS_ROMANEIOS_EMISSAO}.",
+    )
     base, nome_aba, linha_cabecalho = _ler_base_performance(conteudo_performance)
     pedidos = agrupar_etiquetas_importadas(
         conteudo_etiquetas,
         nome_arquivo_etiquetas,
         log=log,
+    )
+    total_etiquetas_importadas = sum(
+        len(pedido["ETIQUETAS"]) for pedido in pedidos
+    )
+    total_paletes_importados = len(
+        {
+            str(palete)
+            for pedido in pedidos
+            for palete in pedido.get("ETIQUETAS_POR_PALETE", {})
+        }
+    )
+    _log_performance_emissao(
+        log,
+        f"Montagem detalhada da fila iniciada: {len(pedidos)} ShipmentId(s), "
+        f"{total_etiquetas_importadas} etiqueta(s), "
+        f"{total_paletes_importados} palete(s).",
+    )
+    for pedido in pedidos:
+        shipment_id = str(pedido["ShipmentId"])
+        mapa_paletes = pedido.get("ETIQUETAS_POR_PALETE") or {
+            "Sem palete": pedido["ETIQUETAS"]
+        }
+        for palete, etiquetas in mapa_paletes.items():
+            _log_performance_emissao(
+                log,
+                f"TXT lido — Palete '{palete}', ShipmentId {shipment_id}, "
+                f"{len(etiquetas)} etiqueta(s): {', '.join(etiquetas)}.",
+            )
+
+    pedidos, etiquetas_ja_registradas = _filtrar_etiquetas_ja_registradas(
+        pedidos,
+        log=log,
+    )
+    total_etiquetas_novas = sum(len(pedido["ETIQUETAS"]) for pedido in pedidos)
+    _log_performance_emissao(
+        log,
+        f"Após consultar o estado, restaram {len(pedidos)} ShipmentId(s) e "
+        f"{total_etiquetas_novas} etiqueta(s) novas; "
+        f"{etiquetas_ja_registradas} etiqueta(s) foram ignoradas por já terem "
+        "sido capturadas em outra execução.",
     )
 
     registros_por_shipment: dict[str, list[dict[str, object]]] = {}
@@ -685,21 +873,24 @@ def montar_fila_emissao(
             }
         )
 
-    linhas: list[dict[str, object]] = []
+    registros_unicos_por_shipment: dict[str, dict[str, object]] = {}
     shipment_ids_sem_match: list[str] = []
-    linhas_por_shipment: dict[str, dict[str, object]] = {}
-    resultados_consulta: dict[str, dict[str, object]] = {}
-    dados_performance_consultados: dict[str, dict[str, str]] = {}
-
     for pedido in pedidos:
         shipment_id = str(pedido["ShipmentId"])
-        etiquetas = sorted(
-            pedido["ETIQUETAS"],
-            key=lambda etiqueta: int(PADRAO_ETIQUETA.fullmatch(etiqueta).group(2)),
+        _log_performance_emissao(
+            log,
+            f"Associando ShipmentId {shipment_id} à Performance; "
+            f"{len(pedido['ETIQUETAS'])} etiqueta(s) novas.",
         )
         candidatos = registros_por_shipment.get(shipment_id, [])
         if not candidatos:
-            shipment_ids_sem_match.append(shipment_id)
+            _log_performance_emissao(
+                log,
+                f"ShipmentId {shipment_id}: sem correspondência direta na "
+                "Performance; será consultado no Fraction.",
+            )
+            if shipment_id not in shipment_ids_sem_match:
+                shipment_ids_sem_match.append(shipment_id)
             continue
 
         registros_unicos = {
@@ -720,59 +911,49 @@ def montar_fila_emissao(
             )
 
         registro = next(iter(registros_unicos.values()))
-        codigo = str(registro["Codigo"]).strip()
-        destino = str(registro["Destino"]).strip()
-        if not codigo or not destino:
+        if not str(registro["Codigo"]).strip() or not str(registro["Destino"]).strip():
             raise ValueError(
                 f"A linha correspondente ao ShipmentId {shipment_id} precisa "
                 "ter Codigo e Destino preenchidos na planilha Performance."
             )
-
-        volume_sistema = _normalizar_volume(
-            registro["Volume"],
-            shipment_id=shipment_id,
+        registros_unicos_por_shipment[shipment_id] = registro
+        _log_performance_emissao(
+            log,
+            f"ShipmentId {shipment_id}: correspondência única na Performance — "
+            f"CTE {registro['Codigo']}, Destino '{registro['Destino']}', "
+            f"Volume '{_normalizar_valor(registro['Volume'])}', "
+            f"Status '{_normalizar_valor(registro['Status'])}'.",
         )
-        linhas_por_shipment[shipment_id] = {
-            "CTE": codigo,
-            "ShipmentId": shipment_id,
-            "Etiquetas do pedido": "\n".join(etiquetas),
-            "Volumes Sistema": volume_sistema,
-            "Volumes Etiquetas": len(etiquetas),
-            "Etiquetas faltantes": gerar_etiquetas_faltantes(
-                shipment_id,
-                etiquetas,
-                volume_sistema,
-            ),
-            "CTEs para dar entrada": gerar_ctes_para_entrada(
-                codigo,
-                etiquetas,
-                volume_sistema,
-            ),
-            "UF": str(registro["UF"]),
-            "Cidade": str(registro["Cidade"]),
-            "Destino": destino,
-            "Manifesto": "",
-            "Origem": "Base",
-            "Status": _normalizar_valor(registro["Status"]),
-        }
 
+    resultados_consulta: dict[str, dict[str, object]] = {}
     if shipment_ids_sem_match:
         log_consulta = log if log is not None else (lambda _mensagem: None)
         resultados_consulta = consultar_shipments_no_fraction(
             shipment_ids_sem_match,
             log=log_consulta,
         )
-        for pedido in pedidos:
-            shipment_id = str(pedido["ShipmentId"])
-            if shipment_id not in shipment_ids_sem_match:
-                continue
 
-            etiquetas = sorted(
-                pedido["ETIQUETAS"],
-                key=lambda etiqueta: int(
-                    PADRAO_ETIQUETA.fullmatch(etiqueta).group(2)
-                ),
+    linhas_por_palete_shipment: dict[tuple[str, str], dict[str, object]] = {}
+    linhas_por_shipment: dict[str, list[dict[str, object]]] = {}
+    for pedido in pedidos:
+        shipment_id = str(pedido["ShipmentId"])
+        etiquetas_por_palete = pedido.get("ETIQUETAS_POR_PALETE")
+        if not isinstance(etiquetas_por_palete, dict) or not etiquetas_por_palete:
+            etiquetas_por_palete = {"Sem palete": pedido["ETIQUETAS"]}
+
+        registro = registros_unicos_por_shipment.get(shipment_id)
+        if registro is not None:
+            codigo = str(registro["Codigo"]).strip()
+            destino = str(registro["Destino"]).strip()
+            volume_sistema = _normalizar_volume(
+                registro["Volume"],
+                shipment_id=shipment_id,
             )
+            uf = str(registro["UF"])
+            cidade = str(registro["Cidade"])
+            status = _normalizar_valor(registro["Status"])
+            origem = "Base"
+        else:
             consulta = resultados_consulta.get(shipment_id, {})
             codigo = _normalizar_valor(consulta.get("CTE"))
             volume_sistema_bruto = consulta.get("Volumes Sistema")
@@ -782,12 +963,26 @@ def montar_fila_emissao(
                 and not pd.isna(volume_sistema_bruto)
                 else None
             )
+            destino = ""
+            uf = ""
+            cidade = ""
+            status = ""
+            origem = "Consulta"
+
+        for palete, etiquetas_brutas in etiquetas_por_palete.items():
+            etiquetas = sorted(
+                list(etiquetas_brutas),
+                key=lambda etiqueta: int(
+                    PADRAO_ETIQUETA.fullmatch(etiqueta).group(2)
+                ),
+            )
             ctes_para_entrada = (
                 gerar_ctes_para_entrada(codigo, etiquetas, volume_sistema)
                 if codigo
                 else ""
             )
-            linhas_por_shipment[shipment_id] = {
+            linha_palete = {
+                "Palete": str(palete),
                 "CTE": codigo,
                 "ShipmentId": shipment_id,
                 "Etiquetas do pedido": "\n".join(etiquetas),
@@ -799,23 +994,31 @@ def montar_fila_emissao(
                     volume_sistema,
                 ),
                 "CTEs para dar entrada": ctes_para_entrada,
-                "UF": "",
-                "Cidade": "",
-                "Destino": "",
+                "UF": uf,
+                "Cidade": cidade,
+                "Destino": destino,
                 "Manifesto": "",
-                "Origem": "Consulta",
-                "Status": "",
+                "Origem": origem,
+                "Status": status,
             }
+            linhas_por_palete_shipment[(str(palete), shipment_id)] = linha_palete
+            linhas_por_shipment.setdefault(shipment_id, []).append(linha_palete)
+            _log_performance_emissao(
+                log,
+                f"Linha montada — Palete '{palete}', ShipmentId {shipment_id}, "
+                f"CTE '{codigo}', {len(etiquetas)} etiqueta(s), "
+                f"{len(ctes_para_entrada.splitlines())} CTE(s) para envio, "
+                f"Status '{status or 'SEM STATUS'}', Destino '{destino or 'SEM DESTINO'}'. "
+                f"Etiquetas: {', '.join(etiquetas)}.",
+            )
 
-
-    shipment_ids_fila = [
-        str(pedido["ShipmentId"])
-        for pedido in pedidos
-        if str(pedido["ShipmentId"]) in linhas_por_shipment
-    ]
+    shipment_ids_fila = list(
+        dict.fromkeys(shipment_id for _, shipment_id in linhas_por_palete_shipment)
+    )
     ctes_por_shipment = {
         shipment_id: _normalizar_valor(
-            linhas_por_shipment[shipment_id].get("CTE")
+            registros_unicos_por_shipment.get(shipment_id, {}).get("Codigo")
+            or resultados_consulta.get(shipment_id, {}).get("CTE")
         )
         for shipment_id in shipment_ids_fila
     }
@@ -829,26 +1032,23 @@ def montar_fila_emissao(
             shipment_id,
             {},
         )
-        linha_fila = linhas_por_shipment[shipment_id]
-        if dados_performance.get("Destino"):
-            linha_fila["Destino"] = dados_performance["Destino"]
-        if dados_performance.get("Status"):
-            linha_fila["Status"] = dados_performance["Status"]
-        if dados_performance.get("UF"):
-            linha_fila["UF"] = dados_performance["UF"]
-        if dados_performance.get("Cidade"):
-            linha_fila["Cidade"] = dados_performance["Cidade"]
+        for linha_fila in linhas_por_shipment.get(shipment_id, []):
+            if dados_performance.get("Destino"):
+                linha_fila["Destino"] = dados_performance["Destino"]
+            if dados_performance.get("Status"):
+                linha_fila["Status"] = dados_performance["Status"]
+            if dados_performance.get("UF"):
+                linha_fila["UF"] = dados_performance["UF"]
+            if dados_performance.get("Cidade"):
+                linha_fila["Cidade"] = dados_performance["Cidade"]
 
-    linhas = [
-        linhas_por_shipment[str(pedido["ShipmentId"])]
-        for pedido in pedidos
-        if str(pedido["ShipmentId"]) in linhas_por_shipment
-    ]
+    linhas = list(linhas_por_palete_shipment.values())
 
-    colunas_fila = COLUNAS_RESULTADO + ["UF", "Cidade", "Origem", "Status"]
+    colunas_fila = ["Palete"] + COLUNAS_RESULTADO + ["UF", "Cidade", "Origem", "Status"]
     tabela_completa = pd.DataFrame(linhas, columns=colunas_fila)
     tabela_completa = _adicionar_rota(tabela_completa)
-    colunas_base_completa = [
+    tabela_completa = _completar_rotas_por_palete(tabela_completa, log=log)
+    colunas_base_completa = ["Palete"] + [
         coluna
         for coluna in COLUNAS_RESULTADO
         if coluna not in {"Destino", "Manifesto"}
@@ -857,20 +1057,53 @@ def montar_fila_emissao(
     status_final_emissao = tabela_completa["Status"].map(
         lambda valor: _normalizar_cabecalho(valor) == "EMISSAO"
     )
+    etiquetas_status_fora_fila = 0
+    for indice, linha in tabela_completa.iterrows():
+        etiquetas = [
+            etiqueta.strip()
+            for etiqueta in str(linha["Etiquetas do pedido"]).splitlines()
+            if etiqueta.strip()
+        ]
+        status = _normalizar_valor(linha["Status"])
+        vai_para_fila = bool(status_final_emissao.loc[indice])
+        _log_performance_emissao(
+            log,
+            f"Classificação — Palete '{linha['Palete']}', ShipmentId "
+            f"{linha['ShipmentId']}, CTE '{linha['CTE']}', Status "
+            f"'{status or 'SEM STATUS'}': "
+            f"{'INCLUÍDO NA FILA EMISSAO' if vai_para_fila else 'FORA DA FILA'}; "
+            f"Rota '{linha['Rota']}', Destino '{linha['Destino']}', "
+            f"{len(etiquetas)} etiqueta(s): {', '.join(etiquetas)}.",
+        )
+        if not vai_para_fila and etiquetas:
+            motivo = (
+                f"Status '{status}' diferente de EMISSAO"
+                if status
+                else "Status ausente"
+            )
+            novas = registrar_etiquetas_romaneio(
+                etiquetas,
+                contexto=(
+                    f"pedido fora da fila — Palete '{linha['Palete']}', "
+                    f"ShipmentId {linha['ShipmentId']}, motivo: {motivo}"
+                ),
+                log=log,
+            )
+            etiquetas_status_fora_fila += len(novas)
     tabela_base_completa = tabela_completa.reset_index(drop=True)
-    colunas_fila_emissao = COLUNAS_RESULTADO + ["Rota", "Origem", "Status"]
+    colunas_fila_emissao = ["Palete"] + COLUNAS_RESULTADO + ["Rota", "Origem", "Status"]
     tabela = tabela_completa.loc[
         status_final_emissao,
         colunas_fila_emissao,
     ].reset_index(drop=True)
-    shipment_ids_fora_emissao = tabela_completa.loc[
+    shipment_ids_fora_emissao = list(dict.fromkeys(tabela_completa.loc[
         ~status_final_emissao,
         "ShipmentId",
-    ].astype(str).tolist()
-    shipment_ids_sem_status = tabela_completa.loc[
+    ].astype(str).tolist()))
+    shipment_ids_sem_status = list(dict.fromkeys(tabela_completa.loc[
         tabela_completa["Status"].fillna("").astype(str).str.strip().eq(""),
         "ShipmentId",
-    ].astype(str).tolist()
+    ].astype(str).tolist()))
 
     if log is not None:
         log(
@@ -878,9 +1111,13 @@ def montar_fila_emissao(
             f"{nome_aba}; cabeçalho na linha {linha_cabecalho}."
         )
         log(
-            f"Etiquetas: {sum(len(pedido['ETIQUETAS']) for pedido in pedidos)} "
-            f"em {len(pedidos)} ShipmentId(s); pedidos com Status final EMISSAO "
-            f"mantidos após atualização: {len(tabela)}."
+            f"Etiquetas: {total_etiquetas_importadas} importada(s), "
+            f"{etiquetas_ja_registradas} já registrada(s) em execuções anteriores, "
+            f"{etiquetas_status_fora_fila} registrada(s) agora por status fora da fila; "
+            f"{sum(len(pedido['ETIQUETAS']) for pedido in pedidos)} "
+            f"em {len(pedidos)} ShipmentId(s) e "
+            f"{tabela_completa['Palete'].nunique()} palete(s); linhas com Status "
+            f"final EMISSAO mantidas após atualização: {len(tabela)}."
         )
         if shipment_ids_fora_emissao:
             log(
@@ -892,20 +1129,26 @@ def montar_fila_emissao(
                 f"{len(shipment_ids_sem_match)} ShipmentId(s) ausentes da "
                 "Performance foram consultados individualmente no Fraction."
             )
-    sem_retorno = [
+    sem_retorno = list(dict.fromkeys([
         shipment_id
         for shipment_id in shipment_ids_sem_match
         if not _normalizar_valor(
             resultados_consulta.get(shipment_id, {}).get("CTE")
         )
-    ]
-    sem_destino = [
+    ]))
+    sem_destino = list(dict.fromkeys([
         shipment_id
         for shipment_id in shipment_ids_sem_match
         if not _normalizar_valor(
-            linhas_por_shipment.get(shipment_id, {}).get("Destino")
+            next(
+                (
+                    linha.get("Destino")
+                    for linha in linhas_por_shipment.get(shipment_id, [])
+                ),
+                "",
+            )
         )
-    ]
+    ]))
     if log is not None:
         if sem_retorno:
             log(
@@ -931,6 +1174,8 @@ def montar_fila_emissao(
         "shipment_ids_sem_destino_performance": sem_destino,
         "shipment_ids_sem_status_performance": shipment_ids_sem_status,
         "shipment_ids_fora_emissao": shipment_ids_fora_emissao,
+        "etiquetas_ja_registradas": etiquetas_ja_registradas,
+        "etiquetas_status_fora_fila": etiquetas_status_fora_fila,
         "shipment_ids_etiquetas": len(tabela),
         "total_etiquetas": int(tabela["Volumes Etiquetas"].sum()),
     }

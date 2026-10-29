@@ -130,6 +130,10 @@ BASES_DIARIAS_ANALITICO = _caminho_configuravel(
 PERFIL_ZENDESK = PASTA_PERFIS / "gerar_tickets_zendesk" / "chromium"
 
 ESTADO_ZENDESK = PASTA_ESTADO / "gerar_tickets_zendesk"
+ESTADO_GERAR_ROMANEIOS_EMISSAO = PASTA_ESTADO / "gerar_romaneios_emissao"
+ARQUIVO_ETIQUETAS_ROMANEIOS_EMISSAO = (
+    ESTADO_GERAR_ROMANEIOS_EMISSAO / "etiquetas_processadas.txt"
+)
 ARQUIVO_PEDIDOS_COM_TICKET = (
     ESTADO_ZENDESK
     / "pedidos_com_ticket.txt"

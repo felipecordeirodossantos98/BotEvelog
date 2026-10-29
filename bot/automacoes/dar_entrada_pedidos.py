@@ -50,6 +50,11 @@ PADRAO_BLOCO_SHIPMENT_TXT = re.compile(
     r"(?:\s*\(\s*(\d+)\s+etiqueta\(s\)\s*\))?\s*$",
     flags=re.IGNORECASE,
 )
+PADRAO_BLOCO_PALETE_TXT = re.compile(
+    r"^PAL[EÉ]TE\s+(.+?)\s*[·•]\s*(\d+)\s+etiqueta\(s\)"
+    r"\s*[·•]\s*(\d+)\s+Shipment\s+ID\(s\)\s*$",
+    flags=re.IGNORECASE,
+)
 PADRAO_VOLUME_TOTAL = re.compile(r"^0*1\s*/\s*0*(\d+)\s*$")
 PADRAO_NUMEROS_ROMANEIO = re.compile(r"\s*[,;\n\r]+\s*|\s+")
 MAX_TENTATIVAS_CONSULTA_ROMANEIOS = 3
@@ -974,7 +979,11 @@ def _localizar_coluna(df: pd.DataFrame, nome: str) -> object | None:
     return None
 
 
-def agrupar_etiquetas(texto: str | bytes) -> list[dict[str, object]]:
+def agrupar_etiquetas(
+    texto: str | bytes,
+    *,
+    identificador_fonte: str = "",
+) -> list[dict[str, object]]:
     """Agrupa etiquetas em TXT simples ou na exportação estruturada do Coletor."""
     if isinstance(texto, bytes):
         texto = texto.decode("utf-8-sig")
@@ -989,7 +998,10 @@ def agrupar_etiquetas(texto: str | bytes) -> list[dict[str, object]]:
         linha.strip().casefold().startswith("coletor evelog")
         for linha in linhas
     ):
-        return _agrupar_etiquetas_export_coletor(linhas)
+        return _agrupar_etiquetas_export_coletor(
+            linhas,
+            identificador_fonte=identificador_fonte,
+        )
 
     pedidos: OrderedDict[str, list[str]] = OrderedDict()
     linhas_invalidas: list[int] = []
@@ -1023,6 +1035,7 @@ def agrupar_etiquetas(texto: str | bytes) -> list[dict[str, object]]:
             "ShipmentId": shipment_id,
             "ETIQUETAS": etiquetas,
             "VOLUMES_ETIQUETAS": len(etiquetas),
+            "ETIQUETAS_POR_PALETE": {"Sem palete": list(etiquetas)},
         }
         for shipment_id, etiquetas in pedidos.items()
     ]
@@ -1036,7 +1049,10 @@ def agrupar_etiquetas_importadas(
 ) -> list[dict[str, object]]:
     """Lê um TXT ou reúne as etiquetas extraídas de todos os TXT de um ZIP."""
     if not nome_arquivo.casefold().endswith(".zip"):
-        return agrupar_etiquetas(conteudo)
+        return agrupar_etiquetas(
+            conteudo,
+            identificador_fonte=Path(nome_arquivo).stem,
+        )
 
     try:
         with ZipFile(BytesIO(conteudo)) as arquivo_zip:
@@ -1053,11 +1069,14 @@ def agrupar_etiquetas_importadas(
             if not arquivos_txt:
                 raise ValueError("O ZIP não contém arquivos TXT de etiquetas.")
 
-            etiquetas_por_shipment: OrderedDict[str, list[str]] = OrderedDict()
+            pedidos_por_shipment: OrderedDict[str, dict[str, object]] = OrderedDict()
             total_etiquetas = 0
             for membro in arquivos_txt:
                 try:
-                    pedidos_arquivo = agrupar_etiquetas(arquivo_zip.read(membro))
+                    pedidos_arquivo = agrupar_etiquetas(
+                        arquivo_zip.read(membro),
+                        identificador_fonte=PurePosixPath(membro.filename).with_suffix("").as_posix(),
+                    )
                 except Exception as erro:
                     raise ValueError(
                         f"Não foi possível processar '{membro.filename}' dentro do ZIP: "
@@ -1067,7 +1086,20 @@ def agrupar_etiquetas_importadas(
                 for pedido in pedidos_arquivo:
                     shipment_id = str(pedido["ShipmentId"])
                     etiquetas = list(pedido["ETIQUETAS"])
-                    etiquetas_por_shipment.setdefault(shipment_id, []).extend(etiquetas)
+                    consolidado = pedidos_por_shipment.setdefault(
+                        shipment_id,
+                        {"ETIQUETAS": [], "ETIQUETAS_POR_PALETE": OrderedDict()},
+                    )
+                    consolidado["ETIQUETAS"].extend(etiquetas)
+                    etiquetas_por_palete = pedido.get(
+                        "ETIQUETAS_POR_PALETE",
+                        {"Sem palete": etiquetas},
+                    )
+                    por_palete_consolidado = consolidado["ETIQUETAS_POR_PALETE"]
+                    for palete, etiquetas_palete in etiquetas_por_palete.items():
+                        por_palete_consolidado.setdefault(palete, []).extend(
+                            etiquetas_palete
+                        )
                     total_etiquetas += len(etiquetas)
 
     except BadZipFile as erro:
@@ -1082,10 +1114,11 @@ def agrupar_etiquetas_importadas(
     pedidos = [
         {
             "ShipmentId": shipment_id,
-            "ETIQUETAS": etiquetas,
-            "VOLUMES_ETIQUETAS": len(etiquetas),
+            "ETIQUETAS": dados["ETIQUETAS"],
+            "VOLUMES_ETIQUETAS": len(dados["ETIQUETAS"]),
+            "ETIQUETAS_POR_PALETE": dict(dados["ETIQUETAS_POR_PALETE"]),
         }
-        for shipment_id, etiquetas in etiquetas_por_shipment.items()
+        for shipment_id, dados in pedidos_por_shipment.items()
     ]
     if log is not None:
         log(
@@ -1097,9 +1130,15 @@ def agrupar_etiquetas_importadas(
 
 def _agrupar_etiquetas_export_coletor(
     linhas: list[str],
+    *,
+    identificador_fonte: str = "",
 ) -> list[dict[str, object]]:
-    secoes: list[tuple[str, int | None, list[str], int]] = []
-    secao_atual: tuple[str, int | None, list[str], int] | None = None
+    secoes: list[tuple[str, int | None, list[str], int, str]] = []
+    secao_atual: tuple[str, int | None, list[str], int, str] | None = None
+    palete_atual = "Sem palete"
+    lote = ""
+    paletes_declarados: dict[str, tuple[int, int]] = {}
+    quantidade_paletes_declarada: int | None = None
     quantidade_shipments_declarada: int | None = None
     quantidade_etiquetas_declarada: int | None = None
     linhas_invalidas: list[int] = []
@@ -1108,6 +1147,39 @@ def _agrupar_etiquetas_export_coletor(
     for numero_linha, linha in enumerate(linhas, start=1):
         texto_linha = linha.strip()
         if not texto_linha:
+            continue
+
+        encontrado_total_paletes = re.fullmatch(
+            r"Paletes\s*:\s*(\d+)",
+            texto_linha,
+            flags=re.IGNORECASE,
+        )
+        if encontrado_total_paletes:
+            quantidade_paletes_declarada = int(encontrado_total_paletes.group(1))
+            continue
+
+        encontrado_lote = re.fullmatch(
+            r"Lote\s*:\s*(.+)",
+            texto_linha,
+            flags=re.IGNORECASE,
+        )
+        if encontrado_lote:
+            lote = encontrado_lote.group(1).strip()
+            continue
+
+        encontrado_palete = PADRAO_BLOCO_PALETE_TXT.fullmatch(texto_linha)
+        if encontrado_palete:
+            identificador_palete = encontrado_palete.group(1).strip()
+            rotulo_palete = f"Palete {identificador_palete}"
+            componentes = [parte for parte in (identificador_fonte, lote) if parte]
+            if componentes:
+                rotulo_palete = " · ".join(componentes + [rotulo_palete])
+            palete_atual = rotulo_palete
+            paletes_declarados[palete_atual] = (
+                int(encontrado_palete.group(2)),
+                int(encontrado_palete.group(3)),
+            )
+            secao_atual = None
             continue
 
         encontrado_secao = PADRAO_BLOCO_SHIPMENT_TXT.fullmatch(texto_linha)
@@ -1119,6 +1191,7 @@ def _agrupar_etiquetas_export_coletor(
                 else None,
                 [],
                 numero_linha,
+                palete_atual,
             )
             secoes.append(secao_atual)
             continue
@@ -1151,14 +1224,37 @@ def _agrupar_etiquetas_export_coletor(
         if re.match(r"^\d{14}\$", texto_linha):
             linhas_invalidas.append(numero_linha)
 
-    pedidos: OrderedDict[str, list[str]] = OrderedDict()
+    pedidos: OrderedDict[str, dict[str, object]] = OrderedDict()
     divergencias_secoes: list[str] = []
-    for shipment_id, quantidade_declarada, etiquetas, linha_secao in secoes:
-        pedidos.setdefault(shipment_id, []).extend(etiquetas)
+    etiquetas_por_palete: dict[str, int] = defaultdict(int)
+    shipments_por_palete: dict[str, set[str]] = defaultdict(set)
+    for shipment_id, quantidade_declarada, etiquetas, linha_secao, palete in secoes:
+        pedido = pedidos.setdefault(
+            shipment_id,
+            {"ETIQUETAS": [], "ETIQUETAS_POR_PALETE": OrderedDict()},
+        )
+        pedido["ETIQUETAS"].extend(etiquetas)
+        pedido["ETIQUETAS_POR_PALETE"].setdefault(palete, []).extend(etiquetas)
+        etiquetas_por_palete[palete] += len(etiquetas)
+        shipments_por_palete[palete].add(shipment_id)
         if quantidade_declarada is not None and len(etiquetas) != quantidade_declarada:
             divergencias_secoes.append(
                 f"ShipmentId {shipment_id}, bloco na linha {linha_secao}: "
                 f"esperadas {quantidade_declarada} etiqueta(s), encontradas {len(etiquetas)}"
+            )
+
+    for palete, (etiquetas_declaradas, shipments_declarados) in paletes_declarados.items():
+        etiquetas_encontradas = etiquetas_por_palete.get(palete, 0)
+        shipments_encontrados = len(shipments_por_palete.get(palete, set()))
+        if etiquetas_encontradas != etiquetas_declaradas:
+            divergencias_secoes.append(
+                f"{palete}: esperadas {etiquetas_declaradas} etiqueta(s), "
+                f"encontradas {etiquetas_encontradas}"
+            )
+        if shipments_encontrados != shipments_declarados:
+            divergencias_secoes.append(
+                f"{palete}: esperados {shipments_declarados} Shipment ID(s), "
+                f"encontrados {shipments_encontrados}"
             )
 
     if linhas_invalidas:
@@ -1182,7 +1278,10 @@ def _agrupar_etiquetas_export_coletor(
             + ("; ..." if len(divergencias_secoes) > 5 else ".")
         )
 
-    total_etiquetas = sum(len(etiquetas) for etiquetas in pedidos.values())
+    total_etiquetas = sum(
+        len(dados["ETIQUETAS"])
+        for dados in pedidos.values()
+    )
     if (
         quantidade_shipments_declarada is not None
         and quantidade_shipments_declarada != len(pedidos)
@@ -1194,12 +1293,22 @@ def _agrupar_etiquetas_export_coletor(
         )
     if (
         quantidade_etiquetas_declarada is not None
-        and quantidade_etiquetas_declarada != total_etiquetas
+        and quantidade_etiquetas_declarada
+        != sum(etiquetas_por_palete.values())
     ):
         raise ValueError(
             "O total de etiquetas informado no cabeçalho do TXT "
             f"({quantidade_etiquetas_declarada}) difere das etiquetas extraídas "
-            f"({total_etiquetas})."
+            f"({sum(etiquetas_por_palete.values())})."
+        )
+    if (
+        quantidade_paletes_declarada is not None
+        and quantidade_paletes_declarada != len(paletes_declarados)
+    ):
+        raise ValueError(
+            "O total de paletes informado no cabeçalho do TXT "
+            f"({quantidade_paletes_declarada}) difere dos paletes encontrados "
+            f"({len(paletes_declarados)})."
         )
     if not total_etiquetas:
         raise ValueError("O TXT não contém etiquetas válidas para consultar.")
@@ -1207,10 +1316,11 @@ def _agrupar_etiquetas_export_coletor(
     return [
         {
             "ShipmentId": shipment_id,
-            "ETIQUETAS": etiquetas,
-            "VOLUMES_ETIQUETAS": len(etiquetas),
+            "ETIQUETAS": dados["ETIQUETAS"],
+            "VOLUMES_ETIQUETAS": len(dados["ETIQUETAS"]),
+            "ETIQUETAS_POR_PALETE": dict(dados["ETIQUETAS_POR_PALETE"]),
         }
-        for shipment_id, etiquetas in pedidos.items()
+        for shipment_id, dados in pedidos.items()
     ]
 
 
