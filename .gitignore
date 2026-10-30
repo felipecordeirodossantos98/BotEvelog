@@ -61,6 +61,7 @@ bot/**/perfil_jadlog/
 bot/**/chromium/
 
 # Temporários
+/tmp/
 *.tmp
 *.temp
 *.part
