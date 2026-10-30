@@ -27,7 +27,7 @@ from automacoes.dar_entrada_pedidos import (
 )
 from servicos.fraction import (
     carregar_codigos_preferenciais_unidades,
-    carregar_regras_rotas_localidade,
+    carregar_regras_rotas_com_destino_e_triagem,
 )
 from utils.config import (
     ARQUIVO_ETIQUETAS_ROMANEIOS_EMISSAO,
@@ -425,37 +425,58 @@ def carregar_codigos_preferenciais_unidades_emissao() -> dict[str, str]:
 
 
 def _adicionar_rota(tabela: pd.DataFrame) -> pd.DataFrame:
-    rotas_por_uf, rotas_por_cidade = carregar_regras_rotas_localidade()
+    (
+        rotas_por_uf,
+        rotas_por_cidade,
+        rotas_por_destino,
+        triagens_por_uf,
+        triagens_por_cidade,
+        triagens_por_destino,
+    ) = carregar_regras_rotas_com_destino_e_triagem()
     resultado = tabela.copy()
 
-    def resolver(linha: pd.Series) -> str:
+    def resolver(linha: pd.Series) -> tuple[str, str]:
         uf = _normalizar_uf(linha.get("UF", ""))
         cidade = _normalizar_rota(_normalizar_valor(linha.get("Cidade", "")))
         rota_cidade = rotas_por_cidade.get(cidade, "")
         if rota_cidade:
-            return rota_cidade
+            return rota_cidade, triagens_por_cidade.get(cidade, "")
         rota_uf = rotas_por_uf.get(uf, "")
         if rota_uf:
-            return rota_uf
-        return "Sem rota"
+            return rota_uf, triagens_por_uf.get(uf, "")
+        destino = _normalizar_rota(_normalizar_valor(linha.get("Destino", "")))
+        rota_destino = rotas_por_destino.get(destino, "")
+        if rota_destino:
+            return rota_destino, triagens_por_destino.get(destino, "")
+        return "Sem rota", ""
 
-    resultado["Rota"] = resultado.apply(resolver, axis=1)
+    resolvidos = resultado.apply(resolver, axis=1)
+    resultado["Rota"] = resolvidos.map(lambda item: item[0])
+    resultado["Triagem"] = resolvidos.map(lambda item: item[1])
     return resultado
 
 
-def _completar_rotas_por_palete(
+def _completar_rotas_por_rua_triagem(
     tabela: pd.DataFrame,
     *,
     log: Callable[[str], None] | None = None,
 ) -> pd.DataFrame:
-    """Aplica a rota conhecida do palete às linhas sem rota quando é única."""
+    """Completa a unidade somente dentro da mesma rua e triagem literal."""
     resultado = tabela.copy()
-    if resultado.empty or "Palete" not in resultado or "Rota" not in resultado:
+    if resultado.empty or "Rua" not in resultado or "Rota" not in resultado:
         return resultado
 
     rotas_sem_valor = {"", "SEM ROTA"}
     rotas_nao_inferiveis = rotas_sem_valor | {"ROTA AMBIGUA"}
-    for palete, indices in resultado.groupby("Palete", sort=False, dropna=False).groups.items():
+    colunas_grupo = ["Rua"]
+    if "Triagem" in resultado:
+        colunas_grupo.append("Triagem")
+    grupos = resultado.groupby(colunas_grupo, sort=False, dropna=False).groups
+    for identificadores, indices in grupos.items():
+        if not isinstance(identificadores, tuple):
+            identificadores = (identificadores,)
+        rua = str(identificadores[0])
+        triagem = str(identificadores[1]) if len(identificadores) > 1 else ""
         rotas_conhecidas: dict[str, str] = {}
         for valor in resultado.loc[indices, "Rota"]:
             rota = _normalizar_valor(valor)
@@ -473,16 +494,17 @@ def _completar_rotas_por_palete(
             resultado.loc[indices_faltantes, "Rota"] = rota
             _log_performance_emissao(
                 log,
-                f"Palete '{palete}': rota '{rota}' aplicada a "
+                f"{rua} / {triagem or 'sem triagem'}: unidade '{rota}' aplicada a "
                 f"{len(indices_faltantes)} pedido(s) sem rota, usando os "
-                "pedidos roteados do mesmo palete.",
+                "pedidos da mesma rua e triagem.",
             )
         elif len(rotas_conhecidas) > 1 and faltantes.any():
             _log_performance_emissao(
                 log,
-                f"Palete '{palete}' tem mais de uma rota conhecida; "
+                f"{rua} / {triagem or 'sem triagem'} tem mais de uma unidade "
+                "conhecida; "
                 f"{int(faltantes.sum())} pedido(s) sem rota não foram inferidos. "
-                "Rotas encontradas: "
+                "Unidades encontradas: "
                 + ", ".join(rotas_conhecidas.values()),
             )
 
@@ -823,7 +845,7 @@ def montar_fila_emissao(
     )
     total_paletes_importados = len(
         {
-            str(palete)
+            (str(pedido.get("RUA_POR_PALETE", {}).get(palete, "")), str(palete))
             for pedido in pedidos
             for palete in pedido.get("ETIQUETAS_POR_PALETE", {})
         }
@@ -832,17 +854,25 @@ def montar_fila_emissao(
         log,
         f"Montagem detalhada da fila iniciada: {len(pedidos)} ShipmentId(s), "
         f"{total_etiquetas_importadas} etiqueta(s), "
-        f"{total_paletes_importados} palete(s).",
+        f"{total_paletes_importados} grupo(s) de rua/palete.",
     )
     for pedido in pedidos:
         shipment_id = str(pedido["ShipmentId"])
         mapa_paletes = pedido.get("ETIQUETAS_POR_PALETE") or {
             "Sem palete": pedido["ETIQUETAS"]
         }
+        ruas_por_palete = pedido.get("RUA_POR_PALETE", {})
         for palete, etiquetas in mapa_paletes.items():
+            rua = str(ruas_por_palete.get(palete, "")).strip()
+            if not rua:
+                raise ValueError(
+                    f"Não identifiquei a rua do arquivo que contém o palete "
+                    f"'{palete}'. Inclua 'Rua 1' (ou o número correspondente) "
+                    "no nome/caminho do TXT dentro do ZIP ou no cabeçalho do TXT."
+                )
             _log_performance_emissao(
                 log,
-                f"TXT lido — Palete '{palete}', ShipmentId {shipment_id}, "
+                f"TXT lido — {rua}, palete '{palete}', ShipmentId {shipment_id}, "
                 f"{len(etiquetas)} etiqueta(s): {', '.join(etiquetas)}.",
             )
 
@@ -933,13 +963,14 @@ def montar_fila_emissao(
             log=log_consulta,
         )
 
-    linhas_por_palete_shipment: dict[tuple[str, str], dict[str, object]] = {}
+    linhas_por_rua_palete_shipment: dict[tuple[str, str, str], dict[str, object]] = {}
     linhas_por_shipment: dict[str, list[dict[str, object]]] = {}
     for pedido in pedidos:
         shipment_id = str(pedido["ShipmentId"])
         etiquetas_por_palete = pedido.get("ETIQUETAS_POR_PALETE")
         if not isinstance(etiquetas_por_palete, dict) or not etiquetas_por_palete:
             etiquetas_por_palete = {"Sem palete": pedido["ETIQUETAS"]}
+        ruas_por_palete = pedido.get("RUA_POR_PALETE", {})
 
         registro = registros_unicos_por_shipment.get(shipment_id)
         if registro is not None:
@@ -970,6 +1001,13 @@ def montar_fila_emissao(
             origem = "Consulta"
 
         for palete, etiquetas_brutas in etiquetas_por_palete.items():
+            rua = str(ruas_por_palete.get(palete, "")).strip()
+            if not rua:
+                raise ValueError(
+                    f"Não identifiquei a rua do arquivo que contém o palete "
+                    f"'{palete}'. Inclua 'Rua 1' (ou o número correspondente) "
+                    "no nome/caminho do TXT dentro do ZIP ou no cabeçalho do TXT."
+                )
             etiquetas = sorted(
                 list(etiquetas_brutas),
                 key=lambda etiqueta: int(
@@ -982,7 +1020,8 @@ def montar_fila_emissao(
                 else ""
             )
             linha_palete = {
-                "Palete": str(palete),
+                "Rua": rua,
+                "Palete de origem": str(palete),
                 "CTE": codigo,
                 "ShipmentId": shipment_id,
                 "Etiquetas do pedido": "\n".join(etiquetas),
@@ -1001,11 +1040,11 @@ def montar_fila_emissao(
                 "Origem": origem,
                 "Status": status,
             }
-            linhas_por_palete_shipment[(str(palete), shipment_id)] = linha_palete
+            linhas_por_rua_palete_shipment[(rua, str(palete), shipment_id)] = linha_palete
             linhas_por_shipment.setdefault(shipment_id, []).append(linha_palete)
             _log_performance_emissao(
                 log,
-                f"Linha montada — Palete '{palete}', ShipmentId {shipment_id}, "
+                f"Linha montada — {rua}, palete '{palete}', ShipmentId {shipment_id}, "
                 f"CTE '{codigo}', {len(etiquetas)} etiqueta(s), "
                 f"{len(ctes_para_entrada.splitlines())} CTE(s) para envio, "
                 f"Status '{status or 'SEM STATUS'}', Destino '{destino or 'SEM DESTINO'}'. "
@@ -1013,7 +1052,10 @@ def montar_fila_emissao(
             )
 
     shipment_ids_fila = list(
-        dict.fromkeys(shipment_id for _, shipment_id in linhas_por_palete_shipment)
+        dict.fromkeys(
+            shipment_id
+            for _, _, shipment_id in linhas_por_rua_palete_shipment
+        )
     )
     ctes_por_shipment = {
         shipment_id: _normalizar_valor(
@@ -1042,17 +1084,34 @@ def montar_fila_emissao(
             if dados_performance.get("Cidade"):
                 linha_fila["Cidade"] = dados_performance["Cidade"]
 
-    linhas = list(linhas_por_palete_shipment.values())
+    linhas = list(linhas_por_rua_palete_shipment.values())
 
-    colunas_fila = ["Palete"] + COLUNAS_RESULTADO + ["UF", "Cidade", "Origem", "Status"]
+    colunas_fila = ["Rua", "Palete de origem"] + COLUNAS_RESULTADO + [
+        "UF",
+        "Cidade",
+        "Origem",
+        "Status",
+    ]
     tabela_completa = pd.DataFrame(linhas, columns=colunas_fila)
     tabela_completa = _adicionar_rota(tabela_completa)
-    tabela_completa = _completar_rotas_por_palete(tabela_completa, log=log)
-    colunas_base_completa = ["Palete"] + [
+    tabela_completa = _completar_rotas_por_rua_triagem(
+        tabela_completa,
+        log=log,
+    )
+    colunas_base_completa = ["Rua", "Palete de origem"] + [
         coluna
         for coluna in COLUNAS_RESULTADO
         if coluna not in {"Destino", "Manifesto"}
-    ] + ["UF", "Cidade", "Destino", "Rota", "Manifesto", "Origem", "Status"]
+    ] + [
+        "UF",
+        "Cidade",
+        "Destino",
+        "Triagem",
+        "Rota",
+        "Manifesto",
+        "Origem",
+        "Status",
+    ]
     tabela_completa = tabela_completa[colunas_base_completa]
     status_final_emissao = tabela_completa["Status"].map(
         lambda valor: _normalizar_cabecalho(valor) == "EMISSAO"
@@ -1068,7 +1127,9 @@ def montar_fila_emissao(
         vai_para_fila = bool(status_final_emissao.loc[indice])
         _log_performance_emissao(
             log,
-            f"Classificação — Palete '{linha['Palete']}', ShipmentId "
+            f"Classificação — {linha['Rua']} / triagem "
+            f"'{linha['Triagem'] or 'SEM TRIAGEM'}', palete "
+            f"'{linha['Palete de origem']}', ShipmentId "
             f"{linha['ShipmentId']}, CTE '{linha['CTE']}', Status "
             f"'{status or 'SEM STATUS'}': "
             f"{'INCLUÍDO NA FILA EMISSAO' if vai_para_fila else 'FORA DA FILA'}; "
@@ -1084,14 +1145,20 @@ def montar_fila_emissao(
             novas = registrar_etiquetas_romaneio(
                 etiquetas,
                 contexto=(
-                    f"pedido fora da fila — Palete '{linha['Palete']}', "
+                    f"pedido fora da fila — {linha['Rua']} / triagem "
+                    f"'{linha['Triagem']}', palete '{linha['Palete de origem']}', "
                     f"ShipmentId {linha['ShipmentId']}, motivo: {motivo}"
                 ),
                 log=log,
             )
             etiquetas_status_fora_fila += len(novas)
     tabela_base_completa = tabela_completa.reset_index(drop=True)
-    colunas_fila_emissao = ["Palete"] + COLUNAS_RESULTADO + ["Rota", "Origem", "Status"]
+    colunas_fila_emissao = ["Rua", "Palete de origem"] + COLUNAS_RESULTADO + [
+        "Triagem",
+        "Rota",
+        "Origem",
+        "Status",
+    ]
     tabela = tabela_completa.loc[
         status_final_emissao,
         colunas_fila_emissao,
@@ -1116,7 +1183,8 @@ def montar_fila_emissao(
             f"{etiquetas_status_fora_fila} registrada(s) agora por status fora da fila; "
             f"{sum(len(pedido['ETIQUETAS']) for pedido in pedidos)} "
             f"em {len(pedidos)} ShipmentId(s) e "
-            f"{tabela_completa['Palete'].nunique()} palete(s); linhas com Status "
+            f"{tabela_completa[['Rua', 'Palete de origem']].drop_duplicates().shape[0]} "
+            "grupo(s) de rua/palete; linhas com Status "
             f"final EMISSAO mantidas após atualização: {len(tabela)}."
         )
         if shipment_ids_fora_emissao:

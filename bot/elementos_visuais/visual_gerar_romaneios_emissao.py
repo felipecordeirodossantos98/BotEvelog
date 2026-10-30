@@ -14,7 +14,7 @@ from servicos.fraction import (
     associar_destinos_fraction,
     carregar_codigos_preferenciais_unidades,
     carregar_destinos_fraction,
-    carregar_regras_rotas_localidade,
+    carregar_regras_rotas_com_destino_e_triagem,
     executar_manifestos_romaneios,
     enviar_pdf_para_impressora_padrao,
     mapear_rotas_para_grupos,
@@ -64,9 +64,14 @@ def _normalizar_rota(valor: object) -> str:
 def _montar_tabela_rotas_json(
     unidades_relevantes: set[str],
 ) -> pd.DataFrame:
-    rotas_por_uf, rotas_por_cidade = carregar_regras_rotas_localidade(
-        ARQUIVO_ROTAS_ROMANEIOS
-    )
+    (
+        rotas_por_uf,
+        rotas_por_cidade,
+        rotas_por_destino,
+        triagens_por_uf,
+        triagens_por_cidade,
+        triagens_por_destino,
+    ) = carregar_regras_rotas_com_destino_e_triagem(ARQUIVO_ROTAS_ROMANEIOS)
     codigos_preferenciais = carregar_codigos_preferenciais_unidades()
     relevantes = {_normalizar_rota(unidade) for unidade in unidades_relevantes}
     linhas = []
@@ -80,6 +85,8 @@ def _montar_tabela_rotas_json(
                 "Unidade": unidade,
                 "UF": uf,
                 "Cidade": "Todas",
+                "Destino": "",
+                "Triagem": triagens_por_uf.get(uf, ""),
                 "Código preferencial": codigos_preferenciais.get(chave_unidade, ""),
             }
         )
@@ -93,6 +100,23 @@ def _montar_tabela_rotas_json(
                 "Unidade": unidade,
                 "UF": "",
                 "Cidade": cidade,
+                "Destino": "",
+                "Triagem": triagens_por_cidade.get(cidade, ""),
+                "Código preferencial": codigos_preferenciais.get(chave_unidade, ""),
+            }
+        )
+
+    for destino, unidade in rotas_por_destino.items():
+        chave_unidade = _normalizar_rota(unidade)
+        if chave_unidade not in relevantes:
+            continue
+        linhas.append(
+            {
+                "Unidade": unidade,
+                "UF": "",
+                "Cidade": "",
+                "Destino": destino,
+                "Triagem": triagens_por_destino.get(destino, ""),
                 "Código preferencial": codigos_preferenciais.get(chave_unidade, ""),
             }
         )
@@ -102,11 +126,19 @@ def _montar_tabela_rotas_json(
             _normalizar_rota(linha["Unidade"]),
             linha["UF"],
             _normalizar_rota(linha["Cidade"]),
+            _normalizar_rota(linha["Destino"]),
         )
     )
     return pd.DataFrame(
         linhas,
-        columns=["Unidade", "UF", "Cidade", "Código preferencial"],
+        columns=[
+            "Unidade",
+            "UF",
+            "Cidade",
+            "Destino",
+            "Triagem",
+            "Código preferencial",
+        ],
     )
 
 
@@ -333,7 +365,8 @@ def renderizar_gerar_romaneios_emissao() -> None:
         tabela,
     )
     configuracao_colunas_fila = {
-        "Palete": st.column_config.TextColumn("Palete"),
+        "Rua": st.column_config.TextColumn("Rua"),
+        "Palete de origem": st.column_config.TextColumn("Palete de origem"),
         "CTE": st.column_config.TextColumn("CTE"),
         "ShipmentId": st.column_config.TextColumn("ShipmentId"),
         "Etiquetas do pedido": st.column_config.TextColumn(
@@ -350,6 +383,7 @@ def renderizar_gerar_romaneios_emissao() -> None:
         "UF": st.column_config.TextColumn("UF"),
         "Cidade": st.column_config.TextColumn("Cidade"),
         "Destino": st.column_config.TextColumn("Destino"),
+        "Triagem": st.column_config.TextColumn("Triagem", width="large"),
         "Manifesto": st.column_config.TextColumn("Manifesto"),
         "Rota": st.column_config.TextColumn("Rota"),
         "Origem": st.column_config.TextColumn("Origem"),
@@ -389,15 +423,17 @@ def renderizar_gerar_romaneios_emissao() -> None:
             selecionados: list[str] = []
             for _, linha in divergencias.iterrows():
                 shipment_id = str(linha["ShipmentId"])
-                palete = str(linha.get("Palete", "Sem palete"))
-                token_confirmacao = f"{palete}\0{shipment_id}"
+                rua = str(linha.get("Rua", "Sem rua"))
+                triagem = str(linha.get("Triagem", "Sem triagem"))
+                palete = str(linha.get("Palete de origem", "Sem palete"))
+                token_confirmacao = f"{rua}\0{palete}\0{shipment_id}"
                 chave_checkbox = sha256(token_confirmacao.encode("utf-8")).hexdigest()[:16]
                 etiquetas_faltantes = str(linha["Etiquetas faltantes"] or "").strip()
                 quantidade_faltantes = (
                     len(etiquetas_faltantes.splitlines()) if etiquetas_faltantes else 0
                 )
                 autorizar = st.checkbox(
-                    f"Autorizar palete {palete} — ShipmentId {shipment_id}: "
+                    f"Autorizar {rua} / {triagem} — ShipmentId {shipment_id}: "
                     f"Volume na Performance "
                     f"{int(linha['Volumes Sistema'])}; etiquetas bipadas "
                     f"{int(linha['Volumes Etiquetas'])}; "
@@ -434,7 +470,9 @@ def renderizar_gerar_romaneios_emissao() -> None:
     confirmacoes = set(resultado_atual.get("confirmacoes", []))
     for indice, linha in tabela_envio.iterrows():
         token_confirmacao = (
-            f"{linha.get('Palete', 'Sem palete')}\0{linha['ShipmentId']}"
+            f"{linha.get('Rua', 'Sem rua')}\0"
+            f"{linha.get('Palete de origem', 'Sem palete')}\0"
+            f"{linha['ShipmentId']}"
         )
         if pd.isna(linha["Volumes Sistema"]):
             tabela_envio.at[indice, "CTEs para dar entrada"] = ""
@@ -447,14 +485,13 @@ def renderizar_gerar_romaneios_emissao() -> None:
             for linha in str(valor).splitlines()
         )
     )
-    rota_linha = tabela_envio["Rota"].fillna("").astype(str).str.strip()
     rota_original = tabela["Rota"].fillna("").astype(str).str.strip()
     sem_rota_ou_ambigua = tabela.loc[
         rota_original.isin({"", "Sem rota", "Rota ambígua"})
     ].copy()
-    grupos, _ = mapear_rotas_para_grupos(
+    grupos, grupos_ignorados = mapear_rotas_para_grupos(
         tabela_envio,
-        separar_por_palete=True,
+        separar_por_rua_triagem=True,
     )
     codigos_preferenciais = carregar_codigos_preferenciais_unidades_emissao()
     grupos_validos, destinos_pendentes = associar_destinos_fraction(
@@ -463,9 +500,26 @@ def renderizar_gerar_romaneios_emissao() -> None:
         codigos_preferenciais=codigos_preferenciais,
     )
 
+    chaves_grupos_prontos = {
+        (
+            _normalizar_rota(grupo.get("RUA", "")),
+            _normalizar_rota(grupo.get("TRIAGEM", "")),
+            _normalizar_rota(grupo["ROTA"]),
+        )
+        for grupo in grupos_validos
+    }
     rotas_prontas = {grupo["ROTA"] for grupo in grupos_validos}
+
+    def linha_em_grupo_pronto(linha: pd.Series) -> bool:
+        chave = (
+            _normalizar_rota(linha.get("Rua", "")),
+            _normalizar_rota(linha.get("Triagem", "")),
+            _normalizar_rota(linha.get("Rota", "")),
+        )
+        return chave in chaves_grupos_prontos
+
     prontos_para_envio = tabela_envio.loc[
-        tem_ctes_envio & rota_linha.isin(rotas_prontas)
+        tem_ctes_envio & tabela_envio.apply(linha_em_grupo_pronto, axis=1)
     ].copy()
     st.markdown("#### Prontos para envio")
     if prontos_para_envio.empty:
@@ -500,8 +554,13 @@ def renderizar_gerar_romaneios_emissao() -> None:
     }
     if destinos_pendentes:
         warning(
-            f"{len(destinos_pendentes)} rota(s) não têm unidade única no catálogo "
+            f"{len(destinos_pendentes)} grupo(s) não têm unidade única no catálogo "
             "do Fraction e ficarão fora do envio."
+        )
+    if grupos_ignorados:
+        warning(
+            f"{len(grupos_ignorados)} CTE(s) não entraram em romaneios porque "
+            "faltou unidade, Rua, triagem ou CTE válido."
         )
     if rotas_sem_unidade:
         tabela_mapa_rotas = _montar_tabela_rotas_json(rotas_sem_unidade)
@@ -515,6 +574,8 @@ def renderizar_gerar_romaneios_emissao() -> None:
                     "Unidade": st.column_config.TextColumn("Unidade"),
                     "UF": st.column_config.TextColumn("UF"),
                     "Cidade": st.column_config.TextColumn("Cidade"),
+                    "Destino": st.column_config.TextColumn("Destino"),
+                    "Triagem": st.column_config.TextColumn("Triagem", width="large"),
                     "Código preferencial": st.column_config.TextColumn(
                         "Código preferencial"
                     ),
@@ -525,7 +586,7 @@ def renderizar_gerar_romaneios_emissao() -> None:
     )
     st.caption(
         f"Prontos para envio: {quantidade_ctes} CTE(s) em "
-        f"{len(grupos_validos)} rota(s)."
+        f"{len(grupos_validos)} grupo(s) de Rua / triagem."
     )
 
     faltantes = avisar_variaveis_faltantes("gerar_romaneios")
@@ -559,7 +620,8 @@ def renderizar_gerar_romaneios_emissao() -> None:
             log("Usuário confirmou a prévia e iniciou a emissão dos romaneios.")
 
             def registrar_grupo_concluido(grupo: dict, caminho_pdf: Path) -> None:
-                palete = str(grupo.get("PALETE") or "Sem palete")
+                rua = str(grupo.get("RUA") or "Sem rua")
+                triagem = str(grupo.get("TRIAGEM") or "Sem triagem")
                 rota = str(grupo.get("ROTA") or "")
                 ctes_grupo = {
                     str(cte).strip()
@@ -568,7 +630,9 @@ def renderizar_gerar_romaneios_emissao() -> None:
                 }
                 etiquetas_grupo: list[str] = []
                 for _, linha in tabela_envio.iterrows():
-                    if str(linha.get("Palete", "Sem palete")) != palete:
+                    if str(linha.get("Rua", "Sem rua")) != rua:
+                        continue
+                    if str(linha.get("Triagem", "Sem triagem")) != triagem:
                         continue
                     if str(linha.get("Rota", "")) != rota:
                         continue
@@ -589,9 +653,10 @@ def renderizar_gerar_romaneios_emissao() -> None:
                         if valor.strip()
                     )
 
+                etiquetas_grupo = list(dict.fromkeys(etiquetas_grupo))
                 if not etiquetas_grupo:
                     raise RuntimeError(
-                        f"O romaneio do palete '{palete}' / rota '{rota}' foi salvo "
+                        f"O romaneio de {rua} / {triagem} / rota '{rota}' foi salvo "
                         "mas não foi possível associar suas etiquetas ao estado "
                         "persistente. O processamento foi interrompido para evitar "
                         "duplicidade silenciosa."
@@ -599,7 +664,7 @@ def renderizar_gerar_romaneios_emissao() -> None:
                 registrar_etiquetas_romaneio(
                     etiquetas_grupo,
                     contexto=(
-                        f"romaneio gerado — Palete '{palete}', rota '{rota}', "
+                        f"romaneio gerado — {rua} / {triagem}, rota '{rota}', "
                         f"PDF '{caminho_pdf}'"
                     ),
                     log=log,
@@ -613,7 +678,7 @@ def renderizar_gerar_romaneios_emissao() -> None:
                     nome_fontes,
                     tabela_previa=tabela_envio,
                     codigos_preferenciais=codigos_preferenciais,
-                    separar_por_palete=True,
+                    separar_por_rua_triagem=True,
                     pasta_destino_pdf=pasta_execucao_pdf,
                     ao_concluir_grupo=registrar_grupo_concluido,
                     log=log,

@@ -55,6 +55,11 @@ PADRAO_BLOCO_PALETE_TXT = re.compile(
     r"\s*[·•]\s*(\d+)\s+Shipment\s+ID\(s\)\s*$",
     flags=re.IGNORECASE,
 )
+PADRAO_IDENTIFICADOR_RUA = re.compile(
+    r"(?<![A-Z0-9])(?:RUA|CORREDOR)\s*[:#._-]?\s*0*(\d+[A-Z]?)"
+    r"(?![A-Z0-9])",
+    flags=re.IGNORECASE,
+)
 PADRAO_VOLUME_TOTAL = re.compile(r"^0*1\s*/\s*0*(\d+)\s*$")
 PADRAO_NUMEROS_ROMANEIO = re.compile(r"\s*[,;\n\r]+\s*|\s+")
 MAX_TENTATIVAS_CONSULTA_ROMANEIOS = 3
@@ -979,6 +984,27 @@ def _localizar_coluna(df: pd.DataFrame, nome: str) -> object | None:
     return None
 
 
+def _extrair_rua_etiquetas(
+    identificador_fonte: str,
+    linhas: list[str],
+) -> str:
+    """Obtém a rua do caminho/nome do TXT ou de um cabeçalho explícito."""
+    candidatos = PADRAO_IDENTIFICADOR_RUA.findall(identificador_fonte)
+    if not candidatos:
+        candidatos = [
+            encontrado.group(1)
+            for linha in linhas[:30]
+            if (encontrado := PADRAO_IDENTIFICADOR_RUA.search(linha.strip()))
+        ]
+    ruas = list(dict.fromkeys(valor.upper() for valor in candidatos))
+    if len(ruas) > 1:
+        raise ValueError(
+            "O TXT identifica mais de uma rua; cada arquivo da fila deve conter "
+            f"uma única rua: {', '.join(ruas)}."
+        )
+    return f"Rua {ruas[0]}" if ruas else ""
+
+
 def agrupar_etiquetas(
     texto: str | bytes,
     *,
@@ -998,6 +1024,11 @@ def agrupar_etiquetas(
         linha.strip().casefold().startswith("coletor evelog")
         for linha in linhas
     ):
+        if not secoes_exportadas:
+            return _agrupar_etiquetas_transferencia_simples(
+                linhas,
+                identificador_fonte=identificador_fonte,
+            )
         return _agrupar_etiquetas_export_coletor(
             linhas,
             identificador_fonte=identificador_fonte,
@@ -1030,14 +1061,117 @@ def agrupar_etiquetas(
     if not pedidos:
         raise ValueError("O TXT não contém etiquetas válidas para consultar.")
 
+    rua = _extrair_rua_etiquetas(identificador_fonte, linhas)
+    identificador_palete = " · ".join(
+        parte
+        for parte in (
+            rua,
+            identificador_fonte,
+            "Sem palete",
+        )
+        if parte
+    )
+
     return [
         {
             "ShipmentId": shipment_id,
             "ETIQUETAS": etiquetas,
             "VOLUMES_ETIQUETAS": len(etiquetas),
-            "ETIQUETAS_POR_PALETE": {"Sem palete": list(etiquetas)},
+            "ETIQUETAS_POR_PALETE": {identificador_palete: list(etiquetas)},
+            "RUA_POR_PALETE": {identificador_palete: rua},
         }
         for shipment_id, etiquetas in pedidos.items()
+    ]
+
+
+def _agrupar_etiquetas_transferencia_simples(
+    linhas: list[str],
+    *,
+    identificador_fonte: str = "",
+) -> list[dict[str, object]]:
+    """Lê a exportação atual: cabeçalho de lote seguido por etiquetas soltas."""
+    etiquetas_por_shipment: OrderedDict[str, list[str]] = OrderedDict()
+    quantidade_shipments_declarada: int | None = None
+    quantidade_etiquetas_declarada: int | None = None
+    lote = ""
+    linhas_invalidas: list[int] = []
+    total_etiquetas = 0
+
+    for numero_linha, linha in enumerate(linhas, start=1):
+        texto = linha.strip()
+        if not texto:
+            continue
+
+        encontrado_lote = re.fullmatch(r"Lote\s*:\s*(.+)", texto, re.IGNORECASE)
+        if encontrado_lote:
+            lote = encontrado_lote.group(1).strip()
+            continue
+
+        encontrado_total = re.fullmatch(
+            r"(Shipment\s+IDs|Etiquetas)\s*:\s*(\d+)",
+            texto,
+            re.IGNORECASE,
+        )
+        if encontrado_total:
+            quantidade = int(encontrado_total.group(2))
+            if encontrado_total.group(1).casefold().startswith("shipment"):
+                quantidade_shipments_declarada = quantidade
+            else:
+                quantidade_etiquetas_declarada = quantidade
+            continue
+
+        etiqueta = PADRAO_ETIQUETA.fullmatch(texto)
+        if etiqueta is not None and etiqueta.group(2) != "000":
+            shipment_id = etiqueta.group(1)
+            etiquetas_por_shipment.setdefault(shipment_id, []).append(texto)
+            total_etiquetas += 1
+            continue
+
+        if re.match(r"^\d{14}\$", texto):
+            linhas_invalidas.append(numero_linha)
+
+    if linhas_invalidas:
+        linhas_texto = ", ".join(str(numero) for numero in linhas_invalidas[:10])
+        sufixo = "..." if len(linhas_invalidas) > 10 else ""
+        raise ValueError(
+            "O TXT contém etiqueta(s) fora do formato esperado nas linha(s): "
+            f"{linhas_texto}{sufixo}."
+        )
+    if not etiquetas_por_shipment:
+        raise ValueError("O TXT não contém etiquetas válidas para consultar.")
+    if (
+        quantidade_shipments_declarada is not None
+        and quantidade_shipments_declarada != len(etiquetas_por_shipment)
+    ):
+        raise ValueError(
+            "O total de Shipment IDs informado no cabeçalho do TXT "
+            f"({quantidade_shipments_declarada}) difere dos ShipmentIds "
+            f"encontrados nas etiquetas ({len(etiquetas_por_shipment)})."
+        )
+    if (
+        quantidade_etiquetas_declarada is not None
+        and quantidade_etiquetas_declarada != total_etiquetas
+    ):
+        raise ValueError(
+            "O total de etiquetas informado no cabeçalho do TXT "
+            f"({quantidade_etiquetas_declarada}) difere das etiquetas "
+            f"encontradas ({total_etiquetas})."
+        )
+
+    rua = _extrair_rua_etiquetas(identificador_fonte, linhas)
+    origem = identificador_fonte or lote or "Transferência"
+    identificador_palete = " · ".join(
+        parte for parte in (rua, origem, "Etiquetas") if parte
+    )
+    return [
+        {
+            "ShipmentId": shipment_id,
+            "ETIQUETAS": etiquetas,
+            "VOLUMES_ETIQUETAS": len(etiquetas),
+            "ETIQUETAS_POR_PALETE": {identificador_palete: list(etiquetas)},
+            "RUA_POR_PALETE": {identificador_palete: rua},
+        }
+        for shipment_id, etiquetas in etiquetas_por_shipment.items()
     ]
 
 
@@ -1088,7 +1222,11 @@ def agrupar_etiquetas_importadas(
                     etiquetas = list(pedido["ETIQUETAS"])
                     consolidado = pedidos_por_shipment.setdefault(
                         shipment_id,
-                        {"ETIQUETAS": [], "ETIQUETAS_POR_PALETE": OrderedDict()},
+                        {
+                            "ETIQUETAS": [],
+                            "ETIQUETAS_POR_PALETE": OrderedDict(),
+                            "RUA_POR_PALETE": {},
+                        },
                     )
                     consolidado["ETIQUETAS"].extend(etiquetas)
                     etiquetas_por_palete = pedido.get(
@@ -1096,10 +1234,19 @@ def agrupar_etiquetas_importadas(
                         {"Sem palete": etiquetas},
                     )
                     por_palete_consolidado = consolidado["ETIQUETAS_POR_PALETE"]
+                    ruas_consolidadas = consolidado["RUA_POR_PALETE"]
+                    ruas_pedido = pedido.get("RUA_POR_PALETE", {})
                     for palete, etiquetas_palete in etiquetas_por_palete.items():
                         por_palete_consolidado.setdefault(palete, []).extend(
                             etiquetas_palete
                         )
+                        rua = str(ruas_pedido.get(palete, ""))
+                        rua_existente = ruas_consolidadas.get(palete)
+                        if rua_existente and rua and rua_existente != rua:
+                            raise ValueError(
+                                f"O palete '{palete}' foi associado a mais de uma rua."
+                            )
+                        ruas_consolidadas[palete] = rua or rua_existente or ""
                     total_etiquetas += len(etiquetas)
 
     except BadZipFile as erro:
@@ -1117,6 +1264,7 @@ def agrupar_etiquetas_importadas(
             "ETIQUETAS": dados["ETIQUETAS"],
             "VOLUMES_ETIQUETAS": len(dados["ETIQUETAS"]),
             "ETIQUETAS_POR_PALETE": dict(dados["ETIQUETAS_POR_PALETE"]),
+            "RUA_POR_PALETE": dict(dados["RUA_POR_PALETE"]),
         }
         for shipment_id, dados in pedidos_por_shipment.items()
     ]
@@ -1141,6 +1289,7 @@ def _agrupar_etiquetas_export_coletor(
     quantidade_paletes_declarada: int | None = None
     quantidade_shipments_declarada: int | None = None
     quantidade_etiquetas_declarada: int | None = None
+    rua = _extrair_rua_etiquetas(identificador_fonte, linhas)
     linhas_invalidas: list[int] = []
     linhas_fora_de_secao: list[int] = []
 
@@ -1171,7 +1320,11 @@ def _agrupar_etiquetas_export_coletor(
         if encontrado_palete:
             identificador_palete = encontrado_palete.group(1).strip()
             rotulo_palete = f"Palete {identificador_palete}"
-            componentes = [parte for parte in (identificador_fonte, lote) if parte]
+            componentes = [
+                parte
+                for parte in (rua, identificador_fonte, lote)
+                if parte
+            ]
             if componentes:
                 rotulo_palete = " · ".join(componentes + [rotulo_palete])
             palete_atual = rotulo_palete
@@ -1225,6 +1378,7 @@ def _agrupar_etiquetas_export_coletor(
             linhas_invalidas.append(numero_linha)
 
     pedidos: OrderedDict[str, dict[str, object]] = OrderedDict()
+    ruas_por_palete: dict[str, str] = {}
     divergencias_secoes: list[str] = []
     etiquetas_por_palete: dict[str, int] = defaultdict(int)
     shipments_por_palete: dict[str, set[str]] = defaultdict(set)
@@ -1235,6 +1389,12 @@ def _agrupar_etiquetas_export_coletor(
         )
         pedido["ETIQUETAS"].extend(etiquetas)
         pedido["ETIQUETAS_POR_PALETE"].setdefault(palete, []).extend(etiquetas)
+        rua_existente = ruas_por_palete.get(palete)
+        if rua_existente and rua and rua_existente != rua:
+            raise ValueError(
+                f"O palete '{palete}' foi associado a mais de uma rua."
+            )
+        ruas_por_palete[palete] = rua or rua_existente or ""
         etiquetas_por_palete[palete] += len(etiquetas)
         shipments_por_palete[palete].add(shipment_id)
         if quantidade_declarada is not None and len(etiquetas) != quantidade_declarada:
@@ -1319,6 +1479,10 @@ def _agrupar_etiquetas_export_coletor(
             "ETIQUETAS": dados["ETIQUETAS"],
             "VOLUMES_ETIQUETAS": len(dados["ETIQUETAS"]),
             "ETIQUETAS_POR_PALETE": dict(dados["ETIQUETAS_POR_PALETE"]),
+            "RUA_POR_PALETE": {
+                palete: ruas_por_palete.get(palete, "")
+                for palete in dados["ETIQUETAS_POR_PALETE"]
+            },
         }
         for shipment_id, dados in pedidos.items()
     ]

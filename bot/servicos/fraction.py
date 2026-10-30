@@ -1484,10 +1484,17 @@ def _normalizar_uf(valor: object) -> str:
     return nomes.get(uf, uf)
 
 
-def carregar_regras_rotas_localidade(
+def carregar_regras_rotas_com_destino_e_triagem(
     caminho: Path = ARQUIVO_ROTAS_ROMANEIOS,
-) -> tuple[dict[str, str], dict[str, str]]:
-    """Carrega as unidades atendentes por UF e por cidade normalizada."""
+) -> tuple[
+    dict[str, str],
+    dict[str, str],
+    dict[str, str],
+    dict[str, str],
+    dict[str, str],
+    dict[str, str],
+]:
+    """Carrega unidade e triagem por UF, cidade e destino normalizados."""
     if not caminho.exists():
         raise FileNotFoundError(f"Base de rotas não encontrada: '{caminho}'.")
     with caminho.open("r", encoding="utf-8-sig") as arquivo:
@@ -1501,29 +1508,44 @@ def carregar_regras_rotas_localidade(
 
     regras_uf = dados["por_uf"]
     regras_cidade = dados["por_cidade"]
-    if not isinstance(regras_uf, list) or not isinstance(regras_cidade, list):
-        raise ValueError("'por_uf' e 'por_cidade' precisam ser listas.")
+    regras_destino = dados.get("por_destino", [])
+    if (
+        not isinstance(regras_uf, list)
+        or not isinstance(regras_cidade, list)
+        or not isinstance(regras_destino, list)
+    ):
+        raise ValueError("'por_uf', 'por_cidade' e 'por_destino' precisam ser listas.")
 
     rotas_por_uf: dict[str, str] = {}
     rotas_por_cidade: dict[str, str] = {}
+    rotas_por_destino: dict[str, str] = {}
+    triagens_por_uf: dict[str, str] = {}
+    triagens_por_cidade: dict[str, str] = {}
+    triagens_por_destino: dict[str, str] = {}
 
     for regra in regras_uf:
         if not isinstance(regra, dict):
             raise ValueError("Cada item de 'por_uf' precisa ser um objeto JSON.")
         uf = _normalizar_uf(regra.get("uf") or "")
         unidade = str(regra.get("unidade") or "").strip()
+        triagem = " ".join(str(regra.get("triagem") or "").split())
         if not uf or not unidade:
             raise ValueError("Cada regra de 'por_uf' precisa de 'uf' e 'unidade'.")
         existente = rotas_por_uf.get(uf)
         if existente and _normalizar_rota(existente) != _normalizar_rota(unidade):
             raise ValueError(f"Mais de uma unidade foi definida para a UF {uf}.")
+        triagem_existente = triagens_por_uf.get(uf)
+        if triagem_existente is not None and triagem_existente != triagem:
+            raise ValueError(f"Mais de uma triagem foi definida para a UF {uf}.")
         rotas_por_uf[uf] = unidade
+        triagens_por_uf[uf] = triagem
 
     for regra in regras_cidade:
         if not isinstance(regra, dict):
             raise ValueError("Cada item de 'por_cidade' precisa ser um objeto JSON.")
         cidade = _normalizar_rota(regra.get("cidade") or "")
         unidade = str(regra.get("unidade") or "").strip()
+        triagem = " ".join(str(regra.get("triagem") or "").split())
         if not cidade or not unidade:
             raise ValueError(
                 "Cada regra de 'por_cidade' precisa de 'cidade' e 'unidade'."
@@ -1531,8 +1553,72 @@ def carregar_regras_rotas_localidade(
         existente = rotas_por_cidade.get(cidade)
         if existente and _normalizar_rota(existente) != _normalizar_rota(unidade):
             raise ValueError(f"Mais de uma unidade foi definida para a cidade {cidade}.")
+        triagem_existente = triagens_por_cidade.get(cidade)
+        if triagem_existente is not None and triagem_existente != triagem:
+            raise ValueError(f"Mais de uma triagem foi definida para a cidade {cidade}.")
         rotas_por_cidade[cidade] = unidade
+        triagens_por_cidade[cidade] = triagem
 
+    for regra in regras_destino:
+        if not isinstance(regra, dict):
+            raise ValueError("Cada item de 'por_destino' precisa ser um objeto JSON.")
+        destino = _normalizar_rota(regra.get("destino") or "")
+        unidade = str(regra.get("unidade") or "").strip()
+        triagem = " ".join(str(regra.get("triagem") or "").split())
+        if not destino or not unidade:
+            raise ValueError(
+                "Cada regra de 'por_destino' precisa de 'destino' e 'unidade'."
+            )
+        existente = rotas_por_destino.get(destino)
+        if existente and _normalizar_rota(existente) != _normalizar_rota(unidade):
+            raise ValueError(
+                f"Mais de uma unidade foi definida para o destino {destino}."
+            )
+        triagem_existente = triagens_por_destino.get(destino)
+        if triagem_existente is not None and triagem_existente != triagem:
+            raise ValueError(
+                f"Mais de uma triagem foi definida para o destino {destino}."
+            )
+        rotas_por_destino[destino] = unidade
+        triagens_por_destino[destino] = triagem
+
+    return (
+        rotas_por_uf,
+        rotas_por_cidade,
+        rotas_por_destino,
+        triagens_por_uf,
+        triagens_por_cidade,
+        triagens_por_destino,
+    )
+
+
+def carregar_regras_rotas_localidade_com_triagem(
+    caminho: Path = ARQUIVO_ROTAS_ROMANEIOS,
+) -> tuple[dict[str, str], dict[str, str], dict[str, str], dict[str, str]]:
+    """Mantém a interface antiga para regras de UF e cidade."""
+    (
+        rotas_por_uf,
+        rotas_por_cidade,
+        _,
+        triagens_por_uf,
+        triagens_por_cidade,
+        _,
+    ) = carregar_regras_rotas_com_destino_e_triagem(caminho)
+    return (
+        rotas_por_uf,
+        rotas_por_cidade,
+        triagens_por_uf,
+        triagens_por_cidade,
+    )
+
+
+def carregar_regras_rotas_localidade(
+    caminho: Path = ARQUIVO_ROTAS_ROMANEIOS,
+) -> tuple[dict[str, str], dict[str, str]]:
+    """Carrega as unidades atendentes por UF e por cidade normalizada."""
+    rotas_por_uf, rotas_por_cidade, _, _ = (
+        carregar_regras_rotas_localidade_com_triagem(caminho)
+    )
     return rotas_por_uf, rotas_por_cidade
 
 
@@ -1671,6 +1757,8 @@ def _caminho_pdf_romaneio(
     unidade: str,
     *,
     palete: str | None = None,
+    rua: str | None = None,
+    triagem: str | None = None,
     pasta_destino: str | Path | None = None,
 ) -> Path:
     pasta = Path(pasta_destino) if pasta_destino is not None else RESULTADOS_ROMANEIOS
@@ -1681,6 +1769,10 @@ def _caminho_pdf_romaneio(
 
     nome_unidade = (nome_seguro(unidade) or "unidade")[:48]
     componentes = ["Romaneio", nome_unidade]
+    if rua:
+        componentes.append((nome_seguro(rua) or "rua")[:24])
+    if triagem:
+        componentes.append((nome_seguro(triagem) or "triagem")[:48])
     if palete:
         identificacao_palete = (
             nome_seguro(palete) or "identificacao_indisponivel"
@@ -1695,6 +1787,9 @@ def _salvar_conteudo_pdf_romaneio(
     unidade: str,
     *,
     palete: str | None = None,
+    rua: str | None = None,
+    triagem: str | None = None,
+    destino_exibicao: str | None = None,
     pasta_destino: str | Path | None = None,
     log=None,
 ) -> Path:
@@ -1707,11 +1802,100 @@ def _salvar_conteudo_pdf_romaneio(
     caminho = _caminho_pdf_romaneio(
         unidade,
         palete=palete,
+        rua=rua,
+        triagem=triagem,
         pasta_destino=pasta_destino,
     )
     caminho.write_bytes(conteudo)
+    try:
+        identificacao = _aplicar_identificacao_romaneio_pdf(
+            caminho,
+            rua=rua,
+            triagem=triagem,
+            destino_exibicao=destino_exibicao or unidade,
+        )
+    except Exception:
+        caminho.unlink(missing_ok=True)
+        raise
     _log(log, f"Romaneio salvo em {caminho} ({len(conteudo)} bytes).")
+    _log(log, f"Identificação aplicada ao PDF: {identificacao}.")
     return caminho
+
+
+def _aplicar_identificacao_romaneio_pdf(
+    caminho: Path,
+    *,
+    rua: str | None,
+    triagem: str | None,
+    destino_exibicao: str,
+) -> str:
+    """Sobrepõe Rua / triagem / código interno no cabeçalho de cada página."""
+    from io import BytesIO
+
+    from pypdf import PdfReader, PdfWriter
+    from reportlab.lib.colors import white
+    from reportlab.pdfbase.pdfmetrics import stringWidth
+    from reportlab.pdfgen import canvas
+
+    conteudo = caminho.read_bytes()
+    leitor = PdfReader(BytesIO(conteudo), strict=True)
+    if not leitor.pages:
+        raise ValueError(f"O PDF '{caminho.name}' não contém páginas.")
+
+    codigo_interno = ""
+    for pagina in leitor.pages:
+        texto = pagina.extract_text() or ""
+        encontrado = re.search(r"(?<![A-Z0-9])[A-Z]{1,3}-\d{2,3}(?!\d)", texto)
+        if encontrado:
+            codigo_interno = encontrado.group(0)
+            break
+
+    destino = codigo_interno or destino_exibicao.strip()
+    partes = [parte.strip() for parte in (rua, triagem, destino) if parte and parte.strip()]
+    if not partes:
+        raise ValueError("Não há Rua, triagem ou unidade para identificar o PDF.")
+    identificacao = " / ".join(partes)
+    identificacao = unicodedata.normalize("NFKD", identificacao)
+    identificacao = "".join(
+        caractere for caractere in identificacao
+        if not unicodedata.combining(caractere)
+    )
+
+    escritor = PdfWriter()
+    for pagina in leitor.pages:
+        largura = float(pagina.mediabox.width)
+        altura = float(pagina.mediabox.height)
+        camada_bytes = BytesIO()
+        camada = canvas.Canvas(camada_bytes, pagesize=(largura, altura))
+        largura_faixa = min(185.0, largura - 32.0)
+        esquerda = (largura - largura_faixa) / 2
+        base = max(0.0, altura - 61.0)
+        camada.setFillColor(white)
+        camada.rect(esquerda, base, largura_faixa, 25.0, fill=1, stroke=0)
+
+        tamanho_fonte = 14.0
+        while (
+            tamanho_fonte > 6.0
+            and stringWidth(identificacao, "Helvetica-Bold", tamanho_fonte)
+            > largura_faixa - 12.0
+        ):
+            tamanho_fonte -= 0.25
+        camada.setFillColorRGB(0, 0, 0)
+        camada.setFont("Helvetica-Bold", tamanho_fonte)
+        camada.drawCentredString(
+            largura / 2,
+            base + 3.0,
+            identificacao,
+        )
+        camada.save()
+        camada_bytes.seek(0)
+        pagina.merge_page(PdfReader(camada_bytes, strict=True).pages[0])
+        escritor.add_page(pagina)
+
+    saida = BytesIO()
+    escritor.write(saida)
+    caminho.write_bytes(saida.getvalue())
+    return identificacao
 
 
 def preparar_lote_impressao_romaneios(
@@ -1896,12 +2080,17 @@ def _salvar_download_romaneio(
     unidade: str,
     *,
     palete: str | None = None,
+    rua: str | None = None,
+    triagem: str | None = None,
+    destino_exibicao: str | None = None,
     pasta_destino: str | Path | None = None,
     log=None,
 ) -> Path:
     caminho = _caminho_pdf_romaneio(
         unidade,
         palete=palete,
+        rua=rua,
+        triagem=triagem,
         pasta_destino=pasta_destino,
     )
 
@@ -1915,13 +2104,20 @@ def _salvar_download_romaneio(
                 f"não é um PDF. Nome informado pelo navegador: "
                 f"{download.suggested_filename!r}."
             )
+        identificacao = _aplicar_identificacao_romaneio_pdf(
+            caminho,
+            rua=rua,
+            triagem=triagem,
+            destino_exibicao=destino_exibicao or unidade,
+        )
     except Exception:
         caminho.unlink(missing_ok=True)
         raise
 
     _log(
         log,
-        f"Download do romaneio ({download.suggested_filename}) salvo em {caminho}.",
+        f"Download do romaneio ({download.suggested_filename}) salvo em {caminho}; "
+        f"identificação aplicada: {identificacao}.",
     )
     return caminho
 
@@ -1932,6 +2128,9 @@ def _salvar_pdf_romaneio(
     unidade: str,
     *,
     palete: str | None = None,
+    rua: str | None = None,
+    triagem: str | None = None,
+    destino_exibicao: str | None = None,
     pasta_destino: str | Path | None = None,
     log=None,
 ) -> Path:
@@ -1965,6 +2164,9 @@ def _salvar_pdf_romaneio(
         conteudo,
         unidade,
         palete=palete,
+        rua=rua,
+        triagem=triagem,
+        destino_exibicao=destino_exibicao,
         pasta_destino=pasta_destino,
         log=log,
     )
@@ -2050,13 +2252,15 @@ def adicionar_rotas_a_previa(tabela_base: pd.DataFrame, *, log=None) -> pd.DataF
         None,
     )
 
-    if coluna_uf is None and coluna_cidade is None:
-        raise ValueError(
-            "A base precisa conter a coluna 'UF' ou 'Cidade' para aplicar as rotas."
-        )
-
     try:
-        rotas_por_uf, rotas_por_cidade = carregar_regras_rotas_localidade()
+        (
+            rotas_por_uf,
+            rotas_por_cidade,
+            rotas_por_destino,
+            _,
+            _,
+            _,
+        ) = carregar_regras_rotas_com_destino_e_triagem()
         codigos_preferenciais = carregar_codigos_preferenciais_unidades()
         unidades = carregar_destinos_fraction()
     except (FileNotFoundError, ValueError, json.JSONDecodeError) as erro:
@@ -2076,6 +2280,16 @@ def adicionar_rotas_a_previa(tabela_base: pd.DataFrame, *, log=None) -> pd.DataF
         rota_uf = rotas_por_uf.get(uf, "")
         if rota_uf:
             return rota_uf
+
+        destino_valor = linha[coluna_destino]
+        destino = (
+            _normalizar_rota(str(destino_valor))
+            if pd.notna(destino_valor)
+            else ""
+        )
+        rota_destino = rotas_por_destino.get(destino, "")
+        if rota_destino:
+            return rota_destino
 
         return "Sem rota"
 
@@ -2106,8 +2320,8 @@ def adicionar_rotas_a_previa(tabela_base: pd.DataFrame, *, log=None) -> pd.DataF
     sem_rota = int(tabela["Rota"].eq("Sem rota").sum())
     _log(
         log,
-        f"Prévia de rotas por UF/cidade: {encontradas}/{len(tabela)} pedido(s) "
-        f"com unidade atribuída; {sem_rota} sem regra de localidade.",
+        f"Prévia de rotas por UF/cidade/destino: {encontradas}/{len(tabela)} "
+        f"pedido(s) com unidade atribuída; {sem_rota} sem regra.",
     )
     return tabela
 
@@ -2116,6 +2330,7 @@ def mapear_rotas_para_grupos(
     tabela_base: pd.DataFrame,
     *,
     separar_por_palete: bool = False,
+    separar_por_rua_triagem: bool = False,
 ) -> tuple[list[dict], list[str]]:
     coluna_cte = next(
         (coluna for coluna in tabela_base if _normalizar_rota(coluna) == "CTE"),
@@ -2139,7 +2354,19 @@ def mapear_rotas_para_grupos(
         ),
         None,
     )
-    grupos_por_chave: dict[tuple[str, str], list[str]] = {}
+    coluna_rua = next(
+        (coluna for coluna in tabela_base if _normalizar_rota(coluna) == "RUA"),
+        None,
+    )
+    coluna_triagem = next(
+        (
+            coluna
+            for coluna in tabela_base
+            if _normalizar_rota(coluna) == "TRIAGEM"
+        ),
+        None,
+    )
+    grupos_por_chave: dict[tuple[str, ...], list[str]] = {}
     ignorados: list[str] = []
     for _, linha in tabela_base.iterrows():
         rota = str(linha["Rota"]).strip()
@@ -2161,22 +2388,62 @@ def mapear_rotas_para_grupos(
         ]
         if not ctes_linha:
             continue
+        rua = (
+            str(linha[coluna_rua]).strip()
+            if coluna_rua is not None and pd.notna(linha[coluna_rua])
+            else ""
+        )
+        triagem = (
+            " ".join(str(linha[coluna_triagem]).split())
+            if coluna_triagem is not None and pd.notna(linha[coluna_triagem])
+            else ""
+        )
+        if separar_por_rua_triagem and (not rua or not triagem):
+            ausentes = []
+            if not rua:
+                ausentes.append("Rua")
+            if not triagem:
+                ausentes.append("triagem")
+            ignorados.append(
+                f"CTE(s) {', '.join(ctes_linha)}: sem {' e '.join(ausentes)}; "
+                "não é possível identificar o palete."
+            )
+            continue
         if rota in {"Sem rota", "Rota ambígua", ""}:
-            identificacao = f" no palete '{palete}'" if separar_por_palete else ""
+            if separar_por_rua_triagem:
+                identificacao = f" em {rua} / {triagem}"
+            else:
+                identificacao = f" no palete '{palete}'" if separar_por_palete else ""
             ignorados.append(
                 f"CTE(s) {', '.join(ctes_linha)}{identificacao}: {rota or 'sem rota'}"
             )
             continue
-        chave = (palete, rota) if separar_por_palete else ("", rota)
+        if separar_por_rua_triagem:
+            chave = (rua, triagem, rota)
+        elif separar_por_palete:
+            chave = (palete, rota)
+        else:
+            chave = ("", rota)
         grupos_por_chave.setdefault(chave, [])
         for cte in ctes_linha:
             if cte not in grupos_por_chave[chave]:
                 grupos_por_chave[chave].append(cte)
     grupos = []
-    for (palete, rota), ctes in sorted(grupos_por_chave.items()):
-        grupo = {"ROTA": rota, "LISTA_CTES": ctes}
-        if separar_por_palete:
-            grupo["PALETE"] = palete
+    for chave, ctes in sorted(grupos_por_chave.items()):
+        if separar_por_rua_triagem:
+            rua, triagem, rota = chave
+            grupo = {
+                "RUA": rua,
+                "TRIAGEM": triagem,
+                "ROTA": rota,
+                "LISTA_CTES": ctes,
+            }
+        elif separar_por_palete:
+            palete, rota = chave
+            grupo = {"ROTA": rota, "LISTA_CTES": ctes, "PALETE": palete}
+        else:
+            _, rota = chave
+            grupo = {"ROTA": rota, "LISTA_CTES": ctes}
         grupos.append(grupo)
     return grupos, ignorados
 
@@ -2233,12 +2500,20 @@ def processar_manifestos(
         rota = grupo["NOME_DESTINO"]
         codigo_destino = grupo["CODIGO_DESTINO"]
         palete = str(grupo.get("PALETE") or "").strip() or None
+        rua = str(grupo.get("RUA") or "").strip() or None
+        triagem = str(grupo.get("TRIAGEM") or "").strip() or None
         ctes = grupo["LISTA_CTES"]
         contexto_palete = f", palete '{palete}'" if palete else ""
+        contexto_rua_triagem = (
+            f", {rua} / triagem '{triagem}'"
+            if rua or triagem
+            else ""
+        )
         _log(
             log,
             f"Unidade {rota_unidade}: {len(ctes)} CTE(s), destino Fraction "
-            f"'{rota}', código selecionado {codigo_destino}{contexto_palete}.",
+            f"'{rota}', código selecionado {codigo_destino}"
+            f"{contexto_rua_triagem}{contexto_palete}.",
         )
         _log(log, "Abrindo seletor de unidade do Manifesto.")
         page.locator(ID_DESTINO_LABEL).click()
@@ -2318,6 +2593,9 @@ def processar_manifestos(
                     download_recebido,
                     rota_unidade,
                     palete=palete,
+                    rua=rua,
+                    triagem=triagem,
+                    destino_exibicao=rota,
                     pasta_destino=pasta_pdf,
                     log=log,
                 )
@@ -2333,6 +2611,9 @@ def processar_manifestos(
                         download_recebido,
                         rota_unidade,
                         palete=palete,
+                        rua=rua,
+                        triagem=triagem,
+                        destino_exibicao=rota,
                         pasta_destino=pasta_pdf,
                         log=log,
                     )
@@ -2342,13 +2623,17 @@ def processar_manifestos(
                         arquivos_pdf,
                         rota_unidade,
                         palete=palete,
+                        rua=rua,
+                        triagem=triagem,
+                        destino_exibicao=rota,
                         pasta_destino=pasta_pdf,
                         log=log,
                     )
             arquivos_romaneios.append(str(caminho_pdf))
             _log(
                 log,
-                f"Remessa da unidade {rota_unidade}{contexto_palete} "
+                f"Remessa da unidade {rota_unidade}{contexto_rua_triagem}"
+                f"{contexto_palete} "
                 f"processada e PDF salvo em {caminho_pdf}.",
             )
             if ao_concluir_grupo is not None:
@@ -2375,6 +2660,7 @@ def executar_manifestos_romaneios(
     tabela_previa: pd.DataFrame | None = None,
     codigos_preferenciais: dict[str, str] | None = None,
     separar_por_palete: bool = False,
+    separar_por_rua_triagem: bool = False,
     pasta_destino_pdf: str | Path | None = None,
     ao_concluir_grupo: Callable[[dict, Path], None] | None = None,
     log=None,
@@ -2401,6 +2687,7 @@ def executar_manifestos_romaneios(
     grupos, rotas_ausentes = mapear_rotas_para_grupos(
         tabela,
         separar_por_palete=separar_por_palete,
+        separar_por_rua_triagem=separar_por_rua_triagem,
     )
     if rotas_ausentes:
         _log(

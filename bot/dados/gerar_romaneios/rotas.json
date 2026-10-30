@@ -2,109 +2,162 @@
   "por_uf": [
     {
       "uf": "RJ",
+      "triagem": "S",
       "unidade": "FL RIO DE JANEIRO"
     },
     {
       "uf": "MG",
+      "triagem": "K",
       "unidade": "FL RIO DE JANEIRO"
     },
     {
       "uf": "ES",
+      "triagem": "V",
       "unidade": "FL RIO DE JANEIRO"
     },
     {
       "uf": "BA",
+      "triagem": "F",
       "unidade": "FL SALVADOR"
     },
     {
       "uf": "PE",
+      "triagem": "Y",
       "unidade": "FL SALVADOR"
     },
     {
       "uf": "CE",
+      "triagem": "R",
       "unidade": "FL SALVADOR"
     },
     {
       "uf": "RS",
+      "triagem": "L, M40, M42, M44",
+      "unidade": "FL PORTO ALEGRE"
+    },
+    {
+      "uf": "SC",
+      "triagem": "L, M40, M42, M44",
       "unidade": "FL PORTO ALEGRE"
     },
     {
       "uf": "AM",
+      "triagem": "H18",
       "unidade": "FL MANAUS"
     },
     {
       "uf": "RR",
+      "triagem": "H08",
       "unidade": "FL MANAUS"
     }
   ],
   "por_cidade": [
     {
       "cidade": "MIRASSOL",
+      "triagem": "C01",
       "unidade": "CO MIRASSOL"
     },
     {
       "cidade": "VOTUPORANGA",
+      "triagem": "C02",
       "unidade": "CO MIRASSOL"
     },
     {
       "cidade": "CATANDUVA",
+      "triagem": "C03",
       "unidade": "CO MIRASSOL"
     },
     {
       "cidade": "SAO JOSE DO RIO PRETO",
+      "triagem": "C04",
       "unidade": "CO MIRASSOL"
     },
     {
       "cidade": "SANTAREM",
+      "triagem": "T80, T81, T82, T83, T84, T85, T86, T87",
       "unidade": "CO MARABA"
     },
     {
       "cidade": "ALTAMIRA",
+      "triagem": "T80, T81, T82, T83, T84, T85, T86, T87",
       "unidade": "CO MARABA"
     },
     {
       "cidade": "NOVO PROGRESSO",
+      "triagem": "T80, T81, T82, T83, T84, T85, T86, T87",
       "unidade": "CO MARABA"
     },
     {
       "cidade": "MARABA",
+      "triagem": "T80, T81, T82, T83, T84, T85, T86, T87",
       "unidade": "CO MARABA"
     },
     {
       "cidade": "REDENCAO",
+      "triagem": "T80, T81, T82, T83, T84, T85, T86, T87",
       "unidade": "CO MARABA"
     },
     {
       "cidade": "PARAUAPEBAS",
+      "triagem": "T80, T81, T82, T83, T84, T85, T86, T87",
       "unidade": "CO MARABA"
     },
     {
       "cidade": "BELEM",
+      "triagem": "T50, T51, T52, T53, T55",
       "unidade": "FL BELEM"
     },
     {
       "cidade": "MACAPA",
+      "triagem": "T50, T51, T52, T53, T55",
       "unidade": "FL BELEM"
     },
     {
       "cidade": "OIAPOQUE",
+      "triagem": "T50, T51, T52, T53, T55",
       "unidade": "FL BELEM"
     },
     {
       "cidade": "TARTARUGALZINHO",
+      "triagem": "T50, T51, T52, T53, T55",
       "unidade": "FL BELEM"
     },
     {
       "cidade": "VITORIA DO JARI",
+      "triagem": "T50, T51, T52, T53, T55",
       "unidade": "FL BELEM"
     },
     {
       "cidade": "BENEVIDES",
+      "triagem": "T50, T51, T52, T53, T55",
       "unidade": "FL BELEM"
     },
     {
       "cidade": "SANTA BARBARA DO PARA",
+      "triagem": "T50, T51, T52, T53, T55",
       "unidade": "FL BELEM"
+    }
+  ],
+  "por_destino": [
+    {
+      "destino": "CO MIRASSOL 01",
+      "triagem": "C01",
+      "unidade": "CO MIRASSOL"
+    },
+    {
+      "destino": "CO VOTUPORANGA 01",
+      "triagem": "C02",
+      "unidade": "CO MIRASSOL"
+    },
+    {
+      "destino": "CO CATANDUVA 02",
+      "triagem": "C03",
+      "unidade": "CO MIRASSOL"
+    },
+    {
+      "destino": "CO SAO JOSE DO RIO PRETO 01",
+      "triagem": "C04",
+      "unidade": "CO MIRASSOL"
     }
   ]
 }
