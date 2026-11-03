@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from datetime import date, datetime
-from decimal import Decimal, InvalidOperation
+from datetime import datetime
+from hashlib import sha256
 from io import BytesIO
-import json
 from pathlib import Path, PurePosixPath
 import re
 import tempfile
@@ -21,32 +20,21 @@ from automacoes.dar_entrada_pedidos import (
     COLUNAS_RESULTADO,
     PADRAO_ETIQUETA,
     agrupar_etiquetas_importadas,
-    consultar_shipments_no_fraction,
-    gerar_ctes_para_entrada,
-    gerar_etiquetas_faltantes,
 )
 from servicos.fraction import (
     carregar_codigos_preferenciais_unidades,
     carregar_regras_rotas_com_destino_e_triagem,
+    consultar_ctes_por_etiquetas_fraction,
 )
 from utils.config import (
     ARQUIVO_ETIQUETAS_ROMANEIOS_EMISSAO,
-    FRACTION_PASSWORD_PERFORMANCE,
-    FRACTION_USER_PERFORMANCE,
     HEADLESS,
     SLOW_MO_MS,
     URL_DRIVE,
-    URL_FRACTION,
 )
 from utils.estado import RegistroTexto
 
 
-CABECALHOS_OBRIGATORIOS = {
-    "SHIPMENTID": "ShipmentId",
-    "CODIGO": "Codigo",
-    "DESTINO": "Destino",
-    "VOLUME": "Volume",
-}
 ALIAS_CTE_RELATORIO = {
     "CTE",
     "CODIGO",
@@ -102,12 +90,8 @@ NOMES_UF = {
     "SERGIPE": "SE",
     "TOCANTINS": "TO",
 }
-SELETOR_DATA_INICIAL_PERFORMANCE = '[id="formPerfEntFiltro:dtini_input"]'
-SELETOR_DATA_FINAL_PERFORMANCE = '[id="formPerfEntFiltro:dtfim_input"]'
-TIMEOUT_DOWNLOAD_PERFORMANCE_MS = 600_000
 TIMEOUT_DOWNLOAD_DRIVE_MS = 300_000
 MAX_TENTATIVAS_DOWNLOAD_DRIVE = 3
-LIMITE_DIAS_PERFORMANCE_EMISSAO = 31
 REGISTRO_ETIQUETAS_ROMANEIOS_EMISSAO = RegistroTexto(
     ARQUIVO_ETIQUETAS_ROMANEIOS_EMISSAO
 )
@@ -253,172 +237,6 @@ def _normalizar_shipment_id(valor: object) -> str:
     return shipment_id
 
 
-def _normalizar_volume(valor: object, *, shipment_id: str) -> int | None:
-    texto = _normalizar_valor(valor)
-    if not texto:
-        return None
-
-    # O Fraction também exporta volumes no formato 1/N.
-    fracao_total = re.fullmatch(r"0*1\s*/\s*0*(\d+)\s*", texto)
-    if fracao_total:
-        volume = int(fracao_total.group(1))
-    else:
-        try:
-            numero = Decimal(texto.replace(",", "."))
-        except InvalidOperation as erro:
-            raise ValueError(
-                f"Volume inválido para o ShipmentId {shipment_id}: {texto!r}."
-            ) from erro
-
-        if not numero.is_finite() or numero != numero.to_integral_value():
-            raise ValueError(
-                f"Volume precisa ser um número inteiro para o ShipmentId "
-                f"{shipment_id}: {texto!r}."
-            )
-        volume = int(numero)
-
-    if volume <= 0:
-        raise ValueError(
-            f"Volume precisa ser maior que zero para o ShipmentId {shipment_id}."
-        )
-    return volume
-
-
-def _ler_base_performance(conteudo: bytes) -> tuple[pd.DataFrame, str, int]:
-    if not conteudo:
-        raise ValueError("A planilha Performance está vazia.")
-
-    correspondencias: list[tuple[str, int]] = []
-
-    try:
-        with pd.ExcelFile(BytesIO(conteudo), engine="openpyxl") as planilha:
-            for nome_aba in planilha.sheet_names:
-                primeiras_linhas = pd.read_excel(
-                    planilha,
-                    sheet_name=nome_aba,
-                    header=None,
-                    nrows=20,
-                    dtype=object,
-                )
-
-                for indice, linha in primeiras_linhas.iterrows():
-                    cabecalhos = {
-                        _normalizar_cabecalho(valor)
-                        for valor in linha.tolist()
-                        if not pd.isna(valor)
-                    }
-                    if set(CABECALHOS_OBRIGATORIOS).issubset(cabecalhos):
-                        correspondencias.append((nome_aba, int(indice)))
-                        break
-
-            if not correspondencias:
-                raise ValueError(
-                    "Não encontrei uma tabela na planilha Performance com as "
-                    "colunas ShipmentId, Codigo, Destino e Volume nas primeiras "
-                    "20 linhas de nenhuma aba."
-                )
-            if len(correspondencias) > 1:
-                abas = ", ".join(nome for nome, _ in correspondencias)
-                raise ValueError(
-                    "Encontrei mais de uma aba com as colunas necessárias na "
-                    f"planilha Performance: {abas}. Deixe apenas uma aba compatível."
-                )
-
-            nome_aba, indice_cabecalho = correspondencias[0]
-            base = pd.read_excel(
-                planilha,
-                sheet_name=nome_aba,
-                header=indice_cabecalho,
-                dtype=object,
-            )
-    except ValueError:
-        raise
-    except Exception as erro:
-        raise ValueError(
-            f"Não foi possível ler a planilha Performance: {erro}"
-        ) from erro
-
-    colunas_por_chave: dict[str, list[object]] = {}
-    colunas_status: list[object] = []
-    for coluna in base.columns:
-        chave = _normalizar_cabecalho(coluna)
-        if chave in CABECALHOS_OBRIGATORIOS:
-            colunas_por_chave.setdefault(chave, []).append(coluna)
-        elif chave == "STATUS":
-            colunas_status.append(coluna)
-
-    duplicadas = [
-        CABECALHOS_OBRIGATORIOS[chave]
-        for chave, colunas in colunas_por_chave.items()
-        if len(colunas) > 1
-    ]
-    if duplicadas:
-        raise ValueError(
-            "A planilha Performance tem cabeçalhos duplicados: "
-            + ", ".join(duplicadas)
-            + "."
-        )
-    if len(colunas_status) > 1:
-        raise ValueError(
-            "A planilha Performance tem mais de uma coluna Status."
-        )
-
-    faltantes = [
-        nome
-        for chave, nome in CABECALHOS_OBRIGATORIOS.items()
-        if chave not in colunas_por_chave
-    ]
-    if faltantes:
-        raise ValueError(
-            "Coluna(s) obrigatória(s) ausente(s) na planilha Performance: "
-            + ", ".join(faltantes)
-            + "."
-        )
-
-    coluna_uf = _localizar_coluna_normalizada(
-        list(base.columns),
-        ALIAS_UF_RELATORIO,
-    )
-    coluna_cidade = _localizar_coluna_normalizada(
-        list(base.columns),
-        ALIAS_CIDADE_RELATORIO,
-    )
-    colunas = {
-        nome: colunas_por_chave[chave][0]
-        for chave, nome in CABECALHOS_OBRIGATORIOS.items()
-    }
-    dados = pd.DataFrame(
-        {
-            "ShipmentId": base[colunas["ShipmentId"]].map(_normalizar_shipment_id),
-            "Codigo": base[colunas["Codigo"]].map(_normalizar_valor),
-            "Destino": base[colunas["Destino"]].map(_normalizar_valor),
-            "Volume": base[colunas["Volume"]],
-            "Status": (
-                base[colunas_status[0]].map(_normalizar_valor)
-                if colunas_status
-                else ""
-            ),
-            "UF": (
-                base[coluna_uf].map(_normalizar_uf)
-                if coluna_uf is not None
-                else ""
-            ),
-            "Cidade": (
-                base[coluna_cidade].map(_normalizar_valor)
-                if coluna_cidade is not None
-                else ""
-            ),
-        }
-    )
-    dados = dados[dados["ShipmentId"] != ""].reset_index(drop=True)
-    return dados, nome_aba, indice_cabecalho + 1
-
-
-def ler_base_performance(conteudo: bytes) -> tuple[pd.DataFrame, str, int]:
-    """Lê e normaliza a tabela Performance para os fluxos de Emissão."""
-    return _ler_base_performance(conteudo)
-
-
 def carregar_codigos_preferenciais_unidades_emissao() -> dict[str, str]:
     """Retorna o código preferencial da unidade quando o nome não é único."""
     return carregar_codigos_preferenciais_unidades()
@@ -509,6 +327,18 @@ def _completar_rotas_por_rua_triagem(
             )
 
     return resultado
+
+
+def recalcular_rotas_fila_emissao(
+    tabela: pd.DataFrame,
+    *,
+    log: Callable[[str], None] | None = None,
+) -> pd.DataFrame:
+    """Resolve novamente rota e triagem usando a versão atual do JSON de rotas."""
+    if tabela.empty:
+        return tabela.copy()
+    resultado = _adicionar_rota(tabela)
+    return _completar_rotas_por_rua_triagem(resultado, log=log)
 
 
 def _localizar_coluna_normalizada(
@@ -722,148 +552,123 @@ def _ler_destinos_relatorio_performance(
     )
 
 
-def _consultar_dados_performance_shipmentids(
-    ctes_por_shipment: dict[str, str],
+def _consultar_dados_performance_ctes(
+    ctes: list[str],
     *,
     log: Callable[[str], None] | None,
     pasta_temporaria: Path | None = None,
 ) -> dict[str, dict[str, str]]:
-    """Gera relatório para todos os CTEs da fila e associa Destino e Status."""
-    ctes_por_shipment = {
-        shipment_id: _normalizar_valor(cte)
-        for shipment_id, cte in ctes_por_shipment.items()
-    }
-    ctes = list(dict.fromkeys(cte for cte in ctes_por_shipment.values() if cte))
-    if not ctes:
-        if log is not None:
-            log("Nenhum CTE foi encontrado para gerar o relatório de Performance complementar.")
+    """Consulta Destino/Status dos CTEs na Performance, em lotes de até 1.000."""
+    ctes_unicos = list(dict.fromkeys(
+        _normalizar_valor(cte) for cte in ctes if _normalizar_valor(cte)
+    ))
+    if not ctes_unicos:
         return {}
 
-    escrever_relatorio = BytesIO()
-    pd.DataFrame({"REMESSA": ctes}).to_excel(
-        escrever_relatorio,
-        index=False,
-        engine="openpyxl",
+    planilha_ctes = BytesIO()
+    pd.DataFrame({"REMESSA": ctes_unicos}).to_excel(
+        planilha_ctes, index=False, engine="openpyxl"
     )
-    escrever_relatorio.seek(0)
-    registrar_log = log if log is not None else (lambda _mensagem: None)
-    registrar_log(
-        f"Gerando relatório de Performance complementar para {len(ctes)} CTE(s) "
-        f"de {sum(bool(cte) for cte in ctes_por_shipment.values())} pedido(s) da fila."
+    planilha_ctes.seek(0)
+    registrar = log if log is not None else (lambda _mensagem: None)
+    quantidade_lotes = (len(ctes_unicos) + 999) // 1000
+    registrar(
+        f"Consultando {len(ctes_unicos)} CTE(s) na Performance em "
+        f"{quantidade_lotes} lote(s) de até 1.000."
     )
 
-    try:
-        resultado = executar_extracao(
-            escrever_relatorio,
-            log=registrar_log,
-            pasta_destino=pasta_temporaria,
+    resultado = executar_extracao(
+        planilha_ctes,
+        log=registrar,
+        pasta_destino=pasta_temporaria,
+    )
+    caminho_relatorio = resultado.get("arquivo")
+    if not caminho_relatorio:
+        raise RuntimeError(
+            "A consulta de Performance por CTE não gerou uma planilha consolidada."
         )
-        caminho_relatorio = resultado.get("arquivo")
-        if not caminho_relatorio:
-            registrar_log(
-                "A consulta complementar não gerou arquivo de Performance; "
-                "os destinos desses pedidos ficarão pendentes."
-            )
-            return {}
+    registrar(f"Performance por CTE salva temporariamente em {caminho_relatorio}.")
+    (
+        destinos_por_cte,
+        _destinos_por_shipment,
+        status_por_cte,
+        _status_por_shipment,
+        uf_por_cte,
+        _uf_por_shipment,
+        cidade_por_cte,
+        _cidade_por_shipment,
+    ) = _ler_destinos_relatorio_performance(str(caminho_relatorio))
 
-        registrar_log(f"Relatório complementar gerado: {caminho_relatorio}.")
-        (
-            destinos_por_cte,
-            destinos_por_shipment,
-            status_por_cte,
-            status_por_shipment,
-            uf_por_cte,
-            uf_por_shipment,
-            cidade_por_cte,
-            cidade_por_shipment,
-        ) = _ler_destinos_relatorio_performance(str(caminho_relatorio))
-    except Exception as erro:
-        registrar_log(
-            "Não foi possível gerar ou ler o relatório de Performance complementar: "
-            f"{type(erro).__name__}: {erro}"
-        )
-        return {}
-
-    dados_por_shipment: dict[str, dict[str, str]] = {}
-    for shipment_id, cte in ctes_por_shipment.items():
-        destino = destinos_por_shipment.get(shipment_id, "") or (
-            destinos_por_cte.get(cte, "") if cte else ""
-        )
-        status = status_por_shipment.get(shipment_id, "") or (
-            status_por_cte.get(cte, "") if cte else ""
-        )
-        uf = uf_por_shipment.get(shipment_id, "") or (
-            uf_por_cte.get(cte, "") if cte else ""
-        )
-        cidade = cidade_por_shipment.get(shipment_id, "") or (
-            cidade_por_cte.get(cte, "") if cte else ""
-        )
+    dados = {}
+    for cte in ctes_unicos:
+        destino = destinos_por_cte.get(cte, "")
+        status = status_por_cte.get(cte, "")
+        uf = uf_por_cte.get(cte, "")
+        cidade = cidade_por_cte.get(cte, "")
         if destino or status or uf or cidade:
-            dados_por_shipment[shipment_id] = {
+            dados[cte] = {
                 "Destino": destino,
                 "Status": status,
                 "UF": uf,
                 "Cidade": cidade,
             }
+    registrar(
+        f"Performance retornou Destino para "
+        f"{sum(bool(item.get('Destino')) for item in dados.values())}/"
+        f"{len(ctes_unicos)} CTE(s) e Status para "
+        f"{sum(bool(item.get('Status')) for item in dados.values())}/"
+        f"{len(ctes_unicos)} CTE(s)."
+    )
+    return dados
 
-    registrar_log(
-        f"Destino localizado no relatório de Performance para "
-        f"{sum(bool(item['Destino']) for item in dados_por_shipment.values())}/"
-        f"{len(ctes_por_shipment)} ShipmentId(s) consultados."
+
+def consultar_status_performance_ctes(
+    ctes: list[str],
+    *,
+    log: Callable[[str], None] | None = None,
+    pasta_temporaria: Path | None = None,
+) -> dict[str, str]:
+    """Consulta o status atual de CTEs na Performance do Fraction."""
+    dados = _consultar_dados_performance_ctes(
+        ctes,
+        log=log,
+        pasta_temporaria=pasta_temporaria,
     )
-    registrar_log(
-        f"Status localizado no relatório de Performance para "
-        f"{sum(bool(item['Status']) for item in dados_por_shipment.values())}/"
-        f"{len(ctes_por_shipment)} ShipmentId(s) consultados."
-    )
-    return dados_por_shipment
+    return {
+        cte: status
+        for cte, item in dados.items()
+        if (status := _normalizar_valor(item.get("Status", "")))
+    }
 
 
 def montar_fila_emissao(
-    conteudo_performance: bytes,
     conteudo_etiquetas: bytes,
     *,
     nome_arquivo_etiquetas: str = "etiquetas.txt",
     log: Callable[[str], None] | None = None,
     pasta_temporaria: Path | None = None,
 ) -> dict[str, object]:
-    """Cruza etiquetas e Performance e monta a fila de envio dos romaneios."""
+    """Cruza etiquetas no Fraction, seus CTEs e a Performance por CTE."""
     preparar_estado_etiquetas_romaneio()
     _log_performance_emissao(
         log,
-        f"Arquivo de estado de etiquetas: "
-        f"{ARQUIVO_ETIQUETAS_ROMANEIOS_EMISSAO}.",
+        f"Arquivo de estado de etiquetas: {ARQUIVO_ETIQUETAS_ROMANEIOS_EMISSAO}.",
     )
-    base, nome_aba, linha_cabecalho = _ler_base_performance(conteudo_performance)
     pedidos = agrupar_etiquetas_importadas(
         conteudo_etiquetas,
         nome_arquivo_etiquetas,
         log=log,
     )
-    total_etiquetas_importadas = sum(
-        len(pedido["ETIQUETAS"]) for pedido in pedidos
-    )
-    total_paletes_importados = len(
-        {
-            (str(pedido.get("RUA_POR_PALETE", {}).get(palete, "")), str(palete))
-            for pedido in pedidos
-            for palete in pedido.get("ETIQUETAS_POR_PALETE", {})
-        }
-    )
+    total_etiquetas_importadas = sum(len(pedido["ETIQUETAS"]) for pedido in pedidos)
     _log_performance_emissao(
         log,
-        f"Montagem detalhada da fila iniciada: {len(pedidos)} ShipmentId(s), "
-        f"{total_etiquetas_importadas} etiqueta(s), "
-        f"{total_paletes_importados} grupo(s) de rua/palete.",
+        f"TXT lido: {len(pedidos)} ShipmentId(s) e "
+        f"{total_etiquetas_importadas} etiqueta(s).",
     )
     for pedido in pedidos:
         shipment_id = str(pedido["ShipmentId"])
-        mapa_paletes = pedido.get("ETIQUETAS_POR_PALETE") or {
-            "Sem palete": pedido["ETIQUETAS"]
-        }
-        ruas_por_palete = pedido.get("RUA_POR_PALETE", {})
-        for palete, etiquetas in mapa_paletes.items():
-            rua = str(ruas_por_palete.get(palete, "")).strip()
+        for palete, etiquetas_palete in pedido.get("ETIQUETAS_POR_PALETE", {}).items():
+            rua = str(pedido.get("RUA_POR_PALETE", {}).get(palete, "")).strip()
             if not rua:
                 raise ValueError(
                     f"Não identifiquei a rua do arquivo que contém o palete "
@@ -873,379 +678,295 @@ def montar_fila_emissao(
             _log_performance_emissao(
                 log,
                 f"TXT lido — {rua}, palete '{palete}', ShipmentId {shipment_id}, "
-                f"{len(etiquetas)} etiqueta(s): {', '.join(etiquetas)}.",
+                f"{len(etiquetas_palete)} etiqueta(s): {', '.join(etiquetas_palete)}.",
             )
 
     pedidos, etiquetas_ja_registradas = _filtrar_etiquetas_ja_registradas(
         pedidos,
         log=log,
     )
-    total_etiquetas_novas = sum(len(pedido["ETIQUETAS"]) for pedido in pedidos)
+    etiquetas_novas = list(dict.fromkeys(
+        etiqueta
+        for pedido in pedidos
+        for etiquetas_palete in pedido.get("ETIQUETAS_POR_PALETE", {}).values()
+        for etiqueta in etiquetas_palete
+    ))
     _log_performance_emissao(
         log,
-        f"Após consultar o estado, restaram {len(pedidos)} ShipmentId(s) e "
-        f"{total_etiquetas_novas} etiqueta(s) novas; "
-        f"{etiquetas_ja_registradas} etiqueta(s) foram ignoradas por já terem "
-        "sido capturadas em outra execução.",
+        f"Após deduplicação local: {len(etiquetas_novas)} etiqueta(s) nova(s) "
+        f"em {len(pedidos)} ShipmentId(s); "
+        f"{etiquetas_ja_registradas} já estavam registradas.",
     )
 
-    registros_por_shipment: dict[str, list[dict[str, object]]] = {}
-    for _, linha in base.iterrows():
-        shipment_id = str(linha["ShipmentId"])
-        registros_por_shipment.setdefault(shipment_id, []).append(
-            {
-                "Codigo": str(linha["Codigo"]),
-                "Destino": str(linha["Destino"]),
-                "Volume": linha["Volume"],
-                "Status": str(linha["Status"]),
-                "UF": str(linha["UF"]),
-                "Cidade": str(linha["Cidade"]),
-            }
-        )
-
-    registros_unicos_por_shipment: dict[str, dict[str, object]] = {}
-    shipment_ids_sem_match: list[str] = []
-    for pedido in pedidos:
-        shipment_id = str(pedido["ShipmentId"])
-        _log_performance_emissao(
-            log,
-            f"Associando ShipmentId {shipment_id} à Performance; "
-            f"{len(pedido['ETIQUETAS'])} etiqueta(s) novas.",
-        )
-        candidatos = registros_por_shipment.get(shipment_id, [])
-        if not candidatos:
-            _log_performance_emissao(
-                log,
-                f"ShipmentId {shipment_id}: sem correspondência direta na "
-                "Performance; será consultado no Fraction.",
-            )
-            if shipment_id not in shipment_ids_sem_match:
-                shipment_ids_sem_match.append(shipment_id)
-            continue
-
-        registros_unicos = {
-            (
-                str(registro["Codigo"]),
-                str(registro["Destino"]),
-                _normalizar_valor(registro["Volume"]),
-                _normalizar_uf(registro.get("UF", "")),
-                _normalizar_rota(registro.get("Cidade", "")),
-            ): registro
-            for registro in candidatos
+    colunas_fila = ["Rua", "Palete de origem"] + COLUNAS_RESULTADO + [
+        "UF", "Cidade", "Origem", "Status",
+    ]
+    if not etiquetas_novas:
+        vazio = pd.DataFrame(columns=colunas_fila)
+        return {
+            "tabela": vazio,
+            "tabela_completa": vazio.copy(),
+            "etiquetas_sem_retorno_fraction": [],
+            "shipment_ids_sem_retorno_fraction": [],
+            "shipment_ids_sem_destino_performance": [],
+            "shipment_ids_sem_status_performance": [],
+            "shipment_ids_fora_emissao": [],
+            "etiquetas_ja_registradas": etiquetas_ja_registradas,
+            "etiquetas_status_fora_fila": 0,
+            "shipment_ids_etiquetas": 0,
+            "total_etiquetas": 0,
         }
-        if len(registros_unicos) > 1:
-            raise ValueError(
-                f"ShipmentId {shipment_id} aparece com mais de um Codigo, "
-                "Destino, Volume, UF ou Cidade na planilha Performance. "
-                "Corrija a base antes de montar a fila."
-            )
 
-        registro = next(iter(registros_unicos.values()))
-        if not str(registro["Codigo"]).strip() or not str(registro["Destino"]).strip():
-            raise ValueError(
-                f"A linha correspondente ao ShipmentId {shipment_id} precisa "
-                "ter Codigo e Destino preenchidos na planilha Performance."
-            )
-        registros_unicos_por_shipment[shipment_id] = registro
+    _log_performance_emissao(
+        log,
+        f"Consultando {len(etiquetas_novas)} etiqueta(s) no Envio de remessa "
+        "do Fraction para obter as Remessas/CTEs.",
+    )
+    cte_por_etiqueta = consultar_ctes_por_etiquetas_fraction(
+        etiquetas_novas,
+        log=log,
+    )
+    cte_por_etiqueta = {
+        str(etiqueta).strip(): _normalizar_valor(cte)
+        for etiqueta, cte in cte_por_etiqueta.items()
+        if _normalizar_valor(cte)
+    }
+    etiquetas_sem_cte = [
+        etiqueta for etiqueta in etiquetas_novas if etiqueta not in cte_por_etiqueta
+    ]
+    if etiquetas_sem_cte:
+        etiquetas_ausentes = set(etiquetas_sem_cte)
         _log_performance_emissao(
             log,
-            f"ShipmentId {shipment_id}: correspondência única na Performance — "
-            f"CTE {registro['Codigo']}, Destino '{registro['Destino']}', "
-            f"Volume '{_normalizar_valor(registro['Volume'])}', "
-            f"Status '{_normalizar_valor(registro['Status'])}'.",
+            f"O Fraction não retornou Remessa/CTE para {len(etiquetas_sem_cte)} "
+            "etiqueta(s); elas serão ignoradas e as correspondências encontradas "
+            "seguirão para a consulta.",
         )
-
-    resultados_consulta: dict[str, dict[str, object]] = {}
-    if shipment_ids_sem_match:
-        log_consulta = log if log is not None else (lambda _mensagem: None)
-        resultados_consulta = consultar_shipments_no_fraction(
-            shipment_ids_sem_match,
-            log=log_consulta,
-        )
-
-    linhas_por_rua_palete_shipment: dict[tuple[str, str, str], dict[str, object]] = {}
-    linhas_por_shipment: dict[str, list[dict[str, object]]] = {}
-    for pedido in pedidos:
-        shipment_id = str(pedido["ShipmentId"])
-        etiquetas_por_palete = pedido.get("ETIQUETAS_POR_PALETE")
-        if not isinstance(etiquetas_por_palete, dict) or not etiquetas_por_palete:
-            etiquetas_por_palete = {"Sem palete": pedido["ETIQUETAS"]}
-        ruas_por_palete = pedido.get("RUA_POR_PALETE", {})
-
-        registro = registros_unicos_por_shipment.get(shipment_id)
-        if registro is not None:
-            codigo = str(registro["Codigo"]).strip()
-            destino = str(registro["Destino"]).strip()
-            volume_sistema = _normalizar_volume(
-                registro["Volume"],
-                shipment_id=shipment_id,
-            )
-            uf = str(registro["UF"])
-            cidade = str(registro["Cidade"])
-            status = _normalizar_valor(registro["Status"])
-            origem = "Base"
-        else:
-            consulta = resultados_consulta.get(shipment_id, {})
-            codigo = _normalizar_valor(consulta.get("CTE"))
-            volume_sistema_bruto = consulta.get("Volumes Sistema")
-            volume_sistema = (
-                _normalizar_volume(volume_sistema_bruto, shipment_id=shipment_id)
-                if volume_sistema_bruto is not None
-                and not pd.isna(volume_sistema_bruto)
-                else None
-            )
-            destino = ""
-            uf = ""
-            cidade = ""
-            status = ""
-            origem = "Consulta"
-
-        for palete, etiquetas_brutas in etiquetas_por_palete.items():
-            rua = str(ruas_por_palete.get(palete, "")).strip()
-            if not rua:
-                raise ValueError(
-                    f"Não identifiquei a rua do arquivo que contém o palete "
-                    f"'{palete}'. Inclua 'Rua 1' (ou o número correspondente) "
-                    "no nome/caminho do TXT dentro do ZIP ou no cabeçalho do TXT."
-                )
-            etiquetas = sorted(
-                list(etiquetas_brutas),
-                key=lambda etiqueta: int(
-                    PADRAO_ETIQUETA.fullmatch(etiqueta).group(2)
-                ),
-            )
-            ctes_para_entrada = (
-                gerar_ctes_para_entrada(codigo, etiquetas, volume_sistema)
-                if codigo
-                else ""
-            )
-            linha_palete = {
-                "Rua": rua,
-                "Palete de origem": str(palete),
-                "CTE": codigo,
-                "ShipmentId": shipment_id,
-                "Etiquetas do pedido": "\n".join(etiquetas),
-                "Volumes Sistema": volume_sistema,
-                "Volumes Etiquetas": len(etiquetas),
-                "Etiquetas faltantes": gerar_etiquetas_faltantes(
-                    shipment_id,
-                    etiquetas,
-                    volume_sistema,
-                ),
-                "CTEs para dar entrada": ctes_para_entrada,
-                "UF": uf,
-                "Cidade": cidade,
-                "Destino": destino,
-                "Manifesto": "",
-                "Origem": origem,
-                "Status": status,
+        pedidos_com_correspondencia: list[dict[str, object]] = []
+        for pedido in pedidos:
+            etiquetas_por_palete = pedido.get("ETIQUETAS_POR_PALETE", {})
+            if not isinstance(etiquetas_por_palete, dict):
+                continue
+            etiquetas_validas_por_palete: dict[str, list[str]] = {}
+            for palete, etiquetas_palete in etiquetas_por_palete.items():
+                validas = [
+                    etiqueta
+                    for etiqueta in etiquetas_palete
+                    if etiqueta in cte_por_etiqueta
+                ]
+                etiquetas_validas_por_palete[str(palete)] = validas
+                for etiqueta in etiquetas_palete:
+                    if etiqueta in etiquetas_ausentes:
+                        _log_performance_emissao(
+                            log,
+                            f"Etiqueta ignorada sem Remessa/CTE: {etiqueta}; "
+                            f"ShipmentId {pedido['ShipmentId']}, palete '{palete}'.",
+                        )
+            etiquetas_validas_por_palete = {
+                palete: etiquetas
+                for palete, etiquetas in etiquetas_validas_por_palete.items()
+                if etiquetas
             }
-            linhas_por_rua_palete_shipment[(rua, str(palete), shipment_id)] = linha_palete
-            linhas_por_shipment.setdefault(shipment_id, []).append(linha_palete)
-            _log_performance_emissao(
-                log,
-                f"Linha montada — {rua}, palete '{palete}', ShipmentId {shipment_id}, "
-                f"CTE '{codigo}', {len(etiquetas)} etiqueta(s), "
-                f"{len(ctes_para_entrada.splitlines())} CTE(s) para envio, "
-                f"Status '{status or 'SEM STATUS'}', Destino '{destino or 'SEM DESTINO'}'. "
-                f"Etiquetas: {', '.join(etiquetas)}.",
+            etiquetas_validas = [
+                etiqueta
+                for etiquetas_palete in etiquetas_validas_por_palete.values()
+                for etiqueta in etiquetas_palete
+            ]
+            if not etiquetas_validas:
+                continue
+            pedido_com_correspondencia = dict(pedido)
+            pedido_com_correspondencia["ETIQUETAS"] = etiquetas_validas
+            pedido_com_correspondencia["VOLUMES_ETIQUETAS"] = len(etiquetas_validas)
+            pedido_com_correspondencia["ETIQUETAS_POR_PALETE"] = (
+                etiquetas_validas_por_palete
             )
+            pedidos_com_correspondencia.append(pedido_com_correspondencia)
+        pedidos = pedidos_com_correspondencia
 
-    shipment_ids_fila = list(
-        dict.fromkeys(
-            shipment_id
-            for _, _, shipment_id in linhas_por_rua_palete_shipment
+    if not cte_por_etiqueta:
+        _log_performance_emissao(
+            log,
+            "Nenhuma etiqueta retornou Remessa/CTE do Fraction; não há dados "
+            "para consultar na Performance.",
         )
+        vazio = pd.DataFrame(columns=colunas_fila)
+        return {
+            "tabela": vazio,
+            "tabela_completa": vazio.copy(),
+            "etiquetas_sem_retorno_fraction": etiquetas_sem_cte,
+            "shipment_ids_sem_retorno_fraction": [],
+            "shipment_ids_sem_destino_performance": [],
+            "shipment_ids_sem_status_performance": [],
+            "shipment_ids_fora_emissao": [],
+            "etiquetas_ja_registradas": etiquetas_ja_registradas,
+            "etiquetas_status_fora_fila": 0,
+            "shipment_ids_etiquetas": 0,
+            "total_etiquetas": 0,
+        }
+
+    _log_performance_emissao(
+        log,
+        f"Prosseguindo com {len(cte_por_etiqueta)} etiqueta(s) associada(s) "
+        f"a {len(set(cte_por_etiqueta.values()))} Remessa/CTE(s).",
     )
-    ctes_por_shipment = {
-        shipment_id: _normalizar_valor(
-            registros_unicos_por_shipment.get(shipment_id, {}).get("Codigo")
-            or resultados_consulta.get(shipment_id, {}).get("CTE")
-        )
-        for shipment_id in shipment_ids_fila
-    }
-    dados_performance_consultados = _consultar_dados_performance_shipmentids(
-        ctes_por_shipment,
+
+    ctes_unicos = list(dict.fromkeys(cte_por_etiqueta.values()))
+    desempenho_por_cte = _consultar_dados_performance_ctes(
+        ctes_unicos,
         log=log,
         pasta_temporaria=pasta_temporaria,
     )
-    for shipment_id in shipment_ids_fila:
-        dados_performance = dados_performance_consultados.get(
-            shipment_id,
-            {},
-        )
-        for linha_fila in linhas_por_shipment.get(shipment_id, []):
-            if dados_performance.get("Destino"):
-                linha_fila["Destino"] = dados_performance["Destino"]
-            if dados_performance.get("Status"):
-                linha_fila["Status"] = dados_performance["Status"]
-            if dados_performance.get("UF"):
-                linha_fila["UF"] = dados_performance["UF"]
-            if dados_performance.get("Cidade"):
-                linha_fila["Cidade"] = dados_performance["Cidade"]
+    linhas: list[dict[str, object]] = []
+    shipment_ids_sem_destino: list[str] = []
+    shipment_ids_sem_status: list[str] = []
+    shipment_ids_sem_retorno: list[str] = []
 
-    linhas = list(linhas_por_rua_palete_shipment.values())
+    for pedido in pedidos:
+        shipment_id = str(pedido["ShipmentId"])
+        for palete, etiquetas_brutas in pedido.get("ETIQUETAS_POR_PALETE", {}).items():
+            rua = str(pedido.get("RUA_POR_PALETE", {}).get(palete, "")).strip()
+            etiquetas = sorted(
+                dict.fromkeys(etiquetas_brutas),
+                key=lambda etiqueta: int(PADRAO_ETIQUETA.fullmatch(etiqueta).group(2)),
+            )
+            ctes_por_etiqueta = [cte_por_etiqueta[etiqueta] for etiqueta in etiquetas]
+            ctes_pedido = list(dict.fromkeys(ctes_por_etiqueta))
+            dados_performance = [
+                desempenho_por_cte.get(cte, {}) for cte in ctes_pedido
+            ]
 
-    colunas_fila = ["Rua", "Palete de origem"] + COLUNAS_RESULTADO + [
-        "UF",
-        "Cidade",
-        "Origem",
-        "Status",
-    ]
-    tabela_completa = pd.DataFrame(linhas, columns=colunas_fila)
+            def valor_unico(campo: str) -> str:
+                valores = list(dict.fromkeys(
+                    _normalizar_valor(item.get(campo, ""))
+                    for item in dados_performance
+                    if _normalizar_valor(item.get(campo, ""))
+                ))
+                if len(valores) > 1:
+                    raise ValueError(
+                        f"ShipmentId {shipment_id} tem valores de {campo} "
+                        f"divergentes entre as Remessas consultadas: {valores}."
+                    )
+                return valores[0] if valores else ""
+
+            destino = valor_unico("Destino")
+            status = valor_unico("Status")
+            uf = valor_unico("UF")
+            cidade = valor_unico("Cidade")
+            if not any(desempenho_por_cte.get(cte) for cte in ctes_pedido):
+                shipment_ids_sem_retorno.append(shipment_id)
+            if not destino:
+                shipment_ids_sem_destino.append(shipment_id)
+            if not status:
+                shipment_ids_sem_status.append(shipment_id)
+
+            linha = {
+                "Rua": rua,
+                "Palete de origem": str(palete),
+                "CTE": ctes_pedido[0] if ctes_pedido else "",
+                "ShipmentId": shipment_id,
+                "Etiquetas do pedido": "\n".join(etiquetas),
+                "Volumes Sistema": None,
+                "Volumes Etiquetas": len(etiquetas),
+                "Etiquetas faltantes": "",
+                "CTEs para dar entrada": "\n".join(ctes_pedido),
+                "Destino": destino,
+                "Manifesto": "",
+                "CTEs por etiqueta": "\n".join(ctes_por_etiqueta),
+                "UF": uf,
+                "Cidade": cidade,
+                "Origem": "Consulta por etiqueta",
+                "Status": status,
+            }
+            linhas.append(linha)
+            _log_performance_emissao(
+                log,
+                f"Linha montada — {rua}, palete '{palete}', ShipmentId "
+                f"{shipment_id}, {len(etiquetas)} etiqueta(s), "
+                f"{len(ctes_pedido)} Remessa/CTE(s), Destino "
+                f"'{destino or 'SEM DESTINO'}', Status "
+                f"'{status or 'SEM STATUS'}'.",
+            )
+
+    tabela_completa = pd.DataFrame(linhas)
     tabela_completa = _adicionar_rota(tabela_completa)
-    tabela_completa = _completar_rotas_por_rua_triagem(
-        tabela_completa,
-        log=log,
-    )
-    colunas_base_completa = ["Rua", "Palete de origem"] + [
-        coluna
-        for coluna in COLUNAS_RESULTADO
-        if coluna not in {"Destino", "Manifesto"}
-    ] + [
-        "UF",
-        "Cidade",
-        "Destino",
-        "Triagem",
-        "Rota",
-        "Manifesto",
-        "Origem",
-        "Status",
-    ]
-    tabela_completa = tabela_completa[colunas_base_completa]
+    tabela_completa = _completar_rotas_por_rua_triagem(tabela_completa, log=log)
     status_final_emissao = tabela_completa["Status"].map(
         lambda valor: _normalizar_cabecalho(valor) == "EMISSAO"
     )
     etiquetas_status_fora_fila = 0
     for indice, linha in tabela_completa.iterrows():
+        vai_para_fila = bool(status_final_emissao.loc[indice])
         etiquetas = [
             etiqueta.strip()
             for etiqueta in str(linha["Etiquetas do pedido"]).splitlines()
             if etiqueta.strip()
         ]
-        status = _normalizar_valor(linha["Status"])
-        vai_para_fila = bool(status_final_emissao.loc[indice])
         _log_performance_emissao(
             log,
             f"Classificação — {linha['Rua']} / triagem "
             f"'{linha['Triagem'] or 'SEM TRIAGEM'}', palete "
-            f"'{linha['Palete de origem']}', ShipmentId "
-            f"{linha['ShipmentId']}, CTE '{linha['CTE']}', Status "
-            f"'{status or 'SEM STATUS'}': "
+            f"'{linha['Palete de origem']}', ShipmentId {linha['ShipmentId']}, "
+            f"CTE '{linha['CTE']}', Status '{linha['Status'] or 'SEM STATUS'}': "
             f"{'INCLUÍDO NA FILA EMISSAO' if vai_para_fila else 'FORA DA FILA'}; "
-            f"Rota '{linha['Rota']}', Destino '{linha['Destino']}', "
-            f"{len(etiquetas)} etiqueta(s): {', '.join(etiquetas)}.",
+            f"Rota '{linha['Rota']}', Destino '{linha['Destino']}'.",
         )
         if not vai_para_fila and etiquetas:
-            motivo = (
-                f"Status '{status}' diferente de EMISSAO"
-                if status
-                else "Status ausente"
-            )
             novas = registrar_etiquetas_romaneio(
                 etiquetas,
                 contexto=(
                     f"pedido fora da fila — {linha['Rua']} / triagem "
                     f"'{linha['Triagem']}', palete '{linha['Palete de origem']}', "
-                    f"ShipmentId {linha['ShipmentId']}, motivo: {motivo}"
+                    f"ShipmentId {linha['ShipmentId']}, status "
+                    f"'{linha['Status'] or 'ausente'}'"
                 ),
                 log=log,
             )
             etiquetas_status_fora_fila += len(novas)
-    tabela_base_completa = tabela_completa.reset_index(drop=True)
-    colunas_fila_emissao = ["Rua", "Palete de origem"] + COLUNAS_RESULTADO + [
-        "Triagem",
-        "Rota",
-        "Origem",
-        "Status",
-    ]
-    tabela = tabela_completa.loc[
-        status_final_emissao,
-        colunas_fila_emissao,
-    ].reset_index(drop=True)
-    shipment_ids_fora_emissao = list(dict.fromkeys(tabela_completa.loc[
-        ~status_final_emissao,
-        "ShipmentId",
-    ].astype(str).tolist()))
-    shipment_ids_sem_status = list(dict.fromkeys(tabela_completa.loc[
-        tabela_completa["Status"].fillna("").astype(str).str.strip().eq(""),
-        "ShipmentId",
-    ].astype(str).tolist()))
 
+    tabela_completa = tabela_completa.reset_index(drop=True)
+    tabela = tabela_completa.loc[status_final_emissao].reset_index(drop=True)
+    shipment_ids_fora_emissao = list(dict.fromkeys(
+        tabela_completa.loc[~status_final_emissao, "ShipmentId"].astype(str).tolist()
+    ))
     if log is not None:
         log(
-            f"Performance: {len(base)} linha(s) utilizável(is) na aba "
-            f"{nome_aba}; cabeçalho na linha {linha_cabecalho}."
-        )
-        log(
-            f"Etiquetas: {total_etiquetas_importadas} importada(s), "
-            f"{etiquetas_ja_registradas} já registrada(s) em execuções anteriores, "
-            f"{etiquetas_status_fora_fila} registrada(s) agora por status fora da fila; "
-            f"{sum(len(pedido['ETIQUETAS']) for pedido in pedidos)} "
-            f"em {len(pedidos)} ShipmentId(s) e "
+            f"Etiquetas dos TXT: {total_etiquetas_importadas} lida(s), "
+            f"{etiquetas_ja_registradas} já estavam registradas, "
+            f"{len(etiquetas_novas) - len(etiquetas_sem_cte)} com Remessa/CTE, "
+            f"{len(etiquetas_sem_cte)} sem retorno e ignorada(s), "
+            f"{etiquetas_status_fora_fila} registrada(s) por status fora da fila; "
+            f"{len(tabela)} linha(s) EMISSAO mantida(s) em "
             f"{tabela_completa[['Rua', 'Palete de origem']].drop_duplicates().shape[0]} "
-            "grupo(s) de rua/palete; linhas com Status "
-            f"final EMISSAO mantidas após atualização: {len(tabela)}."
+            "grupo(s) rua/palete."
         )
-        if shipment_ids_fora_emissao:
+        if shipment_ids_sem_retorno:
             log(
-                f"{len(shipment_ids_fora_emissao)} pedido(s) removidos da fila por "
-                "estarem sem Status EMISSAO."
+                f"{len(set(shipment_ids_sem_retorno))} ShipmentId(s) não retornaram "
+                "dados na Performance consultada por CTE."
             )
-        if shipment_ids_sem_match:
+        if shipment_ids_sem_destino:
             log(
-                f"{len(shipment_ids_sem_match)} ShipmentId(s) ausentes da "
-                "Performance foram consultados individualmente no Fraction."
-            )
-    sem_retorno = list(dict.fromkeys([
-        shipment_id
-        for shipment_id in shipment_ids_sem_match
-        if not _normalizar_valor(
-            resultados_consulta.get(shipment_id, {}).get("CTE")
-        )
-    ]))
-    sem_destino = list(dict.fromkeys([
-        shipment_id
-        for shipment_id in shipment_ids_sem_match
-        if not _normalizar_valor(
-            next(
-                (
-                    linha.get("Destino")
-                    for linha in linhas_por_shipment.get(shipment_id, [])
-                ),
-                "",
-            )
-        )
-    ]))
-    if log is not None:
-        if sem_retorno:
-            log(
-                f"{len(sem_retorno)} ShipmentId(s) sem CTE encontrado na consulta "
-                "do Fraction."
-            )
-        if sem_destino:
-            log(
-                f"{len(sem_destino)} ShipmentId(s) ficaram sem Destino no relatório "
-                "de Performance complementar."
+                f"{len(set(shipment_ids_sem_destino))} ShipmentId(s) ficaram sem "
+                "Destino na Performance."
             )
         if shipment_ids_sem_status:
             log(
-                f"{len(shipment_ids_sem_status)} pedido(s) ficaram sem Status nas "
-                "planilhas de Performance e foram removidos da fila."
+                f"{len(set(shipment_ids_sem_status))} ShipmentId(s) ficaram sem "
+                "Status na Performance e não entraram na fila EMISSAO."
             )
 
     return {
         "tabela": tabela,
-        "tabela_completa": tabela_base_completa,
-        "shipment_ids_sem_match": shipment_ids_sem_match,
-        "shipment_ids_sem_retorno_fraction": sem_retorno,
-        "shipment_ids_sem_destino_performance": sem_destino,
-        "shipment_ids_sem_status_performance": shipment_ids_sem_status,
+        "tabela_completa": tabela_completa,
+        "etiquetas_sem_retorno_fraction": etiquetas_sem_cte,
+        "shipment_ids_sem_retorno_fraction": list(dict.fromkeys(shipment_ids_sem_retorno)),
+        "shipment_ids_sem_destino_performance": list(dict.fromkeys(shipment_ids_sem_destino)),
+        "shipment_ids_sem_status_performance": list(dict.fromkeys(shipment_ids_sem_status)),
         "shipment_ids_fora_emissao": shipment_ids_fora_emissao,
         "etiquetas_ja_registradas": etiquetas_ja_registradas,
         "etiquetas_status_fora_fila": etiquetas_status_fora_fila,
         "shipment_ids_etiquetas": len(tabela),
-        "total_etiquetas": int(tabela["Volumes Etiquetas"].sum()),
+        "total_etiquetas": int(tabela["Volumes Etiquetas"].sum()) if not tabela.empty else 0,
     }
 
 
@@ -1324,12 +1045,55 @@ def _localizar_download_drive_apos_selecao(
     return None
 
 
+def _selecionar_linha_arquivo_drive(linha, celulas, *, ja_selecionados: int) -> str:
+    """Seleciona uma linha do Drive, inclusive quando a caixa não é exposta."""
+    seletores = linha.get_by_role("checkbox")
+    if not seletores.count():
+        # O Drive nem sempre publica o controle de seleção como role acessível;
+        # dependendo da versão/layout ele só aparece visualmente ao passar o mouse.
+        seletores = linha.locator(
+            '[role="checkbox"], input[type="checkbox"], '
+            '[aria-label*="Select"], [aria-label*="Selecionar"]'
+        )
+
+    for indice in range(seletores.count()):
+        seletor = seletores.nth(indice)
+        if not seletor.is_visible() or not seletor.is_enabled():
+            continue
+        marcado = (
+            seletor.get_attribute("aria-checked") == "true"
+            or (seletor.get_attribute("type") == "checkbox" and seletor.is_checked())
+        )
+        if not marcado:
+            seletor.click(timeout=5_000, force=True)
+        return "caixa de seleção"
+
+    # Na lista do Drive, um clique simples seleciona o arquivo; Ctrl+clique
+    # preserva as seleções anteriores ao acumular vários TXT.
+    alvo = celulas.first if celulas.count() else linha
+    modificadores = ["Control"] if ja_selecionados else []
+    alvo.click(timeout=5_000, modifiers=modificadores, force=True)
+    return "clique na linha"
+
+
+def _nome_arquivo_tem_transferencia(nome_arquivo: str) -> bool:
+    nome = PurePosixPath(str(nome_arquivo)).name
+    normalizado = unicodedata.normalize("NFKD", nome)
+    normalizado = "".join(
+        caractere
+        for caractere in normalizado
+        if not unicodedata.combining(caractere)
+    ).casefold()
+    return "transferencia" in normalizado
+
+
 def baixar_etiquetas_drive(
     *,
     pasta_destino: Path | None = None,
+    arquivos_conhecidos: set[str] | None = None,
     log=None,
-) -> Path:
-    """Baixa a pasta compartilhada do Drive como um ZIP."""
+) -> Path | None:
+    """Baixa apenas TXT ainda não registrados, agrupando-os em um ZIP."""
     if not URL_DRIVE:
         raise RuntimeError("Configure URL_DRIVE no arquivo bot/.env.")
 
@@ -1386,73 +1150,121 @@ def baixar_etiquetas_drive(
                         "Compartilhe-a com acesso pelo link e permissão de leitura."
                     )
 
-                acao_download = _localizar_acao_drive(page, padrao_download)
-                if acao_download is None:
-                    grades = page.get_by_role("grid")
-                    try:
-                        grades.first.wait_for(state="visible", timeout=60_000)
-                    except PlaywrightTimeoutError as erro:
-                        raise RuntimeError(
-                            "O link abriu, mas a pasta do Google Drive não exibiu "
-                            "a lista de arquivos. Confirme a permissão de leitura."
-                        ) from erro
+                grades = page.get_by_role("grid")
+                try:
+                    grades.first.wait_for(state="visible", timeout=60_000)
+                except PlaywrightTimeoutError as erro:
+                    raise RuntimeError(
+                        "O link abriu, mas a pasta do Google Drive não exibiu "
+                        "a lista de arquivos. Confirme a permissão de leitura."
+                    ) from erro
 
-                    for indice in range(grades.count()):
-                        grade = grades.nth(indice)
-                        if not grade.is_visible():
+                nomes_conhecidos = {
+                    str(nome).strip().casefold()
+                    for nome in (arquivos_conhecidos or set())
+                }
+                quantidade_selecionada = 0
+                quantidade_txt_drive = 0
+                quantidade_txt_transferencia = 0
+                quantidade_txt_novo = 0
+                for indice_grade in range(grades.count()):
+                    grade = grades.nth(indice_grade)
+                    if not grade.is_visible():
+                        continue
+                    linhas = grade.get_by_role("row")
+                    for indice_linha in range(linhas.count()):
+                        linha = linhas.nth(indice_linha)
+                        celulas = linha.get_by_role("gridcell")
+                        if not celulas.count():
                             continue
-                        _fechar_previa_txt_drive(page, log=log)
+                        texto_celula = celulas.first.inner_text().strip()
+                        if not texto_celula:
+                            continue
+                        nome_arquivo = texto_celula.splitlines()[0].strip()
+                        if PurePosixPath(nome_arquivo).suffix.casefold() != ".txt":
+                            continue
+                        quantidade_txt_drive += 1
+                        if not _nome_arquivo_tem_transferencia(nome_arquivo):
+                            _log_performance_emissao(
+                                log,
+                                f"Ignorando TXT sem 'Transferência' no nome: "
+                                f"{nome_arquivo}.",
+                            )
+                            continue
+                        quantidade_txt_transferencia += 1
+                        if nome_arquivo.casefold() in nomes_conhecidos:
+                            _log_performance_emissao(
+                                log,
+                                f"Arquivo já registrado no estado; não será baixado: "
+                                f"{nome_arquivo}.",
+                            )
+                            continue
+                        quantidade_txt_novo += 1
                         try:
-                            grade.focus(timeout=5_000)
+                            linha.hover(timeout=3_000)
                         except PlaywrightTimeoutError:
                             _log_performance_emissao(
                                 log,
-                                "A grade não aceitou foco direto; tentando selecionar "
-                                "os arquivos pelo teclado.",
+                                f"Não consegui destacar a linha do Drive: {nome_arquivo}.",
                             )
-                        page.keyboard.press("Control+A")
-                        page.wait_for_timeout(500)
-                        acao_download = _localizar_download_drive_apos_selecao(
-                            page,
-                            padrao_download,
-                            padrao_mais_acoes,
+                            continue
+                        metodo_selecao = _selecionar_linha_arquivo_drive(
+                            linha,
+                            celulas,
+                            ja_selecionados=quantidade_selecionada,
                         )
-                        if acao_download is not None:
-                            break
+                        quantidade_selecionada += 1
+                        _log_performance_emissao(
+                            log,
+                            f"Selecionado para sincronização: {nome_arquivo} "
+                            f"({metodo_selecao}).",
+                        )
 
-                        linhas = grade.get_by_role("row")
-                        for indice_linha in range(min(linhas.count(), 5)):
-                            linha = linhas.nth(indice_linha)
-                            try:
-                                linha.hover(timeout=3_000)
-                            except PlaywrightTimeoutError:
-                                continue
-                            seletores = linha.get_by_role("checkbox")
-                            if not seletores.count() or not seletores.first.is_visible():
-                                continue
-                            seletores.first.click(timeout=5_000)
-                            page.keyboard.press("Control+A")
-                            page.wait_for_timeout(500)
-                            acao_download = _localizar_download_drive_apos_selecao(
-                                page,
-                                padrao_download,
-                                padrao_mais_acoes,
-                            )
-                            if acao_download is not None:
-                                break
-                        if acao_download is not None:
-                            break
+                if quantidade_selecionada == 0:
+                    if quantidade_txt_drive == 0:
+                        raise RuntimeError(
+                            "A pasta do Google Drive não contém arquivos TXT visíveis."
+                        )
+                    if quantidade_txt_transferencia == 0:
+                        _log_performance_emissao(
+                            log,
+                            "Nenhum TXT com 'Transferência' no nome foi encontrado; "
+                            "não foi feito download.",
+                        )
+                        return None
+                    if quantidade_txt_novo == 0:
+                        _log_performance_emissao(
+                            log,
+                            "Nenhum TXT novo no Drive; não foi feito download.",
+                        )
+                        return None
+                    raise RuntimeError(
+                        f"Encontrei {quantidade_txt_novo} TXT(s) novo(s), mas não "
+                        "consegui selecionar nenhum no Drive."
+                    )
+                if quantidade_selecionada != quantidade_txt_novo:
+                    raise RuntimeError(
+                        f"Foram selecionados {quantidade_selecionada} de "
+                        f"{quantidade_txt_novo} TXT(s) novo(s). A sincronização foi "
+                        "interrompida para não importar somente parte dos arquivos."
+                    )
+
+                _fechar_previa_txt_drive(page, log=log)
+                acao_download = _localizar_download_drive_apos_selecao(
+                    page,
+                    padrao_download,
+                    padrao_mais_acoes,
+                )
 
                 if acao_download is None:
                     raise RuntimeError(
-                        "A pasta abriu, mas não localizei a ação Download após "
-                        "tentar selecionar os arquivos pelo teclado e pela caixa "
-                        "de seleção."
+                        "TXT novos selecionados, mas não localizei a ação Download."
                     )
 
                 _log_performance_emissao(
                     log,
-                    "Ação Download localizada; aguardando o ZIP da pasta.",
+                    f"Ação Download localizada; aguardando "
+                    f"{quantidade_selecionada} TXT(s) novo(s).",
                 )
                 try:
                     with page.expect_download(
@@ -1481,7 +1293,21 @@ def baixar_etiquetas_drive(
                         acao_download.click(timeout=20_000, force=True)
                     download = informacao_download.value
 
-                download.save_as(caminho_zip)
+                nome_download = str(download.suggested_filename or "").strip()
+                if nome_download.casefold().endswith(".zip"):
+                    download.save_as(caminho_zip)
+                elif nome_download.casefold().endswith(".txt") and quantidade_selecionada == 1:
+                    caminho_txt = pasta_destino / f"download_drive_{identificador}.txt"
+                    download.save_as(caminho_txt)
+                    conteudo_txt = caminho_txt.read_bytes()
+                    with ZipFile(caminho_zip, mode="w") as arquivo_zip:
+                        arquivo_zip.writestr(nome_download, conteudo_txt)
+                    caminho_txt.unlink(missing_ok=True)
+                else:
+                    raise ValueError(
+                        "O Drive retornou um download individual inesperado: "
+                        f"'{nome_download}'."
+                    )
                 try:
                     with ZipFile(caminho_zip) as arquivo_zip:
                         if not any(
@@ -1499,8 +1325,8 @@ def baixar_etiquetas_drive(
 
                 _log_performance_emissao(
                     log,
-                    f"Pasta do Drive baixada como {caminho_zip.name}; "
-                    f"nome original: {download.suggested_filename}.",
+                    f"{quantidade_selecionada} TXT(s) novo(s) baixado(s) em "
+                    f"{caminho_zip.name}; nome retornado pelo Drive: {nome_download}.",
                 )
                 return caminho_zip
             except PermissionError:
@@ -1538,347 +1364,82 @@ def baixar_etiquetas_drive(
     ) from ultimo_erro
 
 
-def _login_performance_emissao(page, token: str, *, log=None) -> None:
-    if not URL_FRACTION:
-        raise RuntimeError("URL_FRACTION não foi configurada no .env.")
-    if not FRACTION_USER_PERFORMANCE or not FRACTION_PASSWORD_PERFORMANCE:
-        raise RuntimeError(
-            "Configure FRACTION_USER_PERFORMANCE e "
-            "FRACTION_PASSWORD_PERFORMANCE no .env."
-        )
-    if not token.strip():
-        raise ValueError("Informe o Token MFA para consultar o Fraction.")
-
-    _log_performance_emissao(log, "Abrindo o Fraction para a extração da Performance.")
-    page.goto(URL_FRACTION, wait_until="domcontentloaded")
-    page.get_by_role("textbox", name="Usuário").fill(
-        FRACTION_USER_PERFORMANCE
-    )
-    page.get_by_role("textbox", name="Senha").fill(
-        FRACTION_PASSWORD_PERFORMANCE
-    )
-    page.get_by_role("button", name="Login").click()
-
-    campo_token = page.get_by_role("textbox", name="Digite o código MFA:")
-    campo_token.wait_for(state="visible", timeout=60_000)
-    campo_token.fill(token.strip())
-    page.get_by_role("button", name="Validar").click()
-    page.get_by_role("link", name="Gerencial").wait_for(
-        state="visible",
-        timeout=120_000,
-    )
-    _log_performance_emissao(log, "Login do Fraction concluído com o Token MFA.")
-
-
-def _abrir_tela_performance_emissao(page, *, log=None) -> None:
-    _log_performance_emissao(log, "Abrindo Gerencial > Performance.")
-    page.get_by_role("link", name="Gerencial").click()
-    page.get_by_role("link", name="Performance", exact=True).click()
-    page.locator(SELETOR_DATA_INICIAL_PERFORMANCE).wait_for(
-        state="visible",
-        timeout=120_000,
-    )
-    page.locator(SELETOR_DATA_FINAL_PERFORMANCE).wait_for(
-        state="visible",
-        timeout=120_000,
-    )
-
-
-def _preencher_data_performance_emissao(page, seletor: str, valor: date) -> None:
-    campo = page.locator(seletor)
-    texto = valor.strftime("%d/%m/%Y")
-    campo.click()
-    meses = page.get_by_label("select month")
-    for indice in range(meses.count()):
-        mes_visivel = meses.nth(indice)
-        if mes_visivel.is_visible():
-            mes_visivel.select_option(str(valor.month - 1))
-            break
-    anos = page.get_by_label("select year")
-    for indice in range(anos.count()):
-        ano_visivel = anos.nth(indice)
-        if ano_visivel.is_visible():
-            ano_visivel.select_option(str(valor.year))
-            break
-    dias = page.get_by_role(
-        "link",
-        name=str(valor.day),
-        exact=True,
-    )
-    dia_selecionado = False
-    for indice in range(dias.count()):
-        dia_visivel = dias.nth(indice)
-        if dia_visivel.is_visible():
-            dia_visivel.click()
-            dia_selecionado = True
-            break
-    if not dia_selecionado:
-        dias.first.wait_for(state="visible", timeout=15_000)
-        dias.first.click()
-    if campo.input_value().strip() != texto:
-        raise RuntimeError(
-            f"O Fraction não manteve a data {texto} no campo {seletor}."
-        )
-
-
-def _extrair_planilhas_performance_zip(
+def selecionar_txt_novos_do_zip(
     conteudo_zip: bytes,
-    data_inicial: date,
-    data_final: date,
-    pasta_planilhas: Path,
-) -> list[tuple[pd.DataFrame, Path, str, int]]:
+    arquivos_importados: set[str],
+    *,
+    log: Callable[[str], None] | None = None,
+) -> tuple[bytes, list[dict[str, str]]]:
+    """Retorna um ZIP só com TXT ainda não importados no estado local."""
+    buffer_novos = BytesIO()
+    novos: list[dict[str, str]] = []
+    vistos_nesta_sincronizacao: set[str] = set()
+
     try:
         with ZipFile(BytesIO(conteudo_zip)) as arquivo_zip:
-            membros = [
+            membros_txt = [
                 membro
                 for membro in arquivo_zip.infolist()
                 if not membro.is_dir()
-                and PurePosixPath(membro.filename).suffix.casefold() == ".xlsx"
-                and "__macosx" not in {
-                    parte.casefold()
-                    for parte in PurePosixPath(membro.filename).parts
-                }
+                and PurePosixPath(membro.filename).suffix.casefold() == ".txt"
             ]
-            if not membros:
-                raise ValueError(
-                    "O ZIP do Fraction não contém uma planilha .xlsx."
-                )
+            if not membros_txt:
+                raise ValueError("O ZIP do Google Drive não contém arquivos TXT.")
 
-            partes: list[tuple[pd.DataFrame, Path, str, int]] = []
-            for indice, membro in enumerate(membros, start=1):
-                conteudo_planilha = arquivo_zip.read(membro)
-                caminho_planilha = pasta_planilhas / (
-                    f"Performance_{data_inicial:%Y-%m-%d}_"
-                    f"a_{data_final:%Y-%m-%d}_{indice:02d}.xlsx"
-                )
-                caminho_planilha.write_bytes(conteudo_planilha)
-                tabela, nome_aba, linha_cabecalho = ler_base_performance(
-                    conteudo_planilha
-                )
-                tabela.insert(
-                    0,
-                    "Período da consulta",
-                    f"{data_inicial.isoformat()} a {data_final.isoformat()}",
-                )
-                tabela = _adicionar_rota(tabela)
-                partes.append(
-                    (
-                        tabela,
-                        caminho_planilha,
-                        nome_aba,
-                        linha_cabecalho,
+            membros_transferencia = []
+            for membro in membros_txt:
+                if _nome_arquivo_tem_transferencia(membro.filename):
+                    membros_transferencia.append(membro)
+                else:
+                    _log_performance_emissao(
+                        log,
+                        "TXT ignorado por não conter 'Transferência' no nome: "
+                        f"{PurePosixPath(membro.filename).as_posix()}.",
                     )
-                )
-    except BadZipFile as erro:
-        raise ValueError(
-            "O ZIP da Performance do período "
-            f"{data_inicial:%d/%m/%Y} a {data_final:%d/%m/%Y} está inválido."
-        ) from erro
 
-    return partes
-
-
-def _baixar_performance_periodo(
-    page,
-    pasta_zips: Path,
-    *,
-    log=None,
-) -> Path:
-    total = page.get_by_role(
-        "gridcell",
-        name="TOTAL DO PERIODO",
-        exact=True,
-    )
-    total.wait_for(state="visible", timeout=240_000)
-    linha_total = total.locator("xpath=ancestor::tr[1]")
-    celulas = linha_total.get_by_role("gridcell")
-    if celulas.count() < 2:
-        raise RuntimeError(
-            "A linha TOTAL DO PERIODO foi localizada, mas não contém a célula "
-            "dinâmica de quantidade esperada."
-        )
-
-    total.click()
-    celula_quantidade = linha_total.get_by_role("gridcell").nth(1)
-    quantidade = celula_quantidade.inner_text().strip()
-    if not quantidade:
-        raise RuntimeError(
-            "A quantidade de pedidos da linha TOTAL DO PERIODO está vazia."
-        )
-    _log_performance_emissao(
-        log,
-        "Selecionando TOTAL DO PERIODO; quantidade retornada pelo Fraction: "
-        f"{quantidade}.",
-    )
-    caminho_zip = pasta_zips / "Performance_Periodo.zip"
-    try:
-        with page.expect_download(
-            timeout=TIMEOUT_DOWNLOAD_PERFORMANCE_MS
-        ) as informacao_download:
-            linha_total.get_by_role("gridcell").nth(1).click()
-        download = informacao_download.value
-    except PlaywrightTimeoutError as erro:
-        raise TimeoutError(
-            "O Fraction mostrou a quantidade de pedidos no TOTAL DO PERIODO, "
-            "mas o clique nessa quantidade não iniciou o download ZIP."
-        ) from erro
-
-    download.save_as(caminho_zip)
-    _log_performance_emissao(
-        log,
-        f"ZIP baixado e salvo como {caminho_zip.name}; "
-        f"nome original: {download.suggested_filename}.",
-    )
-    return caminho_zip
-
-
-def extrair_performance_intervalo(
-    data_inicial: date,
-    data_final: date,
-    token: str,
-    *,
-    pasta_temporaria: Path | None = None,
-    log=None,
-) -> dict[str, object]:
-    """Baixa e processa uma única Performance para o período selecionado."""
-    if data_final < data_inicial:
-        raise ValueError("A data final precisa ser igual ou posterior à inicial.")
-    quantidade_dias = (data_final - data_inicial).days + 1
-    if quantidade_dias > LIMITE_DIAS_PERFORMANCE_EMISSAO:
-        raise ValueError(
-            "O período da Performance pode ter no máximo "
-            f"{LIMITE_DIAS_PERFORMANCE_EMISSAO} dias, contando as datas inicial "
-            "e final."
-        )
-    if not token.strip():
-        raise ValueError("Informe o Token MFA para consultar o Fraction.")
-
-    identificador = datetime.now().strftime("%Y-%m-%d_%H-%M-%S-%f")
-    raiz_temporaria = (
-        Path(pasta_temporaria)
-        if pasta_temporaria is not None
-        else Path(tempfile.mkdtemp(prefix="botevelog_performance_emissao_"))
-    )
-    pasta_execucao = raiz_temporaria / (
-        f"extracao_{data_inicial:%Y-%m-%d}_{data_final:%Y-%m-%d}_{identificador}"
-    )
-    pasta_zips = pasta_execucao / "zips"
-    pasta_planilhas = pasta_execucao / "planilhas"
-    pasta_zips.mkdir(parents=True, exist_ok=True)
-    pasta_planilhas.mkdir(parents=True, exist_ok=True)
-
-    _log_performance_emissao(
-        log,
-        "Extração isolada da Performance em uma única consulta, "
-        f"de {data_inicial:%d/%m/%Y} a {data_final:%d/%m/%Y}.",
-    )
-
-    tabelas: list[pd.DataFrame] = []
-    arquivos_zip: list[str] = []
-    planilhas_extraidas: list[str] = []
-
-    with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(
-            headless=HEADLESS,
-            slow_mo=SLOW_MO_MS,
-        )
-        contexto = browser.new_context(accept_downloads=True)
-        page = contexto.new_page()
-        page.on(
-            "pageerror",
-            lambda erro: _log_performance_emissao(
-                log,
-                f"Erro JavaScript no Fraction: {erro}",
-            ),
-        )
-
-        try:
-            _login_performance_emissao(page, token, log=log)
-            _abrir_tela_performance_emissao(page, log=log)
-            _preencher_data_performance_emissao(
-                page,
-                SELETOR_DATA_INICIAL_PERFORMANCE,
-                data_inicial,
-            )
-            _preencher_data_performance_emissao(
-                page,
-                SELETOR_DATA_FINAL_PERFORMANCE,
-                data_final,
-            )
-            _log_performance_emissao(
-                log,
-                "Processando o relatório do período selecionado.",
-            )
-            page.get_by_role("button", name="Processar").click(
-                timeout=120_000
-            )
-            caminho_zip = _baixar_performance_periodo(
-                page,
-                pasta_zips,
-                log=log,
-            )
-            arquivos_zip.append(str(caminho_zip))
-
-            partes_periodo = _extrair_planilhas_performance_zip(
-                caminho_zip.read_bytes(),
-                data_inicial,
-                data_final,
-                pasta_planilhas,
-            )
-            for (
-                tabela_periodo,
-                caminho_planilha,
-                nome_aba,
-                linha_cabecalho,
-            ) in partes_periodo:
-                tabelas.append(tabela_periodo)
-                planilhas_extraidas.append(str(caminho_planilha))
+            if not membros_transferencia:
                 _log_performance_emissao(
                     log,
-                    f"Planilha do período extraída como {caminho_planilha.name}; "
-                    f"aba {nome_aba}, cabeçalho na linha {linha_cabecalho}, "
-                    f"{len(tabela_periodo)} linha(s).",
+                    "Nenhum TXT com 'Transferência' no nome foi encontrado no ZIP.",
                 )
+                return buffer_novos.getvalue(), novos
 
-        finally:
-            _log_performance_emissao(
-                log,
-                "Encerrando o navegador da extração de Performance.",
-            )
-            contexto.close()
-            browser.close()
+            with ZipFile(buffer_novos, mode="w") as zip_novos:
+                for membro in membros_transferencia:
+                    conteudo = arquivo_zip.read(membro)
+                    digest = sha256(conteudo).hexdigest()
+                    caminho_normalizado = PurePosixPath(membro.filename).as_posix()
+                    chave = sha256(
+                        caminho_normalizado.encode("utf-8") + b"\0" + digest.encode("ascii")
+                    ).hexdigest()
+                    if chave in arquivos_importados or chave in vistos_nesta_sincronizacao:
+                        _log_performance_emissao(
+                            log,
+                            f"TXT já sincronizado; ignorando: {caminho_normalizado}.",
+                        )
+                        continue
 
-    if not tabelas:
-        raise ValueError("Nenhuma planilha foi extraída para o período.")
+                    zip_novos.writestr(membro, conteudo)
+                    vistos_nesta_sincronizacao.add(chave)
+                    novos.append(
+                        {
+                            "chave": chave,
+                            "nome": PurePosixPath(caminho_normalizado).name,
+                            "caminho_no_zip": caminho_normalizado,
+                            "sha256": digest,
+                        }
+                    )
+                    _log_performance_emissao(
+                        log,
+                        f"TXT novo detectado: {caminho_normalizado} "
+                        f"({len(conteudo)} bytes; SHA-256 {digest}).",
+                    )
+    except BadZipFile as erro:
+        raise ValueError("O conteúdo baixado do Drive não é um ZIP válido.") from erro
 
-    tabela_consolidada = pd.concat(tabelas, ignore_index=True)
-    caminho_consolidado = pasta_execucao / (
-        f"Performance_Emissao_{data_inicial:%Y-%m-%d}_"
-        f"{data_final:%Y-%m-%d}.xlsx"
-    )
-    colunas_rota = ["UF", "Cidade", "Destino", "Rota"]
-    with pd.ExcelWriter(caminho_consolidado, engine="openpyxl") as escritor:
-        tabela_consolidada.to_excel(
-            escritor,
-            index=False,
-            sheet_name="Performance",
+    if log is not None:
+        log(
+            f"Sincronização do ZIP: {len(novos)} TXT(s) novo(s) de "
+            f"{len(membros_transferencia)} TXT(s) com 'Transferência' encontrado(s)."
         )
-        tabela_consolidada[colunas_rota].to_excel(
-            escritor,
-            index=False,
-            sheet_name="Rotas",
-        )
-    _log_performance_emissao(
-        log,
-        f"Consolidação salva em {caminho_consolidado}: "
-        f"{len(tabela_consolidada)} linha(s) e abas Performance/Rotas, "
-        f"{len(tabela_consolidada.columns)} coluna(s).",
-    )
-
-    return {
-        "tabela": tabela_consolidada,
-        "arquivo_consolidado": str(caminho_consolidado),
-        "arquivos_zip": arquivos_zip,
-        "planilhas_extraidas": planilhas_extraidas,
-        "pasta_execucao": str(pasta_execucao),
-    }
+    return buffer_novos.getvalue(), novos

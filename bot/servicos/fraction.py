@@ -27,8 +27,11 @@ from utils.config import (
     ARQUIVO_ROTAS_ROMANEIOS,
     ARQUIVO_UNIDADES_FRACTION,
     FRACTION_PASSWORD,
+    FRACTION_PASSWORD_PERFORMANCE,
     FRACTION_USER,
+    FRACTION_USER_PERFORMANCE,
     HEADLESS,
+    RESULTADOS_PERFORMANCE,
     RESULTADOS_ROMANEIOS,
     SLOW_MO_MS,
     URL_FRACTION,
@@ -1427,6 +1430,9 @@ ID_ROTA_LABEL = '[id="form_envio_remessa:selectRota_label"]'
 ID_ROTA_PANEL = '[id="form_envio_remessa:selectRota_panel"]'
 ID_CTES = '[id="form_envio_remessa:txtArea"]'
 TAMANHO_LOTE_CTES = 1000
+SELETOR_DATA_INICIAL_PERFORMANCE = '[id="formPerfEntFiltro:dtini_input"]'
+SELETOR_DATA_FINAL_PERFORMANCE = '[id="formPerfEntFiltro:dtfim_input"]'
+TIMEOUT_DOWNLOAD_PERFORMANCE_INTERVALO_MS = 600_000
 
 
 def _log(log, mensagem: str) -> None:
@@ -1734,6 +1740,414 @@ def aguardar_carregamento_manifesto(page, *, log=None) -> None:
     _log(log, "Spinner detectado; aguardando o fim do carregamento dos CTEs.")
     spinner.wait_for(state="hidden", timeout=180_000)
     _log(log, "Spinner 'Carregando' desapareceu; atualização concluída.")
+
+
+def aguardar_ajax_fraction(page, *, log=None, timeout_ms: int = 120_000) -> None:
+    """Espera o AJAX/PrimeFaces terminar depois de paginar ou mudar a tabela."""
+    page.wait_for_timeout(500)
+    page.wait_for_function(
+        """() => {
+            const visivel = (elemento) => elemento.getClientRects().length > 0 &&
+                getComputedStyle(elemento).visibility !== "hidden" &&
+                getComputedStyle(elemento).display !== "none";
+            const carregando = Array.from(document.querySelectorAll("body *"))
+                .some((elemento) => elemento.children.length === 0 &&
+                    elemento.innerText?.trim().includes("Carregando") && visivel(elemento));
+            const jqueryOcupado = window.jQuery && window.jQuery.active > 0;
+            const fila = window.PrimeFaces?.ajax?.Queue;
+            const filaVazia = !fila || typeof fila.isEmpty !== "function" || fila.isEmpty();
+            const ariaOcupado = Array.from(document.querySelectorAll('[aria-busy="true"]'))
+                .some(visivel);
+            return !carregando && !jqueryOcupado && filaVazia && !ariaOcupado;
+        }""",
+        timeout=timeout_ms,
+    )
+    _log(log, "AJAX do Fraction encerrado; tabela pronta para leitura.")
+
+
+def consultar_ctes_por_etiquetas_fraction(
+    etiquetas: list[str],
+    *,
+    log=None,
+    tamanho_lote: int = TAMANHO_LOTE_CTES,
+) -> dict[str, str]:
+    """Consulta no Envio de remessa o CTE correspondente a cada etiqueta.
+
+    A rotina só adiciona as etiquetas e lê a tabela Código Barras/Remessa.
+    Ela não aciona o botão Processar lista.
+    """
+    etiquetas_unicas = list(dict.fromkeys(
+        str(etiqueta).strip() for etiqueta in etiquetas if str(etiqueta).strip()
+    ))
+    if not etiquetas_unicas:
+        return {}
+    if tamanho_lote < 1 or tamanho_lote > TAMANHO_LOTE_CTES:
+        raise ValueError(
+            f"O tamanho do lote deve ficar entre 1 e {TAMANHO_LOTE_CTES}."
+        )
+    if not URL_FRACTION or not FRACTION_USER or not FRACTION_PASSWORD:
+        raise ValueError(
+            "URL_FRACTION, FRACTION_USER e FRACTION_PASSWORD precisam estar configurados."
+        )
+
+    def registrar(mensagem: str) -> None:
+        _log(log, mensagem)
+
+    def abrir_envio_remessa(page) -> None:
+        registrar(
+            "Recarregando o Fraction antes do lote para limpar resultados "
+            "de consultas anteriores."
+        )
+        page.reload(wait_until="domcontentloaded", timeout=120_000)
+        page.get_by_role("link", name="Operacional").wait_for(
+            state="visible", timeout=120_000
+        )
+        page.get_by_role("link", name="Operacional").click()
+        page.get_by_role("link", name="Manifesto", exact=True).click()
+        page.get_by_role("link", name="Envio de remessa").click()
+        page.locator(ID_CTES).wait_for(state="visible", timeout=120_000)
+
+    def normalizar_cabecalho(valor: object) -> str:
+        return _normalizar_rota(valor).replace(" ", "")
+
+    def consultar_lote(page, lote: list[str], numero_lote: int) -> dict[str, str]:
+        abrir_envio_remessa(page)
+        registrar(
+            f"Lote {numero_lote}: preenchendo {len(lote)} etiqueta(s) no campo "
+            "do Envio de remessa."
+        )
+        page.locator(ID_CTES).fill("\n".join(lote))
+        page.get_by_role("button", name="Adicionar").click(timeout=120_000)
+        registrar(
+            f"Lote {numero_lote}: etiquetas adicionadas; aguardando atualização "
+            "da tabela. Processar lista não será clicado."
+        )
+        aguardar_carregamento_manifesto(page, log=log)
+
+        seletor_linhas = page.get_by_label("Rows Per Page")
+        seletor_linhas.wait_for(state="visible", timeout=60_000)
+        quantidade = len(lote)
+        tamanho_pagina = next(
+            (limite for limite in (10, 25, 50, 100) if quantidade <= limite),
+            100,
+        )
+        seletor_linhas.select_option(str(tamanho_pagina))
+        registrar(
+            f"Lote {numero_lote}: tabela configurada para {tamanho_pagina} "
+            "linhas por página."
+        )
+        aguardar_ajax_fraction(page, log=log)
+
+        cabecalho_barras = page.get_by_role(
+            "columnheader", name=re.compile(r"Código Barras", re.IGNORECASE)
+        ).first
+        cabecalho_barras.wait_for(state="visible", timeout=60_000)
+        tabela = cabecalho_barras.locator("xpath=ancestor::table[1]")
+        cabecalhos = tabela.locator("thead tr").last.locator("th")
+        indice_barras = None
+        indice_remessa = None
+        for indice in range(cabecalhos.count()):
+            texto = normalizar_cabecalho(cabecalhos.nth(indice).inner_text())
+            if "CODIGOBARRAS" in texto:
+                indice_barras = indice
+            elif "REMESSA" in texto:
+                indice_remessa = indice
+        if indice_barras is None or indice_remessa is None:
+            raise RuntimeError(
+                "A tabela do Envio de remessa não exibiu as colunas "
+                "Código Barras e Remessa."
+            )
+
+        encontrados: dict[str, str] = {}
+        pagina_atual = 1
+        paginas_visitadas: set[int] = set()
+        while pagina_atual not in paginas_visitadas:
+            paginas_visitadas.add(pagina_atual)
+            linhas = tabela.locator("tbody tr")
+            for indice_linha in range(linhas.count()):
+                celulas = linhas.nth(indice_linha).locator("td")
+                if celulas.count() <= max(indice_barras, indice_remessa):
+                    continue
+                etiqueta = celulas.nth(indice_barras).inner_text().strip()
+                remessa = celulas.nth(indice_remessa).inner_text().strip()
+                if not etiqueta or not remessa or etiqueta not in lote:
+                    continue
+                anterior = encontrados.get(etiqueta)
+                if anterior and anterior != remessa:
+                    raise ValueError(
+                        f"A etiqueta {etiqueta} apareceu associada às remessas "
+                        f"{anterior} e {remessa}."
+                    )
+                if not anterior:
+                    encontrados[etiqueta] = remessa
+                    registrar(f"Etiqueta {etiqueta} associada à Remessa {remessa}.")
+            registrar(
+                f"Lote {numero_lote}, página {pagina_atual}: "
+                f"{len(encontrados)}/{len(lote)} etiqueta(s) localizadas até agora."
+            )
+
+            if len(encontrados) == len(lote):
+                break
+
+            link_proxima = page.get_by_role(
+                "link", name=f"Page {pagina_atual + 1}", exact=True
+            )
+            if link_proxima.count() and link_proxima.first.is_visible():
+                link_proxima.first.click(timeout=30_000)
+                pagina_atual += 1
+                aguardar_ajax_fraction(page, log=log)
+                continue
+
+            botao_proxima = page.locator(".ui-paginator-next").last
+            if not botao_proxima.count():
+                break
+            classes = (botao_proxima.get_attribute("class") or "").casefold()
+            aria_disabled = (botao_proxima.get_attribute("aria-disabled") or "").casefold()
+            if "ui-state-disabled" in classes or aria_disabled == "true":
+                break
+            if not botao_proxima.is_enabled():
+                break
+            botao_proxima.click(timeout=30_000)
+            pagina_ativa = page.locator(
+                ".ui-paginator-page.ui-state-active"
+            ).last
+            try:
+                pagina_ativa.wait_for(state="visible", timeout=30_000)
+                pagina_atual = int(pagina_ativa.inner_text().strip())
+            except (PlaywrightTimeoutError, ValueError):
+                pagina_atual += 1
+            aguardar_ajax_fraction(page, log=log)
+
+        registrar(
+            f"Lote {numero_lote}: {len(encontrados)}/{len(lote)} etiqueta(s) "
+            "associadas a uma Remessa na tabela."
+        )
+        return encontrados
+
+    resultado: dict[str, str] = {}
+    with sync_playwright() as playwright:
+        browser = None
+        contexto = None
+        page = None
+
+        def fechar_sessao() -> None:
+            nonlocal browser, contexto, page
+            if contexto is not None:
+                try:
+                    contexto.close()
+                except Exception as erro:
+                    registrar(f"Aviso ao fechar o Fraction: {type(erro).__name__}: {erro}")
+            if browser is not None:
+                try:
+                    browser.close()
+                except Exception as erro:
+                    registrar(f"Aviso ao fechar Chromium: {type(erro).__name__}: {erro}")
+            browser = contexto = page = None
+
+        def abrir_sessao() -> None:
+            nonlocal browser, contexto, page
+            fechar_sessao()
+            browser = playwright.chromium.launch(headless=HEADLESS, slow_mo=SLOW_MO_MS)
+            contexto = browser.new_context()
+            page = contexto.new_page()
+            page.on("pageerror", lambda erro: registrar(f"Erro JavaScript no Fraction: {erro}"))
+            registrar("Abrindo sessão padrão do Fraction para consultar as etiquetas.")
+            login_fraction(page, FRACTION_USER, FRACTION_PASSWORD, registrar)
+
+        def recuperar_sessao() -> None:
+            recuperar_sessao_fraction(
+                page,
+                registrar,
+                login_callback=lambda: login_fraction(
+                    page, FRACTION_USER, FRACTION_PASSWORD, registrar
+                ),
+            )
+
+        try:
+            ultimo_erro = None
+            for tentativa in range(1, 4):
+                try:
+                    registrar(f"Abrindo o Fraction (tentativa {tentativa}/3).")
+                    abrir_sessao()
+                    ultimo_erro = None
+                    break
+                except Exception as erro:
+                    ultimo_erro = erro
+                    registrar(
+                        f"Falha ao abrir o Fraction ({tentativa}/3): "
+                        f"{type(erro).__name__}: {erro}"
+                    )
+                    if tentativa < 3:
+                        time.sleep(min(tentativa * 2, 5))
+            if ultimo_erro is not None:
+                raise RuntimeError(
+                    f"Não foi possível abrir o Fraction: {ultimo_erro}"
+                ) from ultimo_erro
+
+            lotes = [
+                etiquetas_unicas[inicio : inicio + tamanho_lote]
+                for inicio in range(0, len(etiquetas_unicas), tamanho_lote)
+            ]
+            for numero_lote, lote in enumerate(lotes, start=1):
+                registrar(
+                    f"Consultando lote {numero_lote}/{len(lotes)} com "
+                    f"{len(lote)} etiqueta(s)."
+                )
+                parte = executar_com_retentativas_fraction(
+                    lambda lote=lote, numero_lote=numero_lote: consultar_lote(
+                        page, lote, numero_lote
+                    ),
+                    recuperar_sessao,
+                    registrar,
+                    descricao=f"Consulta de etiquetas, lote {numero_lote}",
+                    tentativas=5,
+                )
+                resultado.update(parte)
+        finally:
+            fechar_sessao()
+
+    return resultado
+
+
+def _selecionar_data_performance_intervalo(page, seletor: str, valor: date) -> None:
+    campo = page.locator(seletor)
+    texto = valor.strftime("%d/%m/%Y")
+    campo.click()
+    meses = page.get_by_label("select month")
+    for indice in range(meses.count()):
+        mes_visivel = meses.nth(indice)
+        if mes_visivel.is_visible():
+            mes_visivel.select_option(str(valor.month - 1))
+            break
+    anos = page.get_by_label("select year")
+    for indice in range(anos.count()):
+        ano_visivel = anos.nth(indice)
+        if ano_visivel.is_visible():
+            ano_visivel.select_option(str(valor.year))
+            break
+    dias = page.get_by_role("link", name=str(valor.day), exact=True)
+    dia_selecionado = False
+    for indice in range(dias.count()):
+        dia_visivel = dias.nth(indice)
+        if dia_visivel.is_visible():
+            dia_visivel.click()
+            dia_selecionado = True
+            break
+    if not dia_selecionado:
+        dias.first.wait_for(state="visible", timeout=15_000)
+        dias.first.click()
+    if campo.input_value().strip() != texto:
+        raise RuntimeError(
+            f"O Fraction não manteve a data {texto} no campo {seletor}."
+        )
+
+
+def extrair_relatorio_performance_intervalo_fraction(
+    data_inicial: date,
+    data_final: date,
+    token: str,
+    *,
+    pasta_destino: str | Path | None = None,
+    log=None,
+) -> Path:
+    """Baixa a Performance por período para reutilização em outras automações.
+
+    Mantém disponível no serviço Fraction o fluxo antigo de extração por datas,
+    embora a fila de romaneios de Emissão passe a usar a consulta por CTE.
+    """
+    if data_final < data_inicial:
+        raise ValueError("A data final precisa ser igual ou posterior à inicial.")
+    if (data_final - data_inicial).days + 1 > 31:
+        raise ValueError("O período da Performance pode ter no máximo 31 dias.")
+    if not token.strip():
+        raise ValueError("Informe o Token MFA para consultar o Fraction.")
+    if not URL_FRACTION or not FRACTION_USER_PERFORMANCE or not FRACTION_PASSWORD_PERFORMANCE:
+        raise RuntimeError(
+            "Configure URL_FRACTION, FRACTION_USER_PERFORMANCE e "
+            "FRACTION_PASSWORD_PERFORMANCE no .env."
+        )
+
+    pasta = Path(pasta_destino) if pasta_destino is not None else RESULTADOS_PERFORMANCE
+    pasta.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S-%f")
+    caminho_zip = pasta / (
+        f"Performance_{data_inicial:%Y-%m-%d}_a_{data_final:%Y-%m-%d}_"
+        f"{timestamp}.zip"
+    )
+    _log(
+        log,
+        f"Extração reutilizável da Performance: {data_inicial:%d/%m/%Y} a "
+        f"{data_final:%d/%m/%Y}.",
+    )
+
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(headless=HEADLESS, slow_mo=SLOW_MO_MS)
+        contexto = browser.new_context(accept_downloads=True)
+        page = contexto.new_page()
+        try:
+            page.goto(URL_FRACTION, wait_until="domcontentloaded", timeout=120_000)
+            page.get_by_role("textbox", name="Usuário").fill(FRACTION_USER_PERFORMANCE)
+            page.get_by_role("textbox", name="Senha").fill(FRACTION_PASSWORD_PERFORMANCE)
+            page.get_by_role("button", name="Login").click()
+            campo_token = page.get_by_role("textbox", name="Digite o código MFA:")
+            campo_token.wait_for(state="visible", timeout=60_000)
+            campo_token.fill(token.strip())
+            page.get_by_role("button", name="Validar").click()
+            page.get_by_role("link", name="Gerencial").wait_for(
+                state="visible", timeout=120_000
+            )
+            _log(log, "Login da extração de Performance concluído com Token MFA.")
+
+            page.get_by_role("link", name="Gerencial").click()
+            page.get_by_role("link", name="Performance", exact=True).click()
+            page.locator(SELETOR_DATA_INICIAL_PERFORMANCE).wait_for(
+                state="visible", timeout=120_000
+            )
+            page.locator(SELETOR_DATA_FINAL_PERFORMANCE).wait_for(
+                state="visible", timeout=120_000
+            )
+            _selecionar_data_performance_intervalo(
+                page, SELETOR_DATA_INICIAL_PERFORMANCE, data_inicial
+            )
+            _selecionar_data_performance_intervalo(
+                page, SELETOR_DATA_FINAL_PERFORMANCE, data_final
+            )
+            page.get_by_role("button", name="Processar").click(timeout=120_000)
+
+            total = page.get_by_role(
+                "gridcell", name="TOTAL DO PERIODO", exact=True
+            )
+            total.wait_for(state="visible", timeout=240_000)
+            linha_total = total.locator("xpath=ancestor::tr[1]")
+            celulas = linha_total.get_by_role("gridcell")
+            if celulas.count() < 2 or not celulas.nth(1).inner_text().strip():
+                raise RuntimeError(
+                    "A linha TOTAL DO PERIODO não retornou a quantidade de pedidos."
+                )
+            _log(
+                log,
+                "Aguardando o ZIP da Performance; quantidade do período: "
+                f"{celulas.nth(1).inner_text().strip()}.",
+            )
+            try:
+                with page.expect_download(
+                    timeout=TIMEOUT_DOWNLOAD_PERFORMANCE_INTERVALO_MS
+                ) as informacao_download:
+                    celulas.nth(1).click()
+                download = informacao_download.value
+            except PlaywrightTimeoutError as erro:
+                raise TimeoutError(
+                    "O Fraction apresentou o total do período, mas não iniciou "
+                    "o download ZIP da Performance."
+                ) from erro
+            download.save_as(caminho_zip)
+            _log(log, f"ZIP da Performance salvo em {caminho_zip}.")
+            return caminho_zip
+        finally:
+            try:
+                contexto.close()
+            finally:
+                browser.close()
 
 
 def _capturar_resposta_pdf(response, arquivos_pdf: list[tuple[str, bytes]], *, log=None) -> None:

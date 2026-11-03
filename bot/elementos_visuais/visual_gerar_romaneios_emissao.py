@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import datetime
 from hashlib import sha256
 from pathlib import Path
 import tempfile
@@ -21,14 +21,20 @@ from servicos.fraction import (
     preparar_lote_impressao_romaneios,
 )
 from automacoes.gerar_romaneios_emissao import (
-    LIMITE_DIAS_PERFORMANCE_EMISSAO,
+    COLUNAS_RESULTADO,
     baixar_etiquetas_drive,
     carregar_codigos_preferenciais_unidades_emissao,
-    extrair_performance_intervalo,
+    consultar_status_performance_ctes,
     montar_fila_emissao,
     preparar_estado_etiquetas_romaneio,
+    recalcular_rotas_fila_emissao,
     registrar_etiquetas_romaneio,
+    selecionar_txt_novos_do_zip,
 )
+from automacoes.dar_entrada_pedidos import (
+    PADRAO_ETIQUETA,
+)
+from servicos.fila_romaneios_emissao import FilaRomaneiosEmissao
 from utils.interface import (
     LARGURA_BOTAO,
     avisar_variaveis_faltantes,
@@ -39,7 +45,7 @@ from utils.interface import (
     warning,
 )
 from utils.config import (
-    ARQUIVO_ETIQUETAS_ROMANEIOS_EMISSAO,
+    ARQUIVO_FILA_ROMANEIOS_EMISSAO,
     ARQUIVO_ROTAS_ROMANEIOS,
     RESULTADOS_ROMANEIOS,
 )
@@ -49,6 +55,7 @@ from utils.logs import criar_logger_execucao
 CHAVE_RESULTADO = "visual_gerar_romaneios_emissao_resultado"
 CHAVE_LOGS = "visual_gerar_romaneios_emissao_logs"
 CHAVE_LOG_PAINEL_RENDERIZADO = "visual_gerar_romaneios_emissao_log_painel_renderizado"
+CHAVE_MENSAGEM_SINCRONIZACAO = "visual_gerar_romaneios_emissao_sincronizacao"
 
 
 def _normalizar_rota(valor: object) -> str:
@@ -152,218 +159,326 @@ def _volume_divergente(linha: pd.Series) -> bool:
     )
 
 
-def _normalizar_periodo_emissao(valor):
-    if isinstance(valor, tuple):
-        if not valor:
-            return None, None
-        if len(valor) == 1:
-            return valor[0], valor[0]
-        return valor[0], valor[1]
-    return valor, valor
+def _montar_tabela_fila_persistida(
+    fila: FilaRomaneiosEmissao,
+) -> pd.DataFrame:
+    etiquetas_abertas = fila.carregar_etiquetas_abertas()
+    colunas = (
+        ["Rua", "Palete de origem"]
+        + COLUNAS_RESULTADO[:-2]
+        + ["UF", "Cidade"]
+        + COLUNAS_RESULTADO[-2:]
+        + ["CTEs por etiqueta", "Triagem", "Rota", "Origem", "Status"]
+    )
+    if etiquetas_abertas.empty:
+        return pd.DataFrame(columns=colunas)
+
+    linhas = []
+    colunas_grupo = ["rua", "triagem", "rota", "shipment_id"]
+    for _, grupo in etiquetas_abertas.groupby(
+        colunas_grupo,
+        sort=False,
+        dropna=False,
+    ):
+        def primeira_preenchida(coluna: str):
+            for valor in grupo[coluna].tolist():
+                if pd.notna(valor) and str(valor).strip():
+                    return valor
+            return ""
+
+        etiquetas = sorted(
+            grupo["etiqueta"].astype(str).tolist(),
+            key=lambda etiqueta: (
+                int(PADRAO_ETIQUETA.fullmatch(etiqueta).group(2))
+                if PADRAO_ETIQUETA.fullmatch(etiqueta)
+                else 0
+            ),
+        )
+        cte_por_etiqueta = {
+            str(linha["etiqueta"]): str(linha["cte"] or "").strip()
+            for _, linha in grupo.iterrows()
+        }
+        ctes_por_etiqueta = [cte_por_etiqueta.get(etiqueta, "") for etiqueta in etiquetas]
+        ctes_do_pedido = list(dict.fromkeys(cte for cte in ctes_por_etiqueta if cte))
+        volume_sistema = None
+        shipment_id = str(primeira_preenchida("shipment_id"))
+        cte = ctes_do_pedido[0] if ctes_do_pedido else ""
+        linhas.append(
+            {
+                "Rua": str(primeira_preenchida("rua") or ""),
+                "Palete de origem": "; ".join(
+                    dict.fromkeys(
+                        valor.strip()
+                        for valor in grupo["palete_origem"].astype(str)
+                        if valor.strip()
+                    )
+                ),
+                "CTE": cte,
+                "ShipmentId": shipment_id,
+                "Etiquetas do pedido": "\n".join(etiquetas),
+                "Volumes Sistema": volume_sistema,
+                "Volumes Etiquetas": len(etiquetas),
+                "Etiquetas faltantes": "",
+                "CTEs para dar entrada": "\n".join(ctes_do_pedido),
+                "CTEs por etiqueta": "\n".join(ctes_por_etiqueta),
+                "UF": str(primeira_preenchida("uf") or ""),
+                "Cidade": str(primeira_preenchida("cidade") or ""),
+                "Destino": str(primeira_preenchida("destino") or ""),
+                "Manifesto": "",
+                "Triagem": str(primeira_preenchida("triagem") or ""),
+                "Rota": str(primeira_preenchida("rota") or ""),
+                "Origem": str(primeira_preenchida("origem") or ""),
+                "Status": str(primeira_preenchida("status") or ""),
+            }
+        )
+
+    return pd.DataFrame(linhas, columns=colunas)
 
 
-def _renderizar_extracao_performance() -> tuple[str, str] | None:
-    faltantes = avisar_variaveis_faltantes("extrair_performance_emissao")
+def _renderizar_sincronizacao_drive() -> None:
+    faltantes = avisar_variaveis_faltantes("gerar_romaneios")
     faltantes_drive = avisar_variaveis_faltantes("importar_etiquetas_drive")
-
-    hoje = date.today()
-    periodo_selecionado = st.date_input(
-        "Período de extração",
-        value=(hoje, hoje),
-        min_value=date(2000, 1, 1),
-        max_value=hoje,
-        key="gerar_romaneios_emissao_performance_periodo_extracao",
-        format="DD/MM/YYYY",
+    st.caption(
+        "Sincronize os TXT do Drive. O Fraction associa cada etiqueta à Remessa/CTE; "
+        "em seguida, a Performance consulta os CTEs em lotes de até 1.000 para obter "
+        "Destino e Status. O volume do sistema permanece em branco nesta etapa."
     )
-    data_inicial, data_final = _normalizar_periodo_emissao(
-        periodo_selecionado
-    )
-
-    periodo_valido = data_inicial is not None and data_final is not None
-    quantidade_dias = (
-        (data_final - data_inicial).days + 1
-        if periodo_valido
-        else 0
-    )
-    if not periodo_valido:
-        warning("Selecione as datas inicial e final do período de extração.")
-    elif data_final < data_inicial:
-        warning("A data final precisa ser igual ou posterior à data inicial.")
-    elif quantidade_dias > LIMITE_DIAS_PERFORMANCE_EMISSAO:
-        warning(
-            "O período máximo permitido é de "
-            f"{LIMITE_DIAS_PERFORMANCE_EMISSAO} dias, contando as datas inicial "
-            "e final."
-        )
-    else:
-        st.caption(
-            "Será feita uma extração para o intervalo de "
-            f"{data_inicial:%d/%m/%Y} a {data_final:%d/%m/%Y}. "
-            f"Limite: {LIMITE_DIAS_PERFORMANCE_EMISSAO} dias."
-        )
-
-    token = st.text_input(
-        "Token MFA do Fraction",
-        type="password",
-        max_chars=6,
-        placeholder="Digite o código MFA",
-        key="gerar_romaneios_emissao_performance_token_mfa",
-    )
-    processar = st.button(
-        "Processar",
+    sincronizar = st.button(
+        "Sincronizar Drive",
         type="primary",
-        key="gerar_romaneios_emissao_processar",
+        key="gerar_romaneios_emissao_sincronizar",
         width=LARGURA_BOTAO,
-        disabled=(
-            bool(faltantes or faltantes_drive)
-            or not periodo_valido
-            or data_final < data_inicial
-            or quantidade_dias > LIMITE_DIAS_PERFORMANCE_EMISSAO
-        ),
+        disabled=bool(faltantes or faltantes_drive),
     )
+    if not sincronizar:
+        return
 
-    periodo = (
-        (data_inicial.isoformat(), data_final.isoformat())
-        if periodo_valido
-        else None
+    st.session_state[CHAVE_LOGS] = []
+    _, log_visual = criar_painel_execucao(
+        CHAVE_LOGS,
+        limpar=False,
+        max_linhas=None,
+        expandido=True,
     )
-    if processar:
-        if not token.strip():
-            error("Informe o Token MFA para processar a fila.")
-        else:
-            st.session_state.pop(CHAVE_RESULTADO, None)
-            st.session_state[CHAVE_LOGS] = []
-            _, log_visual = criar_painel_execucao(
-                CHAVE_LOGS,
-                limpar=False,
-                max_linhas=None,
-                expandido=True,
+    st.session_state[CHAVE_LOG_PAINEL_RENDERIZADO] = True
+    log, _ = criar_logger_execucao(
+        "gerar_romaneios",
+        log_visual,
+        rotulo="processar_emissao",
+    )
+    try:
+        st.session_state.pop(CHAVE_MENSAGEM_SINCRONIZACAO, None)
+        caminho_estado = preparar_estado_etiquetas_romaneio()
+        fila = FilaRomaneiosEmissao(ARQUIVO_FILA_ROMANEIOS_EMISSAO)
+        log(f"Arquivo de etiquetas já processadas: {caminho_estado}.")
+        log(f"Banco local da fila incremental: {ARQUIVO_FILA_ROMANEIOS_EMISSAO}.")
+        with tempfile.TemporaryDirectory(prefix="botevelog_emissao_") as diretorio_temporario:
+            pasta_temporaria = Path(diretorio_temporario)
+            with st.spinner("Baixando os TXT novos do Drive..."):
+                caminho_zip = baixar_etiquetas_drive(
+                    pasta_destino=pasta_temporaria,
+                    arquivos_conhecidos=fila.nomes_arquivos_importados(),
+                    log=log,
+                )
+            if caminho_zip is None:
+                st.session_state[CHAVE_MENSAGEM_SINCRONIZACAO] = (
+                    "Drive sincronizado: nenhum TXT novo elegível foi baixado. "
+                    "Só são importados arquivos com 'Transferência' no nome; "
+                    "as filas abertas foram mantidas."
+                )
+                success(
+                    "Não há arquivos novos elegíveis; as filas abertas "
+                    "continuam disponíveis."
+                )
+                return
+
+            conteudo_zip = caminho_zip.read_bytes()
+            conteudo_etiquetas, arquivos_novos = selecionar_txt_novos_do_zip(
+                conteudo_zip,
+                fila.arquivos_importados(),
+                log=log,
             )
-            st.session_state[CHAVE_LOG_PAINEL_RENDERIZADO] = True
-            log, _ = criar_logger_execucao(
-                "gerar_romaneios",
-                log_visual,
-                rotulo="processar_emissao",
+            if not arquivos_novos:
+                st.session_state[CHAVE_MENSAGEM_SINCRONIZACAO] = (
+                    "Drive sincronizado: nenhum TXT novo elegível foi encontrado. "
+                    "Só são importados arquivos com 'Transferência' no nome; "
+                    "as filas abertas foram mantidas."
+                )
+                success(
+                    "Não há arquivos novos elegíveis; as filas abertas "
+                    "continuam disponíveis."
+                )
+                return
+
+            with st.spinner(
+                "Consultando etiquetas no Fraction e montando a fila pela Performance..."
+            ):
+                dados = montar_fila_emissao(
+                    conteudo_etiquetas,
+                    nome_arquivo_etiquetas="txt_novos_drive.zip",
+                    pasta_temporaria=pasta_temporaria,
+                    log=log,
+                )
+                contagem = fila.importar_fila(
+                    dados["tabela"],
+                    arquivos_novos,
+                    log=log,
+                )
+
+            st.session_state[CHAVE_MENSAGEM_SINCRONIZACAO] = (
+                f"Sincronização concluída: {contagem['novas']} etiqueta(s) nova(s) "
+                f"adicionada(s); {contagem['repetidas']} já estavam na fila ou no histórico."
             )
-            try:
-                caminho_estado = preparar_estado_etiquetas_romaneio()
-                log(f"Arquivo de estado de etiquetas: {caminho_estado}.")
-                with tempfile.TemporaryDirectory(
-                    prefix="botevelog_emissao_"
-                ) as diretorio_temporario:
-                    pasta_temporaria = Path(diretorio_temporario)
-                    with st.spinner("Extraindo a Performance do período..."):
-                        extracao = extrair_performance_intervalo(
-                            data_inicial,
-                            data_final,
-                            token,
-                            pasta_temporaria=pasta_temporaria,
-                            log=log,
-                        )
-                    conteudo_performance = Path(
-                        extracao["arquivo_consolidado"]
-                    ).read_bytes()
-                    nome_arquivo_performance = Path(
-                        extracao["arquivo_consolidado"]
-                    ).name
-
-                    with st.spinner("Baixando as etiquetas do Drive..."):
-                        caminho_zip = baixar_etiquetas_drive(
-                            pasta_destino=pasta_temporaria,
-                            log=log,
-                        )
-                    conteudo_etiquetas = caminho_zip.read_bytes()
-                    nome_arquivo_etiquetas = caminho_zip.name
-
-                    identificador = sha256(
-                        conteudo_performance
-                        + b"\0"
-                        + nome_arquivo_etiquetas.encode("utf-8")
-                        + b"\0"
-                        + conteudo_etiquetas
-                        + b"\0"
-                        + "|".join(periodo or ()).encode("utf-8")
-                    ).hexdigest()
-
-                    with st.spinner("Montando a fila para conferência..."):
-                        dados = montar_fila_emissao(
-                            conteudo_performance,
-                            conteudo_etiquetas,
-                            nome_arquivo_etiquetas=nome_arquivo_etiquetas,
-                            pasta_temporaria=pasta_temporaria,
-                            log=log,
-                        )
-
-                st.session_state[CHAVE_RESULTADO] = {
-                    "periodo": periodo,
-                    "identificador": identificador,
-                    "arquivo_performance_nome": nome_arquivo_performance,
-                    "nome_arquivo_etiquetas": nome_arquivo_etiquetas,
-                    **dados,
-                    "confirmacoes": [],
-                    "enviado": False,
-                    "resumo_envio": None,
-                }
-                if dados["shipment_ids_sem_retorno_fraction"]:
-                    warning(
-                        f"{len(dados['shipment_ids_sem_retorno_fraction'])} pedido(s) "
-                        "consultados não retornaram CTE no Fraction; permanecerão na "
-                        "fila e não serão enviados até haver um CTE."
-                    )
-                if dados["shipment_ids_sem_destino_performance"]:
-                    warning(
-                        f"{len(dados['shipment_ids_sem_destino_performance'])} pedido(s) "
-                        "consultados ficaram sem Destino no relatório de Performance; "
-                        "permanecerão na fila e não serão enviados até haver uma rota."
-                    )
-                if dados["shipment_ids_sem_status_performance"]:
-                    warning(
-                        f"{len(dados['shipment_ids_sem_status_performance'])} pedido(s) "
-                        "não têm Status preenchido nas planilhas de Performance e foram "
-                        "removidos da fila."
-                    )
-                if dados["tabela"].empty:
-                    warning(
-                        "Nenhum pedido está com Status EMISSAO; a fila de envio ficou vazia."
-                    )
-                else:
-                    success(f"Fila montada: {len(dados['tabela'])} pedido(s).")
-            except CredenciaisFractionInvalidasError as erro_credenciais:
-                warning(str(erro_credenciais))
-            except Exception as erro:
-                log(f"Falha ao processar a fila: {type(erro).__name__}: {erro}")
-                error(f"Não foi possível processar a fila: {erro}")
-
-    return periodo
+            etiquetas_sem_cte = dados.get("etiquetas_sem_retorno_fraction", [])
+            if etiquetas_sem_cte:
+                amostra_etiquetas = ", ".join(etiquetas_sem_cte[:5])
+                mais_etiquetas = "…" if len(etiquetas_sem_cte) > 5 else ""
+                warning(
+                    f"{len(etiquetas_sem_cte)} etiqueta(s) não retornaram "
+                    "Remessa/CTE no Fraction e foram ignoradas. As demais "
+                    f"foram processadas. Amostra: {amostra_etiquetas}{mais_etiquetas}"
+                )
+            if dados["shipment_ids_sem_retorno_fraction"]:
+                warning(
+                    f"{len(dados['shipment_ids_sem_retorno_fraction'])} pedido(s) "
+                    "não retornaram dados de Performance; permanecerão fora da fila."
+                )
+            if dados["shipment_ids_sem_destino_performance"]:
+                warning(
+                    f"{len(dados['shipment_ids_sem_destino_performance'])} pedido(s) "
+                    "ficaram sem Destino na Performance; confira a rota antes de gerar."
+                )
+            if dados["shipment_ids_sem_status_performance"]:
+                warning(
+                    f"{len(dados['shipment_ids_sem_status_performance'])} pedido(s) "
+                    "não têm Status EMISSAO e foram mantidos fora da fila."
+                )
+            if not dados["tabela"].empty:
+                success(
+                    f"Fila atualizada: {contagem['novas']} etiqueta(s) nova(s) "
+                    "adicionada(s)."
+                )
+            else:
+                warning(
+                    "Os TXT novos foram processados, mas não havia etiquetas elegíveis "
+                    "para entrar na fila."
+                )
+    except CredenciaisFractionInvalidasError as erro_credenciais:
+        warning(str(erro_credenciais))
+    except Exception as erro:
+        log(f"Falha ao processar a fila: {type(erro).__name__}: {erro}")
+        error(f"Não foi possível processar a fila: {erro}")
 
 
 def renderizar_gerar_romaneios_emissao() -> None:
-    st.subheader("Gerar romaneios de Emissão")
+    st.subheader("Fila de romaneios de Emissão")
     st.caption(
-        "Etiquetas fora da fila por status e etiquetas de romaneios concluídos "
-        f"ficam registradas em {ARQUIVO_ETIQUETAS_ROMANEIOS_EMISSAO}."
+        "As filas são atualizadas pelos TXT novos do Drive e armazenadas por rua e "
+        "triagem. Cada etiqueta é registrada uma única vez; filas concluídas permanecem "
+        "no histórico."
     )
 
-    periodo = _renderizar_extracao_performance()
-    resultado_atual = st.session_state.get(CHAVE_RESULTADO)
-    if resultado_atual and resultado_atual.get("periodo") != periodo:
-        st.session_state.pop(CHAVE_RESULTADO, None)
-        resultado_atual = None
-    if not resultado_atual:
-        if not st.session_state.pop(CHAVE_LOG_PAINEL_RENDERIZADO, False):
-            renderizar_logs(
-                st.session_state.get(CHAVE_LOGS, []),
-                max_linhas=None,
-                expandido=True,
+    _renderizar_sincronizacao_drive()
+    fila = FilaRomaneiosEmissao(ARQUIVO_FILA_ROMANEIOS_EMISSAO)
+    tabela = _montar_tabela_fila_persistida(fila)
+    if not tabela.empty:
+        try:
+            tabela_recalculada = recalcular_rotas_fila_emissao(tabela)
+            etiquetas_atualizadas = fila.atualizar_rotas_abertas(tabela_recalculada)
+            if etiquetas_atualizadas:
+                tabela = _montar_tabela_fila_persistida(fila)
+                st.caption(
+                    f"Rotas atualizadas pela configuração atual para "
+                    f"{etiquetas_atualizadas} etiqueta(s) da fila aberta."
+                )
+        except (FileNotFoundError, OSError, ValueError) as erro:
+            warning(
+                "Não foi possível recalcular as rotas das filas abertas; "
+                f"os dados salvos foram mantidos. Detalhe: {erro}"
             )
-        return
 
-    identificador = resultado_atual["identificador"]
-    tabela: pd.DataFrame = resultado_atual["tabela"]
-    tabela_completa: pd.DataFrame = resultado_atual.get(
-        "tabela_completa",
-        tabela,
+    etiquetas_abertas_db = fila.carregar_etiquetas_abertas()
+    ctes_abertos = list(dict.fromkeys(
+        str(cte).strip()
+        for cte in etiquetas_abertas_db.get("cte", pd.Series(dtype=str)).tolist()
+        if pd.notna(cte) and str(cte).strip()
+    ))
+    faltantes_config_status = (
+        avisar_variaveis_faltantes("baixar_relatorios_performance")
+        if ctes_abertos
+        else []
     )
+    st.caption(
+        "O status é consultado novamente na Performance do Fraction para os CTEs "
+        "que ainda estão abertos."
+    )
+    atualizar_status = st.button(
+        "Atualizar status no Fraction",
+        key="gerar_romaneios_emissao_atualizar_status",
+        width=LARGURA_BOTAO,
+        disabled=not ctes_abertos or bool(faltantes_config_status),
+    )
+    if atualizar_status:
+        st.session_state[CHAVE_LOGS] = []
+        log, caminho_log = criar_logger_execucao(
+            "gerar_romaneios",
+            st.session_state[CHAVE_LOGS].append,
+            rotulo="atualizar_status_emissao",
+        )
+        log(f"Arquivo de log: {caminho_log}.")
+        try:
+            with st.spinner(
+                f"Atualizando o status de {len(ctes_abertos)} CTE(s) no Fraction..."
+            ):
+                with tempfile.TemporaryDirectory(
+                    prefix="botevelog_status_emissao_"
+                ) as diretorio_temporario:
+                    status_por_cte = consultar_status_performance_ctes(
+                        ctes_abertos,
+                        log=log,
+                        pasta_temporaria=Path(diretorio_temporario),
+                    )
+            ctes_sem_status = [
+                cte for cte in ctes_abertos if cte not in status_por_cte
+            ]
+            etiquetas_atualizadas = fila.atualizar_status_abertas(status_por_cte)
+            log(
+                f"Status atualizado para {etiquetas_atualizadas} etiqueta(s) "
+                f"aberta(s), em {len(status_por_cte)} CTE(s)."
+            )
+            if ctes_sem_status:
+                log(
+                    f"A Performance não retornou Status para {len(ctes_sem_status)} "
+                    "CTE(s); os status anteriores foram mantidos."
+                )
+                warning(
+                    f"A Performance não retornou Status para {len(ctes_sem_status)} "
+                    "CTE(s); os valores anteriores foram mantidos."
+                )
+            else:
+                success(
+                    f"Status consultado para {len(status_por_cte)} CTE(s); "
+                    f"{etiquetas_atualizadas} etiqueta(s) aberta(s) tiveram alteração."
+                )
+            tabela = _montar_tabela_fila_persistida(fila)
+        except Exception as erro:
+            log(f"Falha ao atualizar status: {type(erro).__name__}: {erro}")
+            error(f"Não foi possível atualizar os status no Fraction: {erro}")
+
+    etiquetas_ativas = "\n".join(
+        tabela.get("Etiquetas do pedido", pd.Series(dtype=str)).astype(str)
+    )
+    identificador = sha256(etiquetas_ativas.encode("utf-8")).hexdigest()
+    resultado_atual = st.session_state.get(CHAVE_RESULTADO)
+    if not isinstance(resultado_atual, dict):
+        resultado_atual = {}
+        st.session_state[CHAVE_RESULTADO] = resultado_atual
+    mensagem_sincronizacao = st.session_state.get(CHAVE_MENSAGEM_SINCRONIZACAO)
+    if mensagem_sincronizacao:
+        st.info(mensagem_sincronizacao)
+    if resultado_atual.get("resumo_envio"):
+        success(resultado_atual["resumo_envio"])
+
     configuracao_colunas_fila = {
         "Rua": st.column_config.TextColumn("Rua"),
         "Palete de origem": st.column_config.TextColumn("Palete de origem"),
@@ -389,29 +504,40 @@ def renderizar_gerar_romaneios_emissao() -> None:
         "Origem": st.column_config.TextColumn("Origem"),
         "Status": st.column_config.TextColumn("Status"),
     }
-    st.markdown("#### Todos os pedidos")
-    st.dataframe(
-        tabela_completa,
-        hide_index=True,
-        width="stretch",
-        column_config=configuracao_colunas_fila,
-    )
-
-    if tabela.empty:
-        st.info("Nenhum pedido da base completa ficou na fila EMISSAO.")
-        renderizar_logs(st.session_state.get(CHAVE_LOGS, []))
-        return
-
-    with st.expander("Fila completa para conferência", expanded=False):
-        st.dataframe(
-            tabela,
-            hide_index=True,
-            width="stretch",
-            column_config=configuracao_colunas_fila,
+    resumo_abertos = (
+        tabela.groupby(["Rua", "Triagem", "Rota"], dropna=False)
+        .agg(
+            Pedidos=("ShipmentId", "nunique"),
+            Etiquetas=("Volumes Etiquetas", "sum"),
         )
+        .reset_index()
+        if not tabela.empty
+        else pd.DataFrame(columns=["Rua", "Triagem", "Rota", "Pedidos", "Etiquetas"])
+    )
+    st.markdown("#### Dashboard de filas abertas")
+    if resumo_abertos.empty:
+        st.info("Ainda não há etiquetas pendentes. Sincronize o Drive após enviar um TXT.")
+    else:
+        st.dataframe(resumo_abertos, hide_index=True, width="stretch")
+    with st.expander("Detalhes dos pedidos em filas abertas", expanded=False):
+        if tabela.empty:
+            st.info("Sem pedidos pendentes.")
+        else:
+            st.dataframe(
+                tabela.drop(columns=["CTEs por etiqueta"], errors="ignore"),
+                hide_index=True,
+                width="stretch",
+                column_config=configuracao_colunas_fila,
+            )
+
+    historico = fila.carregar_historico()
+    with st.expander("Romaneios concluídos", expanded=False):
+        if historico.empty:
+            st.info("Nenhum romaneio foi concluído por esta fila ainda.")
+        else:
+            st.dataframe(historico, hide_index=True, width="stretch")
 
     divergencias = tabela[tabela.apply(_volume_divergente, axis=1)]
-    sem_volume = tabela[tabela["Volumes Sistema"].isna()]
     if not divergencias.empty:
         warning(
             f"{len(divergencias)} pedido(s) têm divergência entre Volume e "
@@ -426,7 +552,10 @@ def renderizar_gerar_romaneios_emissao() -> None:
                 rua = str(linha.get("Rua", "Sem rua"))
                 triagem = str(linha.get("Triagem", "Sem triagem"))
                 palete = str(linha.get("Palete de origem", "Sem palete"))
-                token_confirmacao = f"{rua}\0{palete}\0{shipment_id}"
+                etiquetas_token = str(linha.get("Etiquetas do pedido", ""))
+                token_confirmacao = (
+                    f"{rua}\0{palete}\0{shipment_id}\0{etiquetas_token}"
+                )
                 chave_checkbox = sha256(token_confirmacao.encode("utf-8")).hexdigest()[:16]
                 etiquetas_faltantes = str(linha["Etiquetas faltantes"] or "").strip()
                 quantidade_faltantes = (
@@ -460,24 +589,27 @@ def renderizar_gerar_romaneios_emissao() -> None:
                 f"{len(divergencias)} pedido(s) divergente(s) liberado(s)."
             )
 
-    if not sem_volume.empty:
-        warning(
-            f"{len(sem_volume)} pedido(s) não têm Volume na Performance e "
-            "não serão enviados."
-        )
-
     tabela_envio = tabela.copy()
     confirmacoes = set(resultado_atual.get("confirmacoes", []))
     for indice, linha in tabela_envio.iterrows():
         token_confirmacao = (
             f"{linha.get('Rua', 'Sem rua')}\0"
             f"{linha.get('Palete de origem', 'Sem palete')}\0"
-            f"{linha['ShipmentId']}"
+            f"{linha['ShipmentId']}\0"
+            f"{linha.get('Etiquetas do pedido', '')}"
         )
-        if pd.isna(linha["Volumes Sistema"]):
+        if _volume_divergente(linha) and token_confirmacao not in confirmacoes:
             tabela_envio.at[indice, "CTEs para dar entrada"] = ""
-        elif _volume_divergente(linha) and token_confirmacao not in confirmacoes:
-            tabela_envio.at[indice, "CTEs para dar entrada"] = ""
+
+    status_emissao = tabela_envio["Status"].fillna("").map(
+        lambda valor: _normalizar_rota(valor) == "EMISSAO"
+    )
+    pedidos_fora_emissao = tabela_envio.loc[~status_emissao]
+    if not pedidos_fora_emissao.empty:
+        warning(
+            f"{len(pedidos_fora_emissao)} pedido(s) com status diferente de "
+            "EMISSAO estão bloqueados para geração de romaneio."
+        )
 
     tem_ctes_envio = tabela_envio["CTEs para dar entrada"].fillna("").map(
         lambda valor: any(
@@ -485,12 +617,13 @@ def renderizar_gerar_romaneios_emissao() -> None:
             for linha in str(valor).splitlines()
         )
     )
+    tem_ctes_envio &= status_emissao
     rota_original = tabela["Rota"].fillna("").astype(str).str.strip()
     sem_rota_ou_ambigua = tabela.loc[
         rota_original.isin({"", "Sem rota", "Rota ambígua"})
     ].copy()
     grupos, grupos_ignorados = mapear_rotas_para_grupos(
-        tabela_envio,
+        tabela_envio.loc[status_emissao],
         separar_por_rua_triagem=True,
     )
     codigos_preferenciais = carregar_codigos_preferenciais_unidades_emissao()
@@ -519,14 +652,15 @@ def renderizar_gerar_romaneios_emissao() -> None:
         return chave in chaves_grupos_prontos
 
     prontos_para_envio = tabela_envio.loc[
-        tem_ctes_envio & tabela_envio.apply(linha_em_grupo_pronto, axis=1)
+        tem_ctes_envio
+        & tabela_envio.apply(linha_em_grupo_pronto, axis=1)
     ].copy()
     st.markdown("#### Prontos para envio")
     if prontos_para_envio.empty:
         st.info("Nenhum pedido está pronto para envio.")
     else:
         st.dataframe(
-            prontos_para_envio,
+            prontos_para_envio.drop(columns=["CTEs por etiqueta"], errors="ignore"),
             hide_index=True,
             width="stretch",
             column_config=configuracao_colunas_fila,
@@ -537,7 +671,7 @@ def renderizar_gerar_romaneios_emissao() -> None:
         st.info("Não há pedidos sem rota ou com rota ambígua.")
     else:
         st.dataframe(
-            sem_rota_ou_ambigua,
+            sem_rota_ou_ambigua.drop(columns=["CTEs por etiqueta"], errors="ignore"),
             hide_index=True,
             width="stretch",
             column_config=configuracao_colunas_fila,
@@ -581,102 +715,139 @@ def renderizar_gerar_romaneios_emissao() -> None:
                     ),
                 },
             )
-    quantidade_ctes = sum(
-        len(grupo["LISTA_CTES"]) for grupo in grupos_validos
-    )
+    quantidade_ctes = sum(len(grupo["LISTA_CTES"]) for grupo in grupos_validos)
     st.caption(
-        f"Prontos para envio: {quantidade_ctes} CTE(s) em "
-        f"{len(grupos_validos)} grupo(s) de Rua / triagem."
+        f"Disponíveis: {quantidade_ctes} CTE(s) em "
+        f"{len(grupos_validos)} grupo(s) com unidade Fraction resolvida."
     )
 
+    selecao_grupo = None
+    tabela_grupo = tabela_envio.iloc[0:0].copy()
+    if grupos_validos:
+        grupo_por_opcao: dict[str, dict] = {}
+        for grupo in grupos_validos:
+            chave_grupo = (
+                str(grupo.get("RUA", "")),
+                str(grupo.get("TRIAGEM", "")),
+                str(grupo.get("ROTA", "")),
+            )
+            ctes_grupo = len(grupo["LISTA_CTES"])
+            opcao = (
+                f"{chave_grupo[0]} · {chave_grupo[1]} · {chave_grupo[2]} "
+                f"({ctes_grupo} CTE(s))"
+            )
+            grupo_por_opcao[opcao] = grupo
+        opcao_selecionada = st.selectbox(
+            "Fila que será fechada e enviada ao Fraction",
+            list(grupo_por_opcao),
+            key="gerar_romaneios_emissao_grupo_selecionado",
+        )
+        selecao_grupo = grupo_por_opcao[opcao_selecionada]
+        chave_selecionada = (
+            str(selecao_grupo.get("RUA", "")),
+            str(selecao_grupo.get("TRIAGEM", "")),
+            str(selecao_grupo.get("ROTA", "")),
+        )
+        tabela_grupo = tabela_envio.loc[
+            tabela_envio.apply(
+                lambda linha: (
+                    str(linha.get("Rua", "")),
+                    str(linha.get("Triagem", "")),
+                    str(linha.get("Rota", "")),
+                ) == chave_selecionada,
+                axis=1,
+            )
+        ].copy()
+        st.caption(
+            f"Selecionado: {chave_selecionada[0]} / {chave_selecionada[1]} / "
+            f"{chave_selecionada[2]} — {len(selecao_grupo['LISTA_CTES'])} CTE(s). "
+            "As outras filas permanecem abertas."
+        )
+
     faltantes = avisar_variaveis_faltantes("gerar_romaneios")
-    processado = bool(resultado_atual.get("enviado"))
     enviar = st.button(
-        "Gerar romaneios no Fraction",
+        "Gerar romaneio desta rua / triagem",
         type="primary",
         key="gerar_romaneios_emissao_enviar",
         width=LARGURA_BOTAO,
-        disabled=(
-            quantidade_ctes == 0
-            or bool(faltantes)
-            or processado
-        ),
+        disabled=(selecao_grupo is None or bool(faltantes)),
     )
 
-    if processado:
-        success(resultado_atual["resumo_envio"])
-
-    if enviar:
+    if enviar and selecao_grupo is not None:
         log, _ = criar_logger_execucao(
             "gerar_romaneios",
             st.session_state[CHAVE_LOGS].append,
             rotulo="processar_emissao",
         )
-        nome_fontes = (
-            f"{resultado_atual['arquivo_performance_nome']} + "
-            f"{resultado_atual['nome_arquivo_etiquetas']}"
-        )
         try:
-            log("Usuário confirmou a prévia e iniciou a emissão dos romaneios.")
+            rua_selecionada = str(selecao_grupo.get("RUA") or "")
+            triagem_selecionada = str(selecao_grupo.get("TRIAGEM") or "")
+            rota_selecionada = str(selecao_grupo.get("ROTA") or "")
+            ctes_selecionados = {
+                str(cte).strip()
+                for cte in selecao_grupo.get("LISTA_CTES", [])
+                if str(cte).strip()
+            }
+            tabela_grupo = tabela_grupo.loc[
+                tabela_grupo["CTEs para dar entrada"].map(
+                    lambda valor: bool(
+                        ctes_selecionados.intersection(
+                            item.strip()
+                            for item in str(valor).splitlines()
+                            if item.strip()
+                        )
+                    )
+                )
+            ].copy()
+            log(
+                f"Funcionário selecionou {rua_selecionada} / "
+                f"{triagem_selecionada} / {rota_selecionada}; "
+                f"{len(ctes_selecionados)} CTE(s) serão enviados."
+            )
 
             def registrar_grupo_concluido(grupo: dict, caminho_pdf: Path) -> None:
-                rua = str(grupo.get("RUA") or "Sem rua")
-                triagem = str(grupo.get("TRIAGEM") or "Sem triagem")
-                rota = str(grupo.get("ROTA") or "")
-                ctes_grupo = {
-                    str(cte).strip()
-                    for cte in grupo.get("LISTA_CTES", [])
-                    if str(cte).strip()
-                }
-                etiquetas_grupo: list[str] = []
-                for _, linha in tabela_envio.iterrows():
-                    if str(linha.get("Rua", "Sem rua")) != rua:
-                        continue
-                    if str(linha.get("Triagem", "Sem triagem")) != triagem:
-                        continue
-                    if str(linha.get("Rota", "")) != rota:
-                        continue
-                    ctes_linha = {
-                        valor.strip()
-                        for valor in str(
-                            linha.get("CTEs para dar entrada", "")
-                        ).splitlines()
-                        if valor.strip()
-                    }
-                    if not ctes_linha.intersection(ctes_grupo):
-                        continue
-                    etiquetas_grupo.extend(
-                        valor.strip()
-                        for valor in str(
-                            linha.get("Etiquetas do pedido", "")
-                        ).splitlines()
-                        if valor.strip()
-                    )
-
+                etiquetas_grupo = [
+                    etiqueta.strip()
+                    for valor in tabela_grupo["Etiquetas do pedido"]
+                    for etiqueta in str(valor).splitlines()
+                    if etiqueta.strip()
+                ]
                 etiquetas_grupo = list(dict.fromkeys(etiquetas_grupo))
                 if not etiquetas_grupo:
                     raise RuntimeError(
-                        f"O romaneio de {rua} / {triagem} / rota '{rota}' foi salvo "
-                        "mas não foi possível associar suas etiquetas ao estado "
-                        "persistente. O processamento foi interrompido para evitar "
-                        "duplicidade silenciosa."
+                        "O PDF foi salvo, mas não foi possível associar etiquetas "
+                        "à fila selecionada. A fila não será fechada."
                     )
+                quantidade_fechada = fila.fechar_romaneio(
+                    rua=rua_selecionada,
+                    triagem=triagem_selecionada,
+                    rota=rota_selecionada,
+                    etiquetas=etiquetas_grupo,
+                    caminho_pdf=caminho_pdf,
+                )
                 registrar_etiquetas_romaneio(
                     etiquetas_grupo,
                     contexto=(
-                        f"romaneio gerado — {rua} / {triagem}, rota '{rota}', "
+                        f"romaneio gerado — {rua_selecionada} / "
+                        f"{triagem_selecionada}, rota '{rota_selecionada}', "
                         f"PDF '{caminho_pdf}'"
                     ),
                     log=log,
+                )
+                log(
+                    f"Fila fechada no SQLite: {quantidade_fechada} etiqueta(s) "
+                    f"em {rua_selecionada} / {triagem_selecionada}."
                 )
 
             pasta_execucao_pdf = RESULTADOS_ROMANEIOS / (
                 f"Execucao_Emissao_{datetime.now():%Y-%m-%d_%H-%M-%S-%f}"
             )
-            with st.spinner("Gerando romaneios de Emissão no Fraction..."):
-                resultado = executar_manifestos_romaneios(
-                    nome_fontes,
-                    tabela_previa=tabela_envio,
+            with st.spinner(
+                f"Gerando romaneio de {rua_selecionada} / {triagem_selecionada}..."
+            ):
+                processamento = executar_manifestos_romaneios(
+                    f"Fila {rua_selecionada} / {triagem_selecionada}",
+                    tabela_previa=tabela_grupo,
                     codigos_preferenciais=codigos_preferenciais,
                     separar_por_rua_triagem=True,
                     pasta_destino_pdf=pasta_execucao_pdf,
@@ -684,27 +855,29 @@ def renderizar_gerar_romaneios_emissao() -> None:
                     log=log,
                 )
             mensagem = (
-                f"Romaneios de Emissão enviados: "
-                f"{resultado['grupos_manifesto']} grupo(s), "
-                f"{resultado['ctes_manifesto']} CTE(s) em "
-                f"{resultado['lotes_manifesto']} lote(s). "
-                f"PDFs salvos: {len(resultado['arquivos_pdf'])} em "
-                f"{resultado['pasta_pdf']}."
+                f"Romaneio concluído para {rua_selecionada} / {triagem_selecionada}: "
+                f"{processamento['ctes_manifesto']} CTE(s), "
+                f"{len(processamento['arquivos_pdf'])} PDF(s). "
+                f"A fila foi encerrada e as próximas etiquetas abrirão um novo lote."
             )
-            resultado_atual["enviado"] = True
-            resultado_atual["resumo_envio"] = mensagem
-            resultado_atual["arquivos_pdf"] = list(resultado["arquivos_pdf"])
-            resultado_atual["pasta_pdf"] = resultado["pasta_pdf"]
-            resultado_atual["arquivo_lote_impressao"] = None
-            resultado_atual["impressao_solicitada"] = False
+            resultado_atual.update(
+                {
+                    "enviado": True,
+                    "resumo_envio": mensagem,
+                    "arquivos_pdf": list(processamento["arquivos_pdf"]),
+                    "pasta_pdf": processamento["pasta_pdf"],
+                    "arquivo_lote_impressao": None,
+                    "impressao_solicitada": False,
+                }
+            )
             st.session_state[CHAVE_RESULTADO] = resultado_atual
             log(mensagem)
-            success(mensagem)
+            st.rerun()
         except CredenciaisFractionInvalidasError as erro_credenciais:
             warning(str(erro_credenciais))
         except Exception as erro_execucao:
             log(f"Erro: {type(erro_execucao).__name__}: {erro_execucao}")
-            error(f"A geração dos romaneios de Emissão foi interrompida: {erro_execucao}")
+            error(f"A geração do romaneio foi interrompida: {erro_execucao}")
 
     arquivos_pdf = resultado_atual.get("arquivos_pdf", [])
     if resultado_atual.get("enviado") and arquivos_pdf:
