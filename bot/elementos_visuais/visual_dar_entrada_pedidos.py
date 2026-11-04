@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from hashlib import sha256
 from io import BytesIO
+from pathlib import Path
+import tempfile
 
 import pandas as pd
 import streamlit as st
@@ -18,7 +20,10 @@ from automacoes.dar_entrada_pedidos import (
     normalizar_numeros_romaneio,
     salvar_base_entrada_pedidos,
 )
+from automacoes.gerar_romaneios_emissao import baixar_etiquetas_drive
+from automacoes.gerar_romaneios_emissao import selecionar_txt_novos_do_zip
 from servicos.fraction import CredenciaisFractionInvalidasError
+from servicos.fila_romaneios_emissao import FilaRomaneiosEmissao
 from utils.interface import (
     LARGURA_BOTAO,
     avisar_variaveis_faltantes,
@@ -27,6 +32,7 @@ from utils.interface import (
     success,
     warning,
 )
+from utils.config import ARQUIVO_FILA_ROMANEIOS_ENTRADA
 from utils.logs import criar_logger_execucao
 
 
@@ -34,6 +40,7 @@ CHAVE_RESULTADO = "visual_dar_entrada_pedidos_resultado"
 CHAVE_LOGS = "visual_dar_entrada_pedidos_logs"
 CHAVE_CONFIRMACOES_DIVERGENCIAS = "visual_dar_entrada_pedidos_confirmacoes"
 CHAVE_ADICAO_RECEBIMENTO = "visual_dar_entrada_pedidos_processados_v2"
+CHAVE_ETIQUETAS_DRIVE = "visual_dar_entrada_pedidos_etiquetas_drive"
 
 
 def renderizar_dar_entrada_pedidos() -> None:
@@ -56,27 +63,97 @@ def renderizar_dar_entrada_pedidos() -> None:
             erro_romaneios = str(erro)
             warning(erro_romaneios)
 
-    arquivo_etiquetas = st.file_uploader(
-        "Etiquetas bipadas (TXT ou ZIP de TXT)",
-        type=["txt", "zip"],
-        key="dar_entrada_pedidos_txt",
-        help=(
-            "Aceita TXT simples ou estruturado do Coletor Evelog. O ZIP pode conter "
-            "vários TXT; o programa extrai e reúne somente as etiquetas de todos eles."
-        ),
-        width="stretch",
+    buscar_drive = st.button(
+        "Sincronizar etiquetas do Drive",
+        key="dar_entrada_pedidos_buscar_etiquetas_drive",
+        width=LARGURA_BOTAO,
     )
+    if buscar_drive:
+        faltantes_drive = avisar_variaveis_faltantes("importar_etiquetas_drive")
+        if not faltantes_drive:
+            st.session_state.pop(CHAVE_ETIQUETAS_DRIVE, None)
+            st.session_state.pop(CHAVE_RESULTADO, None)
+            st.session_state.pop(CHAVE_CONFIRMACOES_DIVERGENCIAS, None)
+            st.session_state[CHAVE_LOGS] = []
+            _, log_visual = criar_painel_execucao(CHAVE_LOGS)
+            log, _ = criar_logger_execucao(
+                "dar_entrada_pedidos",
+                log_visual,
+                rotulo="buscar_etiquetas_drive_entrada",
+            )
+            try:
+                with tempfile.TemporaryDirectory(
+                    prefix="botevelog_entrada_drive_"
+                ) as diretorio_temporario:
+                    with st.spinner("Buscando arquivos de Entrada no Drive..."):
+                        caminho_zip = baixar_etiquetas_drive(
+                            pasta_destino=Path(diretorio_temporario),
+                            termo_nome="Entrada",
+                            log=log,
+                        )
+                    if caminho_zip is None:
+                        warning(
+                            "Não encontrei TXT com 'Entrada' no nome dos arquivos do Drive."
+                        )
+                    else:
+                        fila_entrada = FilaRomaneiosEmissao(
+                            ARQUIVO_FILA_ROMANEIOS_ENTRADA
+                        )
+                        conteudo_novo, arquivos_novos = selecionar_txt_novos_do_zip(
+                            caminho_zip.read_bytes(),
+                            fila_entrada.arquivos_dar_entrada_importados(),
+                            termo_nome="Entrada",
+                            log=log,
+                        )
+                        if not arquivos_novos:
+                            warning(
+                                "Não há TXT novos com 'Entrada' no nome. Os arquivos "
+                                "já processados foram descartados localmente."
+                            )
+                        else:
+                            st.session_state[CHAVE_ETIQUETAS_DRIVE] = {
+                                "nome": caminho_zip.name,
+                                "conteudo": conteudo_novo,
+                                "arquivos": arquivos_novos,
+                            }
+                            st.session_state.pop(CHAVE_RESULTADO, None)
+                            st.session_state.pop(
+                                CHAVE_CONFIRMACOES_DIVERGENCIAS,
+                                None,
+                            )
+                            log(
+                                f"Selecionados localmente {len(arquivos_novos)} "
+                                "TXT(s) novo(s) com 'Entrada' no nome."
+                            )
+                            success(
+                                f"{len(arquivos_novos)} TXT(s) novo(s) carregado(s). "
+                                "Confira os romaneios e monte a base para dar entrada."
+                            )
+            except Exception as erro_drive:
+                log(
+                    f"Falha ao buscar etiquetas no Drive: "
+                    f"{type(erro_drive).__name__}: {erro_drive}"
+                )
+                error(f"Não foi possível buscar etiquetas no Drive: {erro_drive}")
 
-    arquivo_pronto = arquivo_etiquetas is not None
+    arquivo_etiquetas_drive = st.session_state.get(CHAVE_ETIQUETAS_DRIVE)
+    if arquivo_etiquetas_drive:
+        nome_arquivo_etiquetas = str(arquivo_etiquetas_drive["nome"])
+        conteudo_etiquetas = bytes(arquivo_etiquetas_drive["conteudo"])
+        st.caption(f"Etiquetas carregadas do Drive: {nome_arquivo_etiquetas}")
+    else:
+        nome_arquivo_etiquetas = ""
+        conteudo_etiquetas = b""
+
+    arquivo_pronto = bool(conteudo_etiquetas)
     if not arquivo_pronto:
-        st.info("Selecione um TXT ou ZIP com as etiquetas bipadas.")
-    conteudo_etiquetas = arquivo_etiquetas.getvalue() if arquivo_etiquetas else b""
+        st.info("Busque as etiquetas no Drive para continuar.")
     identificador_arquivos = None
     if arquivo_pronto and numeros_romaneio and not erro_romaneios:
         identificador_arquivos = sha256(
             "\n".join(numeros_romaneio).encode("utf-8")
             + b"\0"
-            + arquivo_etiquetas.name.encode("utf-8")
+            + nome_arquivo_etiquetas.encode("utf-8")
             + b"\0"
             + conteudo_etiquetas
         ).hexdigest()
@@ -109,7 +186,7 @@ def renderizar_dar_entrada_pedidos() -> None:
             )
             pedidos = agrupar_etiquetas_importadas(
                 conteudo_etiquetas,
-                arquivo_etiquetas.name,
+                nome_arquivo_etiquetas,
                 log=log,
             )
             total_etiquetas = sum(
@@ -502,6 +579,23 @@ def renderizar_dar_entrada_pedidos() -> None:
                 ),
                 "incertos": sorted(ctes_incerto),
             }
+            arquivos_drive_entrada = list(
+                (arquivo_etiquetas_drive or {}).get("arquivos", [])
+            )
+            ctes_confirmados = ctes_adicionados | set(resultado_adicao["ctes"])
+            if arquivos_drive_entrada and set(ctes_liberados).issubset(
+                ctes_confirmados
+            ):
+                fila_entrada = FilaRomaneiosEmissao(
+                    ARQUIVO_FILA_ROMANEIOS_ENTRADA
+                )
+                registrados = fila_entrada.registrar_arquivos_dar_entrada(
+                    arquivos_drive_entrada
+                )
+                log(
+                    f"{registrados} TXT(s) de Entrada registrados como processados "
+                    "após confirmação de todos os CTEs no Fraction."
+                )
             try:
                 caminho_base = salvar_base_entrada_pedidos(
                     tabela_para_entrada,

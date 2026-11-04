@@ -1770,11 +1770,13 @@ def consultar_ctes_por_etiquetas_fraction(
     *,
     log=None,
     tamanho_lote: int = TAMANHO_LOTE_CTES,
+    por_shipment_id: bool = False,
 ) -> dict[str, str]:
     """Consulta no Envio de remessa o CTE correspondente a cada etiqueta.
 
     A rotina só adiciona as etiquetas e lê a tabela Código Barras/Remessa.
-    Ela não aciona o botão Processar lista.
+    Com ``por_shipment_id=True``, recebe ShipmentIds e só retorna associações
+    que apontam para uma Remessa única. Ela não aciona Processar lista.
     """
     etiquetas_unicas = list(dict.fromkeys(
         str(etiqueta).strip() for etiqueta in etiquetas if str(etiqueta).strip()
@@ -1812,14 +1814,15 @@ def consultar_ctes_por_etiquetas_fraction(
 
     def consultar_lote(page, lote: list[str], numero_lote: int) -> dict[str, str]:
         abrir_envio_remessa(page)
+        tipo_consulta = "ShipmentId(s)" if por_shipment_id else "etiqueta(s)"
         registrar(
-            f"Lote {numero_lote}: preenchendo {len(lote)} etiqueta(s) no campo "
+            f"Lote {numero_lote}: preenchendo {len(lote)} {tipo_consulta} no campo "
             "do Envio de remessa."
         )
         page.locator(ID_CTES).fill("\n".join(lote))
         page.get_by_role("button", name="Adicionar").click(timeout=120_000)
         registrar(
-            f"Lote {numero_lote}: etiquetas adicionadas; aguardando atualização "
+            f"Lote {numero_lote}: consulta adicionada; aguardando atualização "
             "da tabela. Processar lista não será clicado."
         )
         aguardar_carregamento_manifesto(page, log=log)
@@ -1827,7 +1830,7 @@ def consultar_ctes_por_etiquetas_fraction(
         seletor_linhas = page.get_by_label("Rows Per Page")
         seletor_linhas.wait_for(state="visible", timeout=60_000)
         quantidade = len(lote)
-        tamanho_pagina = next(
+        tamanho_pagina = 100 if por_shipment_id else next(
             (limite for limite in (10, 25, 50, 100) if quantidade <= limite),
             100,
         )
@@ -1859,6 +1862,7 @@ def consultar_ctes_por_etiquetas_fraction(
             )
 
         encontrados: dict[str, str] = {}
+        ambiguos: set[str] = set()
         pagina_atual = 1
         paginas_visitadas: set[int] = set()
         while pagina_atual not in paginas_visitadas:
@@ -1868,25 +1872,48 @@ def consultar_ctes_por_etiquetas_fraction(
                 celulas = linhas.nth(indice_linha).locator("td")
                 if celulas.count() <= max(indice_barras, indice_remessa):
                     continue
-                etiqueta = celulas.nth(indice_barras).inner_text().strip()
+                codigo_barras = celulas.nth(indice_barras).inner_text().strip()
                 remessa = celulas.nth(indice_remessa).inner_text().strip()
-                if not etiqueta or not remessa or etiqueta not in lote:
+                if not codigo_barras or not remessa:
                     continue
-                anterior = encontrados.get(etiqueta)
+                chave = (
+                    codigo_barras.split("$", 1)[0].strip()
+                    if por_shipment_id
+                    else codigo_barras
+                )
+                if chave not in lote or chave in ambiguos:
+                    continue
+                anterior = encontrados.get(chave)
                 if anterior and anterior != remessa:
+                    if por_shipment_id:
+                        encontrados.pop(chave, None)
+                        ambiguos.add(chave)
+                        registrar(
+                            f"ShipmentId {chave} retornou mais de uma Remessa/CTE; "
+                            "a associação alternativa será ignorada por ambiguidade."
+                        )
+                        continue
                     raise ValueError(
-                        f"A etiqueta {etiqueta} apareceu associada às remessas "
+                        f"A etiqueta {codigo_barras} apareceu associada às remessas "
                         f"{anterior} e {remessa}."
                     )
                 if not anterior:
-                    encontrados[etiqueta] = remessa
-                    registrar(f"Etiqueta {etiqueta} associada à Remessa {remessa}.")
+                    encontrados[chave] = remessa
+                    if por_shipment_id:
+                        registrar(
+                            f"ShipmentId {chave}: código de barras "
+                            f"'{codigo_barras}' associado à Remessa {remessa}."
+                        )
+                    else:
+                        registrar(
+                            f"Etiqueta {codigo_barras} associada à Remessa {remessa}."
+                        )
             registrar(
                 f"Lote {numero_lote}, página {pagina_atual}: "
-                f"{len(encontrados)}/{len(lote)} etiqueta(s) localizadas até agora."
+                f"{len(encontrados)}/{len(lote)} consulta(s) localizada(s) até agora."
             )
 
-            if len(encontrados) == len(lote):
+            if not por_shipment_id and len(encontrados) == len(lote):
                 break
 
             link_proxima = page.get_by_role(
@@ -1919,9 +1946,14 @@ def consultar_ctes_por_etiquetas_fraction(
             aguardar_ajax_fraction(page, log=log)
 
         registrar(
-            f"Lote {numero_lote}: {len(encontrados)}/{len(lote)} etiqueta(s) "
-            "associadas a uma Remessa na tabela."
+            f"Lote {numero_lote}: {len(encontrados)}/{len(lote)} "
+            f"{tipo_consulta} associada(s) a uma Remessa única na tabela."
         )
+        if ambiguos:
+            registrar(
+                f"Lote {numero_lote}: {len(ambiguos)} ShipmentId(s) tinham "
+                "mais de uma Remessa/CTE e não serão usados como fallback."
+            )
         return encontrados
 
     resultado: dict[str, str] = {}
@@ -1989,9 +2021,10 @@ def consultar_ctes_por_etiquetas_fraction(
                 for inicio in range(0, len(etiquetas_unicas), tamanho_lote)
             ]
             for numero_lote, lote in enumerate(lotes, start=1):
+                tipo_consulta = "ShipmentId(s)" if por_shipment_id else "etiqueta(s)"
                 registrar(
                     f"Consultando lote {numero_lote}/{len(lotes)} com "
-                    f"{len(lote)} etiqueta(s)."
+                    f"{len(lote)} {tipo_consulta}."
                 )
                 parte = executar_com_retentativas_fraction(
                     lambda lote=lote, numero_lote=numero_lote: consultar_lote(
@@ -1999,7 +2032,9 @@ def consultar_ctes_por_etiquetas_fraction(
                     ),
                     recuperar_sessao,
                     registrar,
-                    descricao=f"Consulta de etiquetas, lote {numero_lote}",
+                    descricao=(
+                        f"Consulta de {tipo_consulta}, lote {numero_lote}"
+                    ),
                     tentativas=5,
                 )
                 resultado.update(parte)
@@ -2315,7 +2350,7 @@ def _aplicar_identificacao_romaneio_pdf(
 def preparar_lote_impressao_romaneios(
     arquivos_pdf: list[str | Path],
     *,
-    pasta_temporaria: str | Path | None = None,
+    pasta_destino: str | Path | None = None,
     log=None,
 ) -> Path:
     """Valida todos os PDFs e cria um arquivo único para a impressão em lote."""
@@ -2325,7 +2360,7 @@ def preparar_lote_impressao_romaneios(
     if not caminhos:
         raise ValueError("Não há PDFs de romaneio para imprimir.")
 
-    pasta_lote = Path(pasta_temporaria) if pasta_temporaria else RESULTADOS_ROMANEIOS
+    pasta_lote = Path(pasta_destino) if pasta_destino else RESULTADOS_ROMANEIOS
     pasta_lote.mkdir(parents=True, exist_ok=True)
     caminho_lote = pasta_lote / (
         f"Romaneios_Emissao_impressao_{datetime.now():%Y-%m-%d_%H-%M-%S-%f}.pdf"

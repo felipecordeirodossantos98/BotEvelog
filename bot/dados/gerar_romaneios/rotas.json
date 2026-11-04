@@ -42,13 +42,18 @@
     },
     {
       "uf": "AM",
-      "triagem": "H18",
+      "triagem": "H08, H18",
       "unidade": "FL MANAUS"
     },
     {
       "uf": "RR",
-      "triagem": "H08",
+      "triagem": "H08, H18",
       "unidade": "FL MANAUS"
+    },
+    {
+      "uf": "DF",
+      "triagem": "X",
+      "unidade": "FL BRASILIA"
     }
   ],
   "por_cidade": [

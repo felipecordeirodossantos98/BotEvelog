@@ -9,7 +9,7 @@ import tempfile
 import time
 import unicodedata
 from typing import Callable
-from zipfile import BadZipFile, ZipFile
+from zipfile import BadZipFile, ZIP_DEFLATED, ZipFile
 
 import pandas as pd
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
@@ -27,6 +27,7 @@ from servicos.fraction import (
     consultar_ctes_por_etiquetas_fraction,
 )
 from utils.config import (
+    ARQUIVO_ETIQUETAS_ROMANEIOS_ENTRADA,
     ARQUIVO_ETIQUETAS_ROMANEIOS_EMISSAO,
     HEADLESS,
     SLOW_MO_MS,
@@ -95,49 +96,76 @@ MAX_TENTATIVAS_DOWNLOAD_DRIVE = 3
 REGISTRO_ETIQUETAS_ROMANEIOS_EMISSAO = RegistroTexto(
     ARQUIVO_ETIQUETAS_ROMANEIOS_EMISSAO
 )
+REGISTRO_ETIQUETAS_ROMANEIOS_ENTRADA = RegistroTexto(
+    ARQUIVO_ETIQUETAS_ROMANEIOS_ENTRADA
+)
 
 
-def preparar_estado_etiquetas_romaneio() -> Path:
+def _estado_etiquetas_romaneio(
+    status_fila: str,
+) -> tuple[Path, RegistroTexto]:
+    status_normalizado = _normalizar_cabecalho(status_fila)
+    if status_normalizado == "ENTRADA":
+        return (
+            ARQUIVO_ETIQUETAS_ROMANEIOS_ENTRADA,
+            REGISTRO_ETIQUETAS_ROMANEIOS_ENTRADA,
+        )
+    return (
+        ARQUIVO_ETIQUETAS_ROMANEIOS_EMISSAO,
+        REGISTRO_ETIQUETAS_ROMANEIOS_EMISSAO,
+    )
+
+
+def preparar_estado_etiquetas_romaneio(status_fila: str = "EMISSAO") -> Path:
     """Cria a pasta e o arquivo de estado sem alterar etiquetas registradas."""
-    ARQUIVO_ETIQUETAS_ROMANEIOS_EMISSAO.parent.mkdir(
+    caminho, _ = _estado_etiquetas_romaneio(status_fila)
+    caminho.parent.mkdir(
         parents=True,
         exist_ok=True,
     )
-    ARQUIVO_ETIQUETAS_ROMANEIOS_EMISSAO.touch(exist_ok=True)
-    return ARQUIVO_ETIQUETAS_ROMANEIOS_EMISSAO
+    caminho.touch(exist_ok=True)
+    return caminho
 
 
 def registrar_etiquetas_romaneio(
     etiquetas: list[str],
     *,
     contexto: str,
+    status_fila: str = "EMISSAO",
     log: Callable[[str], None] | None = None,
+    detalhar_etiquetas: bool = True,
 ) -> list[str]:
     """Persiste etiquetas de um romaneio confirmado para evitar reenvio."""
-    novas = REGISTRO_ETIQUETAS_ROMANEIOS_EMISSAO.adicionar_varios(etiquetas)
+    caminho, registro = _estado_etiquetas_romaneio(status_fila)
+    novas = registro.adicionar_varios(etiquetas)
     _log_performance_emissao(
         log,
         f"Estado de etiquetas atualizado para {contexto}: "
         f"{len(novas)} nova(s) etiqueta(s) registrada(s), "
         f"{len(etiquetas) - len(novas)} já constavam no estado. "
-        f"Arquivo: {ARQUIVO_ETIQUETAS_ROMANEIOS_EMISSAO}.",
+        f"Arquivo: {caminho}.",
     )
-    for etiqueta in novas:
-        _log_performance_emissao(log, f"Etiqueta persistida: {etiqueta}.")
+    if detalhar_etiquetas:
+        for etiqueta in novas:
+            _log_performance_emissao(log, f"Etiqueta persistida: {etiqueta}.")
     return novas
 
 
 def _filtrar_etiquetas_ja_registradas(
     pedidos: list[dict[str, object]],
     *,
+    status_fila: str = "EMISSAO",
+    etiquetas_ja_conhecidas: set[str] | None = None,
     log: Callable[[str], None] | None = None,
 ) -> tuple[list[dict[str, object]], int]:
     pedidos_novos: list[dict[str, object]] = []
     total_ignoradas = 0
+    etiquetas_ja_conhecidas = etiquetas_ja_conhecidas or set()
+    caminho_estado, registro = _estado_etiquetas_romaneio(status_fila)
     _log_performance_emissao(
         log,
-        f"Estado local: {len(REGISTRO_ETIQUETAS_ROMANEIOS_EMISSAO)} etiqueta(s) "
-        f"já registradas em {ARQUIVO_ETIQUETAS_ROMANEIOS_EMISSAO}.",
+        f"Estado local {status_fila}: {len(registro)} etiqueta(s) já registradas "
+        f"em {caminho_estado}.",
     )
 
     for pedido in pedidos:
@@ -151,7 +179,10 @@ def _filtrar_etiquetas_ja_registradas(
             frescas = []
             registradas = []
             for etiqueta in etiquetas:
-                if REGISTRO_ETIQUETAS_ROMANEIOS_EMISSAO.contem(etiqueta):
+                if (
+                    registro.contem(etiqueta)
+                    or etiqueta in etiquetas_ja_conhecidas
+                ):
                     registradas.append(etiqueta)
                 else:
                     frescas.append(etiqueta)
@@ -159,8 +190,8 @@ def _filtrar_etiquetas_ja_registradas(
             if registradas:
                 _log_performance_emissao(
                     log,
-                    f"Ignorando {len(registradas)} etiqueta(s) já tratada(s) "
-                    f"em outra execução: Palete '{palete}', ShipmentId "
+                    f"Ignorando {len(registradas)} etiqueta(s) já conhecidas "
+                    f"localmente: Palete '{palete}', ShipmentId "
                     f"{shipment_id}: {', '.join(registradas)}.",
                 )
             if frescas:
@@ -645,14 +676,18 @@ def montar_fila_emissao(
     conteudo_etiquetas: bytes,
     *,
     nome_arquivo_etiquetas: str = "etiquetas.txt",
+    status_fila: str = "EMISSAO",
+    etiquetas_ja_conhecidas: set[str] | None = None,
     log: Callable[[str], None] | None = None,
     pasta_temporaria: Path | None = None,
 ) -> dict[str, object]:
     """Cruza etiquetas no Fraction, seus CTEs e a Performance por CTE."""
-    preparar_estado_etiquetas_romaneio()
+    preparar_estado_etiquetas_romaneio(status_fila)
+    status_alvo = _normalizar_cabecalho(status_fila)
     _log_performance_emissao(
         log,
-        f"Arquivo de estado de etiquetas: {ARQUIVO_ETIQUETAS_ROMANEIOS_EMISSAO}.",
+        f"Arquivo de estado de etiquetas ({status_alvo}): "
+        f"{preparar_estado_etiquetas_romaneio(status_alvo)}.",
     )
     pedidos = agrupar_etiquetas_importadas(
         conteudo_etiquetas,
@@ -665,8 +700,9 @@ def montar_fila_emissao(
         f"TXT lido: {len(pedidos)} ShipmentId(s) e "
         f"{total_etiquetas_importadas} etiqueta(s).",
     )
+    paletes_origem: set[str] = set()
+    ruas_origem: set[str] = set()
     for pedido in pedidos:
-        shipment_id = str(pedido["ShipmentId"])
         for palete, etiquetas_palete in pedido.get("ETIQUETAS_POR_PALETE", {}).items():
             rua = str(pedido.get("RUA_POR_PALETE", {}).get(palete, "")).strip()
             if not rua:
@@ -675,14 +711,20 @@ def montar_fila_emissao(
                     f"'{palete}'. Inclua 'Rua 1' (ou o número correspondente) "
                     "no nome/caminho do TXT dentro do ZIP ou no cabeçalho do TXT."
                 )
-            _log_performance_emissao(
-                log,
-                f"TXT lido — {rua}, palete '{palete}', ShipmentId {shipment_id}, "
-                f"{len(etiquetas_palete)} etiqueta(s): {', '.join(etiquetas_palete)}.",
-            )
+            paletes_origem.add(str(palete))
+            ruas_origem.add(rua)
+    if paletes_origem:
+        _log_performance_emissao(
+            log,
+            f"Origem validada: {len(pedidos)} ShipmentId(s), "
+            f"{total_etiquetas_importadas} etiqueta(s) em "
+            f"{len(paletes_origem)} palete(s) de {len(ruas_origem)} rua(s).",
+        )
 
     pedidos, etiquetas_ja_registradas = _filtrar_etiquetas_ja_registradas(
         pedidos,
+        status_fila=status_alvo,
+        etiquetas_ja_conhecidas=etiquetas_ja_conhecidas,
         log=log,
     )
     etiquetas_novas = list(dict.fromkeys(
@@ -711,36 +753,104 @@ def montar_fila_emissao(
             "shipment_ids_sem_destino_performance": [],
             "shipment_ids_sem_status_performance": [],
             "shipment_ids_fora_emissao": [],
+            "shipment_ids_fora_fila": [],
             "etiquetas_ja_registradas": etiquetas_ja_registradas,
             "etiquetas_status_fora_fila": 0,
             "shipment_ids_etiquetas": 0,
             "total_etiquetas": 0,
         }
 
+    etiquetas_por_shipment_id: dict[str, list[str]] = {}
+    for etiqueta in etiquetas_novas:
+        partes_etiqueta = PADRAO_ETIQUETA.fullmatch(etiqueta)
+        if partes_etiqueta is None:
+            continue
+        etiquetas_por_shipment_id.setdefault(
+            partes_etiqueta.group(1),
+            [],
+        ).append(etiqueta)
+
+    shipment_ids = list(etiquetas_por_shipment_id)
     _log_performance_emissao(
         log,
-        f"Consultando {len(etiquetas_novas)} etiqueta(s) no Envio de remessa "
-        "do Fraction para obter as Remessas/CTEs.",
+        f"Consultando {len(shipment_ids)} ShipmentId(s) únicos no Envio de remessa "
+        "do Fraction, usando os 14 primeiros dígitos das etiquetas.",
     )
-    cte_por_etiqueta = consultar_ctes_por_etiquetas_fraction(
-        etiquetas_novas,
+    cte_por_shipment = consultar_ctes_por_etiquetas_fraction(
+        shipment_ids,
         log=log,
+        por_shipment_id=True,
     )
-    cte_por_etiqueta = {
-        str(etiqueta).strip(): _normalizar_valor(cte)
-        for etiqueta, cte in cte_por_etiqueta.items()
+    cte_por_shipment = {
+        str(shipment_id).strip(): _normalizar_valor(cte)
+        for shipment_id, cte in cte_por_shipment.items()
         if _normalizar_valor(cte)
+    }
+
+    shipment_ids_sem_cte = [
+        shipment_id
+        for shipment_id in shipment_ids
+        if shipment_id not in cte_por_shipment
+    ]
+    if shipment_ids_sem_cte:
+        _log_performance_emissao(
+            log,
+            f"Tentando recuperar isoladamente {len(shipment_ids_sem_cte)} "
+            "ShipmentId(s) sem Remessa/CTE na consulta em lote.",
+        )
+        for shipment_id in shipment_ids_sem_cte:
+            try:
+                ctes_isolados = consultar_ctes_por_etiquetas_fraction(
+                    [shipment_id],
+                    log=log,
+                    por_shipment_id=True,
+                )
+            except Exception as erro_consulta_shipment:
+                _log_performance_emissao(
+                    log,
+                    f"Falha na consulta isolada do ShipmentId {shipment_id}: "
+                    f"{type(erro_consulta_shipment).__name__}: "
+                    f"{erro_consulta_shipment}.",
+                )
+                continue
+
+            cte_unico = _normalizar_valor(ctes_isolados.get(shipment_id, ""))
+            if not cte_unico:
+                _log_performance_emissao(
+                    log,
+                    f"A consulta isolada do ShipmentId {shipment_id} não retornou "
+                    "uma Remessa/CTE única.",
+                )
+                continue
+            cte_por_shipment[shipment_id] = cte_unico
+            _log_performance_emissao(
+                log,
+                f"Consulta isolada do ShipmentId {shipment_id}: Remessa/CTE "
+                f"{cte_unico} recuperada.",
+            )
+
+    cte_por_etiqueta = {
+        etiqueta: cte_por_shipment[shipment_id]
+        for shipment_id, etiquetas_do_shipment in etiquetas_por_shipment_id.items()
+        if shipment_id in cte_por_shipment
+        for etiqueta in etiquetas_do_shipment
     }
     etiquetas_sem_cte = [
         etiqueta for etiqueta in etiquetas_novas if etiqueta not in cte_por_etiqueta
     ]
     if etiquetas_sem_cte:
         etiquetas_ausentes = set(etiquetas_sem_cte)
+        shipments_sem_cte = {
+            match.group(1)
+            for etiqueta in etiquetas_sem_cte
+            if (match := PADRAO_ETIQUETA.fullmatch(etiqueta)) is not None
+        }
         _log_performance_emissao(
             log,
             f"O Fraction não retornou Remessa/CTE para {len(etiquetas_sem_cte)} "
-            "etiqueta(s); elas serão ignoradas e as correspondências encontradas "
-            "seguirão para a consulta.",
+            f"etiqueta(s) de {len(shipments_sem_cte)} ShipmentId(s), nem na "
+            "consulta em lote nem na tentativa isolada; elas serão ignoradas e as "
+            "correspondências encontradas seguirão.",
         )
         pedidos_com_correspondencia: list[dict[str, object]] = []
         for pedido in pedidos:
@@ -798,6 +908,7 @@ def montar_fila_emissao(
             "shipment_ids_sem_destino_performance": [],
             "shipment_ids_sem_status_performance": [],
             "shipment_ids_fora_emissao": [],
+            "shipment_ids_fora_fila": [],
             "etiquetas_ja_registradas": etiquetas_ja_registradas,
             "etiquetas_status_fora_fila": 0,
             "shipment_ids_etiquetas": 0,
@@ -817,6 +928,9 @@ def montar_fila_emissao(
         pasta_temporaria=pasta_temporaria,
     )
     linhas: list[dict[str, object]] = []
+    total_linhas_previstas = sum(
+        len(pedido.get("ETIQUETAS_POR_PALETE", {})) for pedido in pedidos
+    )
     shipment_ids_sem_destino: list[str] = []
     shipment_ids_sem_status: list[str] = []
     shipment_ids_sem_retorno: list[str] = []
@@ -878,55 +992,66 @@ def montar_fila_emissao(
                 "Status": status,
             }
             linhas.append(linha)
-            _log_performance_emissao(
-                log,
-                f"Linha montada — {rua}, palete '{palete}', ShipmentId "
-                f"{shipment_id}, {len(etiquetas)} etiqueta(s), "
-                f"{len(ctes_pedido)} Remessa/CTE(s), Destino "
-                f"'{destino or 'SEM DESTINO'}', Status "
-                f"'{status or 'SEM STATUS'}'.",
-            )
+            if len(linhas) % 100 == 0 or len(linhas) == total_linhas_previstas:
+                _log_performance_emissao(
+                    log,
+                    f"Montagem da fila: {len(linhas)}/{total_linhas_previstas} "
+                    "pedido(s) preparados.",
+                )
 
     tabela_completa = pd.DataFrame(linhas)
     tabela_completa = _adicionar_rota(tabela_completa)
     tabela_completa = _completar_rotas_por_rua_triagem(tabela_completa, log=log)
-    status_final_emissao = tabela_completa["Status"].map(
-        lambda valor: _normalizar_cabecalho(valor) == "EMISSAO"
+    status_alvo_boleano = tabela_completa["Status"].map(
+        lambda valor: _normalizar_cabecalho(valor) == status_alvo
     )
-    etiquetas_status_fora_fila = 0
-    for indice, linha in tabela_completa.iterrows():
-        vai_para_fila = bool(status_final_emissao.loc[indice])
+    etiquetas_fora_fila: list[str] = []
+    quantidade_pedidos_fora_fila = int((~status_alvo_boleano).sum())
+    pedidos_alvo_classificados = 0
+    for indice, (_, linha) in enumerate(tabela_completa.iterrows()):
+        vai_para_fila = bool(status_alvo_boleano.iloc[indice])
+        pedidos_alvo_classificados += int(vai_para_fila)
         etiquetas = [
             etiqueta.strip()
             for etiqueta in str(linha["Etiquetas do pedido"]).splitlines()
             if etiqueta.strip()
         ]
-        _log_performance_emissao(
-            log,
-            f"Classificação — {linha['Rua']} / triagem "
-            f"'{linha['Triagem'] or 'SEM TRIAGEM'}', palete "
-            f"'{linha['Palete de origem']}', ShipmentId {linha['ShipmentId']}, "
-            f"CTE '{linha['CTE']}', Status '{linha['Status'] or 'SEM STATUS'}': "
-            f"{'INCLUÍDO NA FILA EMISSAO' if vai_para_fila else 'FORA DA FILA'}; "
-            f"Rota '{linha['Rota']}', Destino '{linha['Destino']}'.",
-        )
         if not vai_para_fila and etiquetas:
-            novas = registrar_etiquetas_romaneio(
-                etiquetas,
-                contexto=(
-                    f"pedido fora da fila — {linha['Rua']} / triagem "
-                    f"'{linha['Triagem']}', palete '{linha['Palete de origem']}', "
-                    f"ShipmentId {linha['ShipmentId']}, status "
-                    f"'{linha['Status'] or 'ausente'}'"
-                ),
-                log=log,
+            etiquetas_fora_fila.extend(etiquetas)
+
+        quantidade_classificada = indice + 1
+        if (
+            quantidade_classificada % 100 == 0
+            or quantidade_classificada == len(tabela_completa)
+        ):
+            _log_performance_emissao(
+                log,
+                f"Classificação por Status: {quantidade_classificada}/"
+                f"{len(tabela_completa)} pedido(s); "
+                f"{pedidos_alvo_classificados} "
+                f"com Status final {status_alvo}.",
             )
-            etiquetas_status_fora_fila += len(novas)
+
+    _log_performance_emissao(
+        log,
+        f"Classificação concluída: {int(status_alvo_boleano.sum())} pedido(s) "
+        f"{status_alvo} e {quantidade_pedidos_fora_fila} fora da fila.",
+    )
+    etiquetas_status_fora_fila = 0
+    if status_alvo == "EMISSAO":
+        novas_etiquetas_fora_fila = registrar_etiquetas_romaneio(
+            etiquetas_fora_fila,
+            contexto="pedidos fora da fila por Status final diferente de EMISSAO",
+            status_fila=status_alvo,
+            log=log,
+            detalhar_etiquetas=False,
+        )
+        etiquetas_status_fora_fila = len(novas_etiquetas_fora_fila)
 
     tabela_completa = tabela_completa.reset_index(drop=True)
-    tabela = tabela_completa.loc[status_final_emissao].reset_index(drop=True)
-    shipment_ids_fora_emissao = list(dict.fromkeys(
-        tabela_completa.loc[~status_final_emissao, "ShipmentId"].astype(str).tolist()
+    tabela = tabela_completa.loc[status_alvo_boleano].reset_index(drop=True)
+    shipment_ids_fora_fila = list(dict.fromkeys(
+        tabela_completa.loc[~status_alvo_boleano, "ShipmentId"].astype(str).tolist()
     ))
     if log is not None:
         log(
@@ -935,7 +1060,7 @@ def montar_fila_emissao(
             f"{len(etiquetas_novas) - len(etiquetas_sem_cte)} com Remessa/CTE, "
             f"{len(etiquetas_sem_cte)} sem retorno e ignorada(s), "
             f"{etiquetas_status_fora_fila} registrada(s) por status fora da fila; "
-            f"{len(tabela)} linha(s) EMISSAO mantida(s) em "
+            f"{len(tabela)} linha(s) {status_alvo} mantida(s) em "
             f"{tabela_completa[['Rua', 'Palete de origem']].drop_duplicates().shape[0]} "
             "grupo(s) rua/palete."
         )
@@ -952,7 +1077,7 @@ def montar_fila_emissao(
         if shipment_ids_sem_status:
             log(
                 f"{len(set(shipment_ids_sem_status))} ShipmentId(s) ficaram sem "
-                "Status na Performance e não entraram na fila EMISSAO."
+                f"Status na Performance e não entraram na fila {status_alvo}."
             )
 
     return {
@@ -962,7 +1087,10 @@ def montar_fila_emissao(
         "shipment_ids_sem_retorno_fraction": list(dict.fromkeys(shipment_ids_sem_retorno)),
         "shipment_ids_sem_destino_performance": list(dict.fromkeys(shipment_ids_sem_destino)),
         "shipment_ids_sem_status_performance": list(dict.fromkeys(shipment_ids_sem_status)),
-        "shipment_ids_fora_emissao": shipment_ids_fora_emissao,
+        "shipment_ids_fora_emissao": (
+            shipment_ids_fora_fila if status_alvo == "EMISSAO" else []
+        ),
+        "shipment_ids_fora_fila": shipment_ids_fora_fila,
         "etiquetas_ja_registradas": etiquetas_ja_registradas,
         "etiquetas_status_fora_fila": etiquetas_status_fora_fila,
         "shipment_ids_etiquetas": len(tabela),
@@ -982,8 +1110,34 @@ def _localizar_acao_drive(page, padrao: re.Pattern):
         controles = page.get_by_role(papel, name=padrao)
         for indice in range(controles.count()):
             controle = controles.nth(indice)
-            if controle.is_visible() and controle.is_enabled():
+            try:
+                if controle.is_visible() and controle.is_enabled():
+                    return controle
+            except Exception:
+                # O Drive redesenha os menus durante a seleção; descarte
+                # controles que ficaram obsoletos e continue procurando.
+                continue
+
+    # Em alguns layouts do Drive, os botões da barra de ações têm apenas
+    # aria-label/title/data-tooltip e não são expostos com nome acessível.
+    controles_rotulados = page.locator(
+        "[aria-label], [title], [data-tooltip]"
+    )
+    for indice in range(controles_rotulados.count()):
+        controle = controles_rotulados.nth(indice)
+        try:
+            rotulos = " ".join(
+                str(controle.get_attribute(atributo) or "")
+                for atributo in ("aria-label", "title", "data-tooltip")
+            )
+            if (
+                padrao.search(rotulos)
+                and controle.is_visible()
+                and controle.is_enabled()
+            ):
                 return controle
+        except Exception:
+            continue
     return None
 
 
@@ -1031,7 +1185,120 @@ def _localizar_download_drive_apos_selecao(
     page,
     padrao_download: re.Pattern,
     padrao_mais_acoes: re.Pattern,
+    nome_linha_selecionada: str | None = None,
 ):
+    # Procura primeiro dentro da barra que aparece após a seleção. Isso evita
+    # acionar um Download da pasta inteira, fora da seleção de arquivos.
+    barras = page.get_by_role("toolbar")
+    for indice in range(barras.count()):
+        barra = barras.nth(indice)
+        try:
+            if not barra.is_visible():
+                continue
+            acao_download = _localizar_acao_drive(barra, padrao_download)
+            if acao_download is not None:
+                return acao_download
+            mais_acoes = _localizar_acao_drive(barra, padrao_mais_acoes)
+            if mais_acoes is not None:
+                mais_acoes.click(timeout=10_000)
+                page.wait_for_timeout(300)
+                menus = page.get_by_role("menu")
+                for indice_menu in range(menus.count()):
+                    menu = menus.nth(indice_menu)
+                    if menu.is_visible():
+                        acao_download = _localizar_acao_drive(menu, padrao_download)
+                        if acao_download is not None:
+                            return acao_download
+                page.keyboard.press("Escape")
+        except Exception:
+            continue
+
+    def localizar_download_no_menu():
+        menus = page.get_by_role("menu")
+        for indice_menu in range(menus.count()):
+            menu = menus.nth(indice_menu)
+            try:
+                if menu.is_visible():
+                    acao = _localizar_acao_drive(menu, padrao_download)
+                    if acao is not None:
+                        return acao
+            except Exception:
+                continue
+        itens = page.get_by_role("menuitem", name=padrao_download)
+        for indice_item in range(itens.count()):
+            item = itens.nth(indice_item)
+            try:
+                if item.is_visible() and item.is_enabled():
+                    return item
+            except Exception:
+                continue
+        return None
+
+    # Se não houver botão na barra, abre o menu do conjunto selecionado.
+    try:
+        page.keyboard.press("Shift+F10")
+        page.wait_for_timeout(300)
+        acao_download = localizar_download_no_menu()
+        if acao_download is not None:
+            return acao_download
+        page.keyboard.press("Escape")
+    except Exception:
+        pass
+
+    if nome_linha_selecionada:
+        linha_selecionada, _ = _localizar_linha_arquivo_drive(
+            page,
+            nome_linha_selecionada,
+        )
+        if linha_selecionada is not None:
+            try:
+                linha_selecionada.click(
+                    button="right",
+                    timeout=5_000,
+                    force=True,
+                )
+                page.wait_for_timeout(300)
+                return localizar_download_no_menu()
+            except Exception:
+                pass
+    return None
+
+
+def _localizar_download_pasta_drive(
+    page,
+    padrao_download: re.Pattern,
+    padrao_mais_acoes: re.Pattern,
+):
+    """Localiza a ação de baixar a pasta inteira sem selecionar linhas."""
+    barras = page.get_by_role("toolbar")
+    for indice in range(barras.count()):
+        barra = barras.nth(indice)
+        try:
+            if not barra.is_visible():
+                continue
+            acao_download = _localizar_acao_drive(barra, padrao_download)
+            if acao_download is not None:
+                return acao_download
+            mais_acoes = _localizar_acao_drive(barra, padrao_mais_acoes)
+            if mais_acoes is not None:
+                mais_acoes.click(timeout=10_000)
+                page.wait_for_timeout(300)
+                menus = page.get_by_role("menu")
+                for indice_menu in range(menus.count()):
+                    menu = menus.nth(indice_menu)
+                    if menu.is_visible():
+                        acao_download = _localizar_acao_drive(
+                            menu,
+                            padrao_download,
+                        )
+                        if acao_download is not None:
+                            return acao_download
+                page.keyboard.press("Escape")
+        except Exception:
+            continue
+
+    # Link compartilhado e layouts compactos podem expor o comando fora de uma
+    # toolbar acessível. Sem uma linha em hover, o Download visível é da pasta.
     acao_download = _localizar_acao_drive(page, padrao_download)
     if acao_download is not None:
         return acao_download
@@ -1040,9 +1307,67 @@ def _localizar_download_drive_apos_selecao(
     if mais_acoes is not None:
         mais_acoes.click(timeout=10_000)
         page.wait_for_timeout(300)
-        _fechar_previa_txt_drive(page)
-        return _localizar_acao_drive(page, padrao_download)
+        menus = page.get_by_role("menu")
+        for indice_menu in range(menus.count()):
+            menu = menus.nth(indice_menu)
+            try:
+                if menu.is_visible():
+                    acao_download = _localizar_acao_drive(menu, padrao_download)
+                    if acao_download is not None:
+                        return acao_download
+            except Exception:
+                continue
     return None
+
+
+def _resumir_acoes_drive_visiveis(page, limite: int = 30) -> list[str]:
+    """Retorna rótulos de controles visíveis para registrar falhas de UI do Drive."""
+    rotulos: list[str] = []
+    controles = page.locator(
+        'button, [role="button"], [role="menuitem"], a[href], '
+        "[aria-label], [title], [data-tooltip]"
+    )
+    for indice in range(min(controles.count(), 250)):
+        controle = controles.nth(indice)
+        try:
+            if not controle.is_visible():
+                continue
+            partes = [
+                str(controle.get_attribute(atributo) or "").strip()
+                for atributo in ("aria-label", "title", "data-tooltip")
+            ]
+            texto = " ".join(partes + [controle.inner_text().strip()]).strip()
+            texto = " ".join(texto.split())
+            if texto and texto not in rotulos:
+                rotulos.append(texto[:120])
+                if len(rotulos) >= limite:
+                    break
+        except Exception:
+            continue
+    return rotulos
+
+
+def _localizar_linha_arquivo_drive(page, nome_arquivo: str):
+    """Reconsulta as linhas visíveis pelo nome para tolerar redesenhos do Drive."""
+    grades = page.get_by_role("grid")
+    for indice_grade in range(grades.count()):
+        grade = grades.nth(indice_grade)
+        try:
+            if not grade.is_visible():
+                continue
+            linhas = grade.get_by_role("row")
+            for indice_linha in range(linhas.count()):
+                linha = linhas.nth(indice_linha)
+                celulas = linha.get_by_role("gridcell")
+                if not celulas.count():
+                    continue
+                primeiro_texto = celulas.first.inner_text().strip()
+                if primeiro_texto.splitlines()[0].strip() == nome_arquivo:
+                    return linha, celulas
+        except Exception:
+            # Uma re-renderização entre count() e inner_text() é normal no Drive.
+            continue
+    return None, None
 
 
 def _selecionar_linha_arquivo_drive(linha, celulas, *, ja_selecionados: int) -> str:
@@ -1076,26 +1401,45 @@ def _selecionar_linha_arquivo_drive(linha, celulas, *, ja_selecionados: int) -> 
     return "clique na linha"
 
 
-def _nome_arquivo_tem_transferencia(nome_arquivo: str) -> bool:
-    nome = PurePosixPath(str(nome_arquivo)).name
+def _nome_arquivo_contem_termo(nome_arquivo: str, termo: str) -> bool:
+    normalizado = _normalizar_nome_arquivo(nome_arquivo)
+    termo_normalizado = _normalizar_nome_arquivo(termo)
+    return bool(termo_normalizado) and termo_normalizado in normalizado
+
+
+def _etiquetas_validas_do_txt(conteudo: bytes) -> set[str]:
+    """Extrai códigos de etiqueta para detectar TXT importados incompletos."""
+    texto = conteudo.decode("utf-8-sig", errors="ignore")
+    etiquetas: set[str] = set()
+    for linha in texto.splitlines():
+        etiqueta = linha.strip()
+        correspondencia = PADRAO_ETIQUETA.fullmatch(etiqueta)
+        if correspondencia is not None and correspondencia.group(2) != "000":
+            etiquetas.add(etiqueta)
+    return etiquetas
+
+
+def _normalizar_nome_arquivo(nome_arquivo: str) -> str:
+    nome = PurePosixPath(str(nome_arquivo).replace("\\", "/")).name
     normalizado = unicodedata.normalize("NFKD", nome)
-    normalizado = "".join(
+    return "".join(
         caractere
         for caractere in normalizado
         if not unicodedata.combining(caractere)
     ).casefold()
-    return "transferencia" in normalizado
 
 
 def baixar_etiquetas_drive(
     *,
     pasta_destino: Path | None = None,
-    arquivos_conhecidos: set[str] | None = None,
+    termo_nome: str = "Transferência",
     log=None,
 ) -> Path | None:
-    """Baixa apenas TXT ainda não registrados, agrupando-os em um ZIP."""
+    """Baixa todos os TXT do fluxo; a deduplicação é feita localmente depois."""
     if not URL_DRIVE:
         raise RuntimeError("Configure URL_DRIVE no arquivo bot/.env.")
+    if not str(termo_nome).strip():
+        raise ValueError("Informe o termo que deve aparecer no nome dos TXT.")
 
     pasta_destino = (
         Path(pasta_destino)
@@ -1109,6 +1453,12 @@ def baixar_etiquetas_drive(
     padrao_mais_acoes = re.compile(
         r"more actions|mais ações|mais opcoes|mais opções",
         re.IGNORECASE,
+    )
+
+    _log_performance_emissao(
+        log,
+        f"Sincronização em lote ativa: vou baixar todos os TXT com "
+        f"'{termo_nome}' no nome; os já salvos serão descartados localmente.",
     )
 
     with sync_playwright() as playwright:
@@ -1128,143 +1478,125 @@ def baixar_etiquetas_drive(
                 )
                 contexto = browser.new_context(accept_downloads=True)
                 page = contexto.new_page()
-                page.goto(
-                    URL_DRIVE,
-                    wait_until="domcontentloaded",
-                    timeout=90_000,
-                )
-                page.wait_for_timeout(1_500)
-                _fechar_previa_txt_drive(page, log=log)
-                texto_pagina = page.locator("body").inner_text().casefold()
-                if any(
-                    frase in texto_pagina
-                    for frase in (
-                        "you need access",
-                        "request access",
-                        "solicitar acesso",
-                        "pedir acesso",
-                    )
-                ):
-                    raise PermissionError(
-                        "O link do Google Drive não permite acesso à pasta. "
-                        "Compartilhe-a com acesso pelo link e permissão de leitura."
-                    )
-
                 grades = page.get_by_role("grid")
-                try:
-                    grades.first.wait_for(state="visible", timeout=60_000)
-                except PlaywrightTimeoutError as erro:
+                pasta_aberta = False
+                for tentativa_abertura in range(1, 3):
+                    page.goto(
+                        URL_DRIVE,
+                        wait_until="domcontentloaded",
+                        timeout=90_000,
+                    )
+                    page.wait_for_timeout(1_500)
+                    _fechar_previa_txt_drive(page, log=log)
+                    texto_pagina = page.locator("body").inner_text().casefold()
+                    if any(
+                        frase in texto_pagina
+                        for frase in (
+                            "you need access",
+                            "request access",
+                            "solicitar acesso",
+                            "pedir acesso",
+                        )
+                    ):
+                        raise PermissionError(
+                            "O link do Google Drive não permite acesso à pasta. "
+                            "Compartilhe-a com acesso pelo link e permissão de leitura."
+                        )
+                    try:
+                        grades.first.wait_for(state="visible", timeout=30_000)
+                        pasta_aberta = True
+                        break
+                    except PlaywrightTimeoutError:
+                        if tentativa_abertura < 2:
+                            _log_performance_emissao(
+                                log,
+                                "A lista da pasta não apareceu após fechar a prévia; "
+                                "reabrindo o link do Drive nesta sessão.",
+                            )
+                if not pasta_aberta:
                     raise RuntimeError(
                         "O link abriu, mas a pasta do Google Drive não exibiu "
-                        "a lista de arquivos. Confirme a permissão de leitura."
-                    ) from erro
+                        "a lista de arquivos após duas tentativas de abertura."
+                    )
 
-                nomes_conhecidos = {
-                    str(nome).strip().casefold()
-                    for nome in (arquivos_conhecidos or set())
-                }
-                quantidade_selecionada = 0
-                quantidade_txt_drive = 0
-                quantidade_txt_transferencia = 0
-                quantidade_txt_novo = 0
-                for indice_grade in range(grades.count()):
-                    grade = grades.nth(indice_grade)
-                    if not grade.is_visible():
-                        continue
-                    linhas = grade.get_by_role("row")
+                _log_performance_emissao(
+                    log,
+                    "Pasta do Drive carregada; baixando o conteúdo completo em "
+                    "um único ZIP, sem selecionar as linhas uma a uma.",
+                )
+                acao_download = _localizar_download_pasta_drive(
+                    page,
+                    padrao_download,
+                    padrao_mais_acoes,
+                )
+                selecao_total_acionada = False
+                nome_primeira_linha: str | None = None
+                if acao_download is None:
+                    grade_visivel = next(
+                        (
+                            grades.nth(indice)
+                            for indice in range(grades.count())
+                            if grades.nth(indice).is_visible()
+                        ),
+                        None,
+                    )
+                    if grade_visivel is None:
+                        raise RuntimeError(
+                            "A lista do Drive sumiu antes de acionar o download."
+                        )
+                    linhas = grade_visivel.get_by_role("row")
                     for indice_linha in range(linhas.count()):
                         linha = linhas.nth(indice_linha)
                         celulas = linha.get_by_role("gridcell")
                         if not celulas.count():
                             continue
-                        texto_celula = celulas.first.inner_text().strip()
-                        if not texto_celula:
+                        texto_linha = celulas.first.inner_text().strip()
+                        if not texto_linha:
                             continue
-                        nome_arquivo = texto_celula.splitlines()[0].strip()
-                        if PurePosixPath(nome_arquivo).suffix.casefold() != ".txt":
-                            continue
-                        quantidade_txt_drive += 1
-                        if not _nome_arquivo_tem_transferencia(nome_arquivo):
-                            _log_performance_emissao(
-                                log,
-                                f"Ignorando TXT sem 'Transferência' no nome: "
-                                f"{nome_arquivo}.",
-                            )
-                            continue
-                        quantidade_txt_transferencia += 1
-                        if nome_arquivo.casefold() in nomes_conhecidos:
-                            _log_performance_emissao(
-                                log,
-                                f"Arquivo já registrado no estado; não será baixado: "
-                                f"{nome_arquivo}.",
-                            )
-                            continue
-                        quantidade_txt_novo += 1
+                        nome_primeira_linha = texto_linha.splitlines()[0].strip()
                         try:
                             linha.hover(timeout=3_000)
                         except PlaywrightTimeoutError:
-                            _log_performance_emissao(
-                                log,
-                                f"Não consegui destacar a linha do Drive: {nome_arquivo}.",
-                            )
-                            continue
-                        metodo_selecao = _selecionar_linha_arquivo_drive(
+                            pass
+                        _selecionar_linha_arquivo_drive(
                             linha,
                             celulas,
-                            ja_selecionados=quantidade_selecionada,
+                            ja_selecionados=0,
                         )
-                        quantidade_selecionada += 1
-                        _log_performance_emissao(
-                            log,
-                            f"Selecionado para sincronização: {nome_arquivo} "
-                            f"({metodo_selecao}).",
-                        )
-
-                if quantidade_selecionada == 0:
-                    if quantidade_txt_drive == 0:
+                        break
+                    if not nome_primeira_linha:
                         raise RuntimeError(
-                            "A pasta do Google Drive não contém arquivos TXT visíveis."
+                            "A pasta do Google Drive está vazia; não há arquivos para baixar."
                         )
-                    if quantidade_txt_transferencia == 0:
-                        _log_performance_emissao(
-                            log,
-                            "Nenhum TXT com 'Transferência' no nome foi encontrado; "
-                            "não foi feito download.",
-                        )
-                        return None
-                    if quantidade_txt_novo == 0:
-                        _log_performance_emissao(
-                            log,
-                            "Nenhum TXT novo no Drive; não foi feito download.",
-                        )
-                        return None
-                    raise RuntimeError(
-                        f"Encontrei {quantidade_txt_novo} TXT(s) novo(s), mas não "
-                        "consegui selecionar nenhum no Drive."
+                    page.keyboard.press("Control+A")
+                    page.wait_for_timeout(400)
+                    selecao_total_acionada = True
+                    _log_performance_emissao(
+                        log,
+                        "O botão da pasta não apareceu; usei Ctrl+A uma única vez "
+                        "para selecionar todos os itens.",
                     )
-                if quantidade_selecionada != quantidade_txt_novo:
-                    raise RuntimeError(
-                        f"Foram selecionados {quantidade_selecionada} de "
-                        f"{quantidade_txt_novo} TXT(s) novo(s). A sincronização foi "
-                        "interrompida para não importar somente parte dos arquivos."
+                    acao_download = _localizar_download_drive_apos_selecao(
+                        page,
+                        padrao_download,
+                        padrao_mais_acoes,
+                        nome_linha_selecionada=nome_primeira_linha,
                     )
-
-                _fechar_previa_txt_drive(page, log=log)
-                acao_download = _localizar_download_drive_apos_selecao(
-                    page,
-                    padrao_download,
-                    padrao_mais_acoes,
-                )
-
                 if acao_download is None:
+                    acoes_visiveis = _resumir_acoes_drive_visiveis(page)
+                    _log_performance_emissao(
+                        log,
+                        "Ações visíveis no Drive ao baixar a pasta: "
+                        + (" | ".join(acoes_visiveis) if acoes_visiveis else "nenhuma"),
+                    )
                     raise RuntimeError(
-                        "TXT novos selecionados, mas não localizei a ação Download."
+                        "Não localizei a ação para baixar o conteúdo completo da pasta."
                     )
 
                 _log_performance_emissao(
                     log,
-                    f"Ação Download localizada; aguardando "
-                    f"{quantidade_selecionada} TXT(s) novo(s).",
+                    "Ação de download da pasta localizada; solicitando um único ZIP. "
+                    "A filtragem de TXT e arquivos já salvos será local.",
                 )
                 try:
                     with page.expect_download(
@@ -1273,19 +1605,28 @@ def baixar_etiquetas_drive(
                         acao_download.click(timeout=20_000)
                     download = informacao_download.value
                 except PlaywrightTimeoutError:
-                    _fechar_previa_txt_drive(page, log=log)
-                    acao_download = _localizar_acao_drive(
-                        page,
-                        padrao_download,
-                    )
+                    page.keyboard.press("Escape")
+                    if selecao_total_acionada:
+                        acao_download = _localizar_download_drive_apos_selecao(
+                            page,
+                            padrao_download,
+                            padrao_mais_acoes,
+                            nome_linha_selecionada=nome_primeira_linha,
+                        )
+                    else:
+                        acao_download = _localizar_download_pasta_drive(
+                            page,
+                            padrao_download,
+                            padrao_mais_acoes,
+                        )
                     if acao_download is None:
                         raise RuntimeError(
-                            "A ação Download desapareceu antes de iniciar o ZIP."
+                            "A ação de download da pasta desapareceu antes de iniciar."
                         )
                     _log_performance_emissao(
                         log,
-                        "O clique normal foi bloqueado; repetindo a ação Download "
-                        "com verificação de elemento e clique de contingência.",
+                        "O clique normal não iniciou o download; repetindo a ação "
+                        "da pasta com clique forçado.",
                     )
                     with page.expect_download(
                         timeout=TIMEOUT_DOWNLOAD_DRIVE_MS
@@ -1294,39 +1635,105 @@ def baixar_etiquetas_drive(
                     download = informacao_download.value
 
                 nome_download = str(download.suggested_filename or "").strip()
-                if nome_download.casefold().endswith(".zip"):
-                    download.save_as(caminho_zip)
-                elif nome_download.casefold().endswith(".txt") and quantidade_selecionada == 1:
-                    caminho_txt = pasta_destino / f"download_drive_{identificador}.txt"
-                    download.save_as(caminho_txt)
-                    conteudo_txt = caminho_txt.read_bytes()
-                    with ZipFile(caminho_zip, mode="w") as arquivo_zip:
-                        arquivo_zip.writestr(nome_download, conteudo_txt)
-                    caminho_txt.unlink(missing_ok=True)
-                else:
-                    raise ValueError(
-                        "O Drive retornou um download individual inesperado: "
-                        f"'{nome_download}'."
+                with tempfile.TemporaryDirectory(
+                    prefix="botevelog_drive_lote_",
+                    dir=pasta_destino,
+                ) as diretorio_download:
+                    if nome_download.casefold().endswith(".zip"):
+                        caminho_zip_drive = Path(diretorio_download) / "drive.zip"
+                        download.save_as(caminho_zip_drive)
+                    else:
+                        if not nome_download.casefold().endswith(".txt"):
+                            raise ValueError(
+                                "O Drive retornou um formato inesperado ao baixar a "
+                                f"pasta: '{nome_download}'."
+                            )
+                        caminho_txt_drive = Path(diretorio_download) / "drive.txt"
+                        download.save_as(caminho_txt_drive)
+                        nome_base_txt = PurePosixPath(
+                            nome_download.replace("\\", "/")
+                        ).name
+                        caminho_zip_drive = Path(diretorio_download) / "drive.zip"
+                        with ZipFile(
+                            caminho_zip_drive,
+                            mode="w",
+                            compression=ZIP_DEFLATED,
+                        ) as zip_drive:
+                            zip_drive.write(caminho_txt_drive, arcname=nome_base_txt)
+
+                    quantidade_txt_drive = 0
+                    quantidade_txt_fluxo = 0
+                    try:
+                        with ZipFile(caminho_zip_drive) as zip_drive:
+                            with ZipFile(
+                                caminho_zip,
+                                mode="w",
+                                compression=ZIP_DEFLATED,
+                            ) as zip_filtrado:
+                                for membro in zip_drive.infolist():
+                                    if membro.is_dir() or PurePosixPath(
+                                        membro.filename.replace("\\", "/")
+                                    ).suffix.casefold() != ".txt":
+                                        continue
+                                    quantidade_txt_drive += 1
+                                    if not _nome_arquivo_contem_termo(
+                                        membro.filename,
+                                        termo_nome,
+                                    ):
+                                        continue
+                                    nome_base = PurePosixPath(
+                                        membro.filename.replace("\\", "/")
+                                    ).name
+                                    if not nome_base:
+                                        continue
+                                    zip_filtrado.writestr(
+                                        nome_base,
+                                        zip_drive.read(membro),
+                                    )
+                                    quantidade_txt_fluxo += 1
+                    except BadZipFile as erro:
+                        raise ValueError(
+                            "O Google Drive não retornou um ZIP válido para a pasta."
+                        ) from erro
+
+                if quantidade_txt_fluxo == 0:
+                    caminho_zip.unlink(missing_ok=True)
+                    _log_performance_emissao(
+                        log,
+                        f"O ZIP completo contém {quantidade_txt_drive} TXT(s), "
+                        f"mas nenhum nome contém '{termo_nome}'.",
                     )
+                    return None
+
                 try:
                     with ZipFile(caminho_zip) as arquivo_zip:
-                        if not any(
-                            not membro.is_dir()
-                            and PurePosixPath(membro.filename).suffix.casefold() == ".txt"
+                        membros_txt = [
+                            membro
                             for membro in arquivo_zip.infolist()
-                        ):
+                            if not membro.is_dir()
+                            and PurePosixPath(membro.filename).suffix.casefold()
+                            == ".txt"
+                        ]
+                        if len(membros_txt) != quantidade_txt_fluxo:
                             raise ValueError(
-                                "O ZIP baixado do Drive não contém arquivos TXT."
+                                "O ZIP filtrado localmente ficou incompleto: "
+                                f"{len(membros_txt)} de {quantidade_txt_fluxo} TXT(s)."
+                            )
+                        if not membros_txt:
+                            raise ValueError(
+                                "A pasta do Drive não contém TXT do fluxo selecionado."
                             )
                 except BadZipFile as erro:
                     raise ValueError(
-                        "O Google Drive não retornou um ZIP válido para a pasta."
+                        "O ZIP local filtrado com os TXT do Drive ficou inválido."
                     ) from erro
 
                 _log_performance_emissao(
                     log,
-                    f"{quantidade_selecionada} TXT(s) novo(s) baixado(s) em "
-                    f"{caminho_zip.name}; nome retornado pelo Drive: {nome_download}.",
+                    f"Download completo recebido como '{nome_download}': "
+                    f"{quantidade_txt_drive} TXT(s) na pasta; "
+                    f"{quantidade_txt_fluxo} TXT(s) com '{termo_nome}' filtrado(s) "
+                    f"localmente em {caminho_zip.name}.",
                 )
                 return caminho_zip
             except PermissionError:
@@ -1368,12 +1775,21 @@ def selecionar_txt_novos_do_zip(
     conteudo_zip: bytes,
     arquivos_importados: set[str],
     *,
+    etiquetas_ja_conhecidas: set[str] | None = None,
+    termo_nome: str = "Transferência",
     log: Callable[[str], None] | None = None,
 ) -> tuple[bytes, list[dict[str, str]]]:
-    """Retorna um ZIP só com TXT ainda não importados no estado local."""
+    """Seleciona TXT novos e reavalia arquivos importados com etiqueta pendente."""
     buffer_novos = BytesIO()
     novos: list[dict[str, str]] = []
     vistos_nesta_sincronizacao: set[str] = set()
+    arquivos_reavaliados = 0
+    etiquetas_pendentes_reavaliadas = 0
+    etiquetas_conhecidas = {
+        str(etiqueta).strip()
+        for etiqueta in (etiquetas_ja_conhecidas or set())
+        if str(etiqueta).strip()
+    }
 
     try:
         with ZipFile(BytesIO(conteudo_zip)) as arquivo_zip:
@@ -1386,41 +1802,85 @@ def selecionar_txt_novos_do_zip(
             if not membros_txt:
                 raise ValueError("O ZIP do Google Drive não contém arquivos TXT.")
 
-            membros_transferencia = []
+            membros_correspondentes = []
             for membro in membros_txt:
-                if _nome_arquivo_tem_transferencia(membro.filename):
-                    membros_transferencia.append(membro)
+                if _nome_arquivo_contem_termo(membro.filename, termo_nome):
+                    membros_correspondentes.append(membro)
                 else:
                     _log_performance_emissao(
                         log,
-                        "TXT ignorado por não conter 'Transferência' no nome: "
+                        f"TXT ignorado por não conter '{termo_nome}' no nome: "
                         f"{PurePosixPath(membro.filename).as_posix()}.",
                     )
 
-            if not membros_transferencia:
+            if not membros_correspondentes:
                 _log_performance_emissao(
                     log,
-                    "Nenhum TXT com 'Transferência' no nome foi encontrado no ZIP.",
+                    f"Nenhum TXT com '{termo_nome}' no nome foi encontrado no ZIP.",
                 )
                 return buffer_novos.getvalue(), novos
 
             with ZipFile(buffer_novos, mode="w") as zip_novos:
-                for membro in membros_transferencia:
+                for membro in membros_correspondentes:
                     conteudo = arquivo_zip.read(membro)
                     digest = sha256(conteudo).hexdigest()
                     caminho_normalizado = PurePosixPath(membro.filename).as_posix()
                     chave = sha256(
                         caminho_normalizado.encode("utf-8") + b"\0" + digest.encode("ascii")
                     ).hexdigest()
-                    if chave in arquivos_importados or chave in vistos_nesta_sincronizacao:
+                    chave_estavel = sha256(
+                        _normalizar_nome_arquivo(caminho_normalizado).encode("utf-8")
+                        + b"\0"
+                        + digest.encode("ascii")
+                    ).hexdigest()
+                    if (
+                        chave in vistos_nesta_sincronizacao
+                        or chave_estavel in vistos_nesta_sincronizacao
+                    ):
                         _log_performance_emissao(
                             log,
-                            f"TXT já sincronizado; ignorando: {caminho_normalizado}.",
+                            f"TXT duplicado dentro do ZIP; ignorando: "
+                            f"{caminho_normalizado}.",
                         )
                         continue
 
+                    ja_importado = (
+                        chave in arquivos_importados
+                        or chave_estavel in arquivos_importados
+                    )
+                    reavaliado = False
+                    if ja_importado:
+                        if etiquetas_ja_conhecidas is None:
+                            _log_performance_emissao(
+                                log,
+                                f"TXT já sincronizado; ignorando: "
+                                f"{caminho_normalizado}.",
+                            )
+                            continue
+                        etiquetas_pendentes = (
+                            _etiquetas_validas_do_txt(conteudo)
+                            - etiquetas_conhecidas
+                        )
+                        if not etiquetas_pendentes:
+                            _log_performance_emissao(
+                                log,
+                                f"TXT já sincronizado e sem etiquetas pendentes; "
+                                f"ignorando: {caminho_normalizado}.",
+                            )
+                            continue
+                        reavaliado = True
+                        arquivos_reavaliados += 1
+                        etiquetas_pendentes_reavaliadas += len(etiquetas_pendentes)
+                        _log_performance_emissao(
+                            log,
+                            f"TXT importado reavaliado: {caminho_normalizado}; "
+                            f"{len(etiquetas_pendentes)} etiqueta(s) ainda não "
+                            "constam na fila nem no histórico.",
+                        )
+
                     zip_novos.writestr(membro, conteudo)
                     vistos_nesta_sincronizacao.add(chave)
+                    vistos_nesta_sincronizacao.add(chave_estavel)
                     novos.append(
                         {
                             "chave": chave,
@@ -1429,17 +1889,20 @@ def selecionar_txt_novos_do_zip(
                             "sha256": digest,
                         }
                     )
-                    _log_performance_emissao(
-                        log,
-                        f"TXT novo detectado: {caminho_normalizado} "
-                        f"({len(conteudo)} bytes; SHA-256 {digest}).",
-                    )
+                    if not reavaliado:
+                        _log_performance_emissao(
+                            log,
+                            f"TXT novo detectado: {caminho_normalizado} "
+                            f"({len(conteudo)} bytes; SHA-256 {digest}).",
+                        )
     except BadZipFile as erro:
         raise ValueError("O conteúdo baixado do Drive não é um ZIP válido.") from erro
 
     if log is not None:
         log(
-            f"Sincronização do ZIP: {len(novos)} TXT(s) novo(s) de "
-            f"{len(membros_transferencia)} TXT(s) com 'Transferência' encontrado(s)."
+            f"Sincronização do ZIP: {len(novos) - arquivos_reavaliados} TXT(s) "
+            f"novo(s), {arquivos_reavaliados} TXT(s) reavaliado(s) por "
+            f"{etiquetas_pendentes_reavaliadas} etiqueta(s) sem registro; "
+            f"{len(membros_correspondentes)} TXT(s) com '{termo_nome}' encontrado(s)."
         )
     return buffer_novos.getvalue(), novos

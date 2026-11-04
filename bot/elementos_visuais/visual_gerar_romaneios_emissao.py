@@ -45,6 +45,7 @@ from utils.interface import (
     warning,
 )
 from utils.config import (
+    ARQUIVO_FILA_ROMANEIOS_ENTRADA,
     ARQUIVO_FILA_ROMANEIOS_EMISSAO,
     ARQUIVO_ROTAS_ROMANEIOS,
     RESULTADOS_ROMANEIOS,
@@ -55,7 +56,6 @@ from utils.logs import criar_logger_execucao
 CHAVE_RESULTADO = "visual_gerar_romaneios_emissao_resultado"
 CHAVE_LOGS = "visual_gerar_romaneios_emissao_logs"
 CHAVE_LOG_PAINEL_RENDERIZADO = "visual_gerar_romaneios_emissao_log_painel_renderizado"
-CHAVE_MENSAGEM_SINCRONIZACAO = "visual_gerar_romaneios_emissao_sincronizacao"
 
 
 def _normalizar_rota(valor: object) -> str:
@@ -235,151 +235,273 @@ def _montar_tabela_fila_persistida(
     return pd.DataFrame(linhas, columns=colunas)
 
 
-def _renderizar_sincronizacao_drive() -> None:
-    faltantes = avisar_variaveis_faltantes("gerar_romaneios")
-    faltantes_drive = avisar_variaveis_faltantes("importar_etiquetas_drive")
-    st.caption(
-        "Sincronize os TXT do Drive. O Fraction associa cada etiqueta à Remessa/CTE; "
-        "em seguida, a Performance consulta os CTEs em lotes de até 1.000 para obter "
-        "Destino e Status. O volume do sistema permanece em branco nesta etapa."
-    )
-    sincronizar = st.button(
-        "Sincronizar Drive",
+def _renderizar_atualizacao_fila(
+    status_fila: str,
+    arquivo_fila: Path,
+    termo_nome: str,
+    sufixo_chave: str,
+    sincronizacao_disponivel: bool,
+) -> None:
+    chave_logs = f"{CHAVE_LOGS}_{sufixo_chave}"
+    chave_log_painel = f"{CHAVE_LOG_PAINEL_RENDERIZADO}_{sufixo_chave}"
+    atualizar = st.button(
+        "Atualizar filas",
         type="primary",
-        key="gerar_romaneios_emissao_sincronizar",
+        key=f"gerar_romaneios_{sufixo_chave}_atualizar_filas",
         width=LARGURA_BOTAO,
-        disabled=bool(faltantes or faltantes_drive),
+        disabled=not sincronizacao_disponivel,
     )
-    if not sincronizar:
+    if not atualizar:
         return
 
-    st.session_state[CHAVE_LOGS] = []
+    st.session_state[chave_logs] = []
     _, log_visual = criar_painel_execucao(
-        CHAVE_LOGS,
+        chave_logs,
         limpar=False,
         max_linhas=None,
         expandido=True,
     )
-    st.session_state[CHAVE_LOG_PAINEL_RENDERIZADO] = True
+    st.session_state[chave_log_painel] = True
     log, _ = criar_logger_execucao(
         "gerar_romaneios",
         log_visual,
-        rotulo="processar_emissao",
+        rotulo=f"atualizar_fila_{sufixo_chave}",
     )
+    fila = FilaRomaneiosEmissao(arquivo_fila)
+    novas_etiquetas = 0
+    etiquetas_repetidas = 0
+    ctes_com_status = 0
+    etiquetas_com_status_atualizado = 0
+    erros: list[str] = []
+    avisos: list[str] = []
+
     try:
-        st.session_state.pop(CHAVE_MENSAGEM_SINCRONIZACAO, None)
-        caminho_estado = preparar_estado_etiquetas_romaneio()
-        fila = FilaRomaneiosEmissao(ARQUIVO_FILA_ROMANEIOS_EMISSAO)
+        caminho_estado = preparar_estado_etiquetas_romaneio(status_fila)
         log(f"Arquivo de etiquetas já processadas: {caminho_estado}.")
-        log(f"Banco local da fila incremental: {ARQUIVO_FILA_ROMANEIOS_EMISSAO}.")
-        with tempfile.TemporaryDirectory(prefix="botevelog_emissao_") as diretorio_temporario:
+        log(f"Banco local da fila incremental ({status_fila}): {arquivo_fila}.")
+        etiquetas_ja_conhecidas = {
+            etiqueta.strip()
+            for etiqueta in caminho_estado.read_text(encoding="utf-8-sig").splitlines()
+            if etiqueta.strip()
+        }
+        etiquetas_ja_conhecidas.update(fila.etiquetas_conhecidas())
+        with tempfile.TemporaryDirectory(
+            prefix=f"botevelog_{sufixo_chave}_"
+        ) as diretorio_temporario:
             pasta_temporaria = Path(diretorio_temporario)
-            with st.spinner("Baixando os TXT novos do Drive..."):
-                caminho_zip = baixar_etiquetas_drive(
-                    pasta_destino=pasta_temporaria,
-                    arquivos_conhecidos=fila.nomes_arquivos_importados(),
-                    log=log,
-                )
-            if caminho_zip is None:
-                st.session_state[CHAVE_MENSAGEM_SINCRONIZACAO] = (
-                    "Drive sincronizado: nenhum TXT novo elegível foi baixado. "
-                    "Só são importados arquivos com 'Transferência' no nome; "
-                    "as filas abertas foram mantidas."
-                )
-                success(
-                    "Não há arquivos novos elegíveis; as filas abertas "
-                    "continuam disponíveis."
-                )
-                return
 
-            conteudo_zip = caminho_zip.read_bytes()
-            conteudo_etiquetas, arquivos_novos = selecionar_txt_novos_do_zip(
-                conteudo_zip,
-                fila.arquivos_importados(),
-                log=log,
-            )
-            if not arquivos_novos:
-                st.session_state[CHAVE_MENSAGEM_SINCRONIZACAO] = (
-                    "Drive sincronizado: nenhum TXT novo elegível foi encontrado. "
-                    "Só são importados arquivos com 'Transferência' no nome; "
-                    "as filas abertas foram mantidas."
-                )
-                success(
-                    "Não há arquivos novos elegíveis; as filas abertas "
-                    "continuam disponíveis."
-                )
-                return
-
-            with st.spinner(
-                "Consultando etiquetas no Fraction e montando a fila pela Performance..."
-            ):
-                dados = montar_fila_emissao(
-                    conteudo_etiquetas,
-                    nome_arquivo_etiquetas="txt_novos_drive.zip",
-                    pasta_temporaria=pasta_temporaria,
-                    log=log,
-                )
-                contagem = fila.importar_fila(
-                    dados["tabela"],
-                    arquivos_novos,
-                    log=log,
-                )
-
-            st.session_state[CHAVE_MENSAGEM_SINCRONIZACAO] = (
-                f"Sincronização concluída: {contagem['novas']} etiqueta(s) nova(s) "
-                f"adicionada(s); {contagem['repetidas']} já estavam na fila ou no histórico."
-            )
-            etiquetas_sem_cte = dados.get("etiquetas_sem_retorno_fraction", [])
-            if etiquetas_sem_cte:
-                amostra_etiquetas = ", ".join(etiquetas_sem_cte[:5])
-                mais_etiquetas = "…" if len(etiquetas_sem_cte) > 5 else ""
-                warning(
-                    f"{len(etiquetas_sem_cte)} etiqueta(s) não retornaram "
-                    "Remessa/CTE no Fraction e foram ignoradas. As demais "
-                    f"foram processadas. Amostra: {amostra_etiquetas}{mais_etiquetas}"
-                )
-            if dados["shipment_ids_sem_retorno_fraction"]:
-                warning(
-                    f"{len(dados['shipment_ids_sem_retorno_fraction'])} pedido(s) "
-                    "não retornaram dados de Performance; permanecerão fora da fila."
-                )
-            if dados["shipment_ids_sem_destino_performance"]:
-                warning(
-                    f"{len(dados['shipment_ids_sem_destino_performance'])} pedido(s) "
-                    "ficaram sem Destino na Performance; confira a rota antes de gerar."
-                )
-            if dados["shipment_ids_sem_status_performance"]:
-                warning(
-                    f"{len(dados['shipment_ids_sem_status_performance'])} pedido(s) "
-                    "não têm Status EMISSAO e foram mantidos fora da fila."
-                )
-            if not dados["tabela"].empty:
-                success(
-                    f"Fila atualizada: {contagem['novas']} etiqueta(s) nova(s) "
-                    "adicionada(s)."
-                )
+            etiquetas_abertas = fila.carregar_etiquetas_abertas()
+            ctes_abertos = list(dict.fromkeys(
+                str(cte).strip()
+                for cte in etiquetas_abertas.get("cte", pd.Series(dtype=str)).tolist()
+                if pd.notna(cte) and str(cte).strip()
+            ))
+            if ctes_abertos:
+                try:
+                    with st.spinner(
+                        f"Atualizando Status de {len(ctes_abertos)} CTE(s)..."
+                    ):
+                        status_por_cte = consultar_status_performance_ctes(
+                            ctes_abertos,
+                            log=log,
+                            pasta_temporaria=pasta_temporaria,
+                        )
+                    etiquetas_com_status_atualizado = fila.atualizar_status_abertas(
+                        status_por_cte
+                    )
+                    ctes_com_status = len(status_por_cte)
+                    ctes_sem_status = [
+                        cte for cte in ctes_abertos if cte not in status_por_cte
+                    ]
+                    log(
+                        f"Status atualizado para {etiquetas_com_status_atualizado} "
+                        f"etiqueta(s) aberta(s), em {ctes_com_status} CTE(s)."
+                    )
+                    if ctes_sem_status:
+                        avisos.append(
+                            f"A Performance não retornou Status para "
+                            f"{len(ctes_sem_status)} CTE(s); os valores anteriores "
+                            "foram mantidos."
+                        )
+                        log(avisos[-1])
+                except Exception as erro_status:
+                    mensagem = (
+                        f"Falha ao atualizar Status: {type(erro_status).__name__}: "
+                        f"{erro_status}"
+                    )
+                    log(mensagem)
+                    erros.append(mensagem)
             else:
-                warning(
-                    "Os TXT novos foram processados, mas não havia etiquetas elegíveis "
-                    "para entrar na fila."
+                log(
+                    f"Não há CTEs em filas abertas de {status_fila} para "
+                    "atualizar o Status."
                 )
-    except CredenciaisFractionInvalidasError as erro_credenciais:
-        warning(str(erro_credenciais))
+
+            try:
+                with st.spinner("Sincronizando arquivos novos..."):
+                    caminho_zip = baixar_etiquetas_drive(
+                        pasta_destino=pasta_temporaria,
+                        termo_nome=termo_nome,
+                        log=log,
+                    )
+                if caminho_zip is None:
+                    log("Nenhum TXT novo foi encontrado no Drive.")
+                else:
+                    conteudo_zip = caminho_zip.read_bytes()
+                    conteudo_etiquetas, arquivos_novos = selecionar_txt_novos_do_zip(
+                        conteudo_zip,
+                        fila.arquivos_importados(),
+                        etiquetas_ja_conhecidas=etiquetas_ja_conhecidas,
+                        termo_nome=termo_nome,
+                        log=log,
+                    )
+                    if not arquivos_novos:
+                        log("O ZIP baixado não contém TXT novo para importar.")
+                    else:
+                        with st.spinner("Importando etiquetas e atualizando a fila..."):
+                            dados = montar_fila_emissao(
+                                conteudo_etiquetas,
+                                nome_arquivo_etiquetas="txt_novos_drive.zip",
+                                status_fila=status_fila,
+                                etiquetas_ja_conhecidas=etiquetas_ja_conhecidas,
+                                pasta_temporaria=pasta_temporaria,
+                                log=log,
+                            )
+                            contagem = fila.importar_fila(
+                                dados["tabela"],
+                                arquivos_novos,
+                                log=log,
+                            )
+                        novas_etiquetas = contagem["novas"]
+                        etiquetas_repetidas = contagem["repetidas"]
+                        if contagem.get("conflitos", 0):
+                            quantidade_conflitos = int(contagem["conflitos"])
+                            pedidos_isolados = int(
+                                contagem.get("pedidos_isolados", 0)
+                            )
+                            avisos.append(
+                                f"{quantidade_conflitos} etiqueta(s) foram isoladas "
+                                "por aparecerem em mais de uma rua/triagem; "
+                                f"{pedidos_isolados} pedido(s) completo(s) ficaram "
+                                "fora das filas abertas para revisão manual."
+                            )
+
+                        etiquetas_sem_cte = dados.get(
+                            "etiquetas_sem_retorno_fraction", []
+                        )
+                        if etiquetas_sem_cte:
+                            amostra_etiquetas = ", ".join(etiquetas_sem_cte[:5])
+                            mais_etiquetas = "…" if len(etiquetas_sem_cte) > 5 else ""
+                            avisos.append(
+                                f"{len(etiquetas_sem_cte)} etiqueta(s) não retornaram "
+                                "Remessa/CTE no Fraction e foram ignoradas. Amostra: "
+                                f"{amostra_etiquetas}{mais_etiquetas}"
+                            )
+                        if dados["shipment_ids_sem_retorno_fraction"]:
+                            avisos.append(
+                                f"{len(dados['shipment_ids_sem_retorno_fraction'])} "
+                                "pedido(s) não retornaram dados de Performance e "
+                                "ficaram fora da fila."
+                            )
+                        if dados["shipment_ids_sem_destino_performance"]:
+                            avisos.append(
+                                f"{len(dados['shipment_ids_sem_destino_performance'])} "
+                                "pedido(s) ficaram sem Destino na Performance; "
+                                "confira a rota antes de gerar."
+                            )
+                        if dados["shipment_ids_sem_status_performance"]:
+                            avisos.append(
+                                f"{len(dados['shipment_ids_sem_status_performance'])} "
+                                f"pedido(s) sem Status na Performance ficaram fora "
+                                f"da fila {status_fila}."
+                            )
+                        if dados["tabela"].empty and not avisos:
+                            avisos.append(
+                                "Os TXT novos foram processados, mas não havia "
+                                "etiquetas elegíveis para entrar na fila."
+                            )
+            except Exception as erro_drive:
+                mensagem = (
+                    f"Falha ao sincronizar os arquivos: {type(erro_drive).__name__}: "
+                    f"{erro_drive}"
+                )
+                log(mensagem)
+                erros.append(mensagem)
+
+        resumo = (
+            f"Atualização concluída: {novas_etiquetas} etiqueta(s) nova(s), "
+            f"{etiquetas_repetidas} já conhecida(s)."
+        )
+        if ctes_abertos:
+            resumo += (
+                f" Status retornado para {ctes_com_status}/{len(ctes_abertos)} "
+                f"CTE(s) aberto(s); {etiquetas_com_status_atualizado} etiqueta(s) "
+                "tiveram Status atualizado."
+            )
+        else:
+            resumo += (
+                f" Não havia CTEs em filas abertas de {status_fila} para consultar."
+            )
+        if erros:
+            error(f"Atualização parcial. {resumo} {'; '.join(erros)}")
+        else:
+            success(resumo)
+        for aviso in avisos:
+            warning(aviso)
     except Exception as erro:
-        log(f"Falha ao processar a fila: {type(erro).__name__}: {erro}")
-        error(f"Não foi possível processar a fila: {erro}")
+        log(f"Falha ao atualizar as filas: {type(erro).__name__}: {erro}")
+        error(f"Não foi possível atualizar as filas: {erro}")
 
 
 def renderizar_gerar_romaneios_emissao() -> None:
-    st.subheader("Fila de romaneios de Emissão")
-    st.caption(
-        "As filas são atualizadas pelos TXT novos do Drive e armazenadas por rua e "
-        "triagem. Cada etiqueta é registrada uma única vez; filas concluídas permanecem "
-        "no histórico."
-    )
+    st.subheader("Filas de romaneios")
+    faltantes = avisar_variaveis_faltantes("gerar_romaneios")
+    faltantes_drive = avisar_variaveis_faltantes("importar_etiquetas_drive")
+    geracao_disponivel = not bool(faltantes)
+    sincronizacao_disponivel = geracao_disponivel and not bool(faltantes_drive)
+    aba_emissao, aba_entrada = st.tabs(["Emissão", "Entrada"])
+    with aba_emissao:
+        _renderizar_fila_romaneios(
+            "EMISSAO",
+            ARQUIVO_FILA_ROMANEIOS_EMISSAO,
+            "Transferência",
+            "emissao",
+            sincronizacao_disponivel,
+            geracao_disponivel,
+        )
+    with aba_entrada:
+        _renderizar_fila_romaneios(
+            "ENTRADA",
+            ARQUIVO_FILA_ROMANEIOS_ENTRADA,
+            "Entrada",
+            "entrada",
+            sincronizacao_disponivel,
+            geracao_disponivel,
+        )
 
-    _renderizar_sincronizacao_drive()
-    fila = FilaRomaneiosEmissao(ARQUIVO_FILA_ROMANEIOS_EMISSAO)
+
+def _renderizar_fila_romaneios(
+    status_fila: str,
+    arquivo_fila: Path,
+    termo_nome: str,
+    sufixo_chave: str,
+    sincronizacao_disponivel: bool,
+    geracao_disponivel: bool,
+) -> None:
+    chave_resultado = f"{CHAVE_RESULTADO}_{sufixo_chave}"
+    chave_logs = f"{CHAVE_LOGS}_{sufixo_chave}"
+    chave_log_painel = f"{CHAVE_LOG_PAINEL_RENDERIZADO}_{sufixo_chave}"
+    chave_widget = f"gerar_romaneios_{sufixo_chave}"
+    st.session_state.setdefault(chave_logs, [])
+
+    _renderizar_atualizacao_fila(
+        status_fila,
+        arquivo_fila,
+        termo_nome,
+        sufixo_chave,
+        sincronizacao_disponivel,
+    )
+    fila = FilaRomaneiosEmissao(arquivo_fila)
     tabela = _montar_tabela_fila_persistida(fila)
     if not tabela.empty:
         try:
@@ -397,85 +519,14 @@ def renderizar_gerar_romaneios_emissao() -> None:
                 f"os dados salvos foram mantidos. Detalhe: {erro}"
             )
 
-    etiquetas_abertas_db = fila.carregar_etiquetas_abertas()
-    ctes_abertos = list(dict.fromkeys(
-        str(cte).strip()
-        for cte in etiquetas_abertas_db.get("cte", pd.Series(dtype=str)).tolist()
-        if pd.notna(cte) and str(cte).strip()
-    ))
-    faltantes_config_status = (
-        avisar_variaveis_faltantes("baixar_relatorios_performance")
-        if ctes_abertos
-        else []
-    )
-    st.caption(
-        "O status é consultado novamente na Performance do Fraction para os CTEs "
-        "que ainda estão abertos."
-    )
-    atualizar_status = st.button(
-        "Atualizar status no Fraction",
-        key="gerar_romaneios_emissao_atualizar_status",
-        width=LARGURA_BOTAO,
-        disabled=not ctes_abertos or bool(faltantes_config_status),
-    )
-    if atualizar_status:
-        st.session_state[CHAVE_LOGS] = []
-        log, caminho_log = criar_logger_execucao(
-            "gerar_romaneios",
-            st.session_state[CHAVE_LOGS].append,
-            rotulo="atualizar_status_emissao",
-        )
-        log(f"Arquivo de log: {caminho_log}.")
-        try:
-            with st.spinner(
-                f"Atualizando o status de {len(ctes_abertos)} CTE(s) no Fraction..."
-            ):
-                with tempfile.TemporaryDirectory(
-                    prefix="botevelog_status_emissao_"
-                ) as diretorio_temporario:
-                    status_por_cte = consultar_status_performance_ctes(
-                        ctes_abertos,
-                        log=log,
-                        pasta_temporaria=Path(diretorio_temporario),
-                    )
-            ctes_sem_status = [
-                cte for cte in ctes_abertos if cte not in status_por_cte
-            ]
-            etiquetas_atualizadas = fila.atualizar_status_abertas(status_por_cte)
-            log(
-                f"Status atualizado para {etiquetas_atualizadas} etiqueta(s) "
-                f"aberta(s), em {len(status_por_cte)} CTE(s)."
-            )
-            if ctes_sem_status:
-                log(
-                    f"A Performance não retornou Status para {len(ctes_sem_status)} "
-                    "CTE(s); os status anteriores foram mantidos."
-                )
-                warning(
-                    f"A Performance não retornou Status para {len(ctes_sem_status)} "
-                    "CTE(s); os valores anteriores foram mantidos."
-                )
-            else:
-                success(
-                    f"Status consultado para {len(status_por_cte)} CTE(s); "
-                    f"{etiquetas_atualizadas} etiqueta(s) aberta(s) tiveram alteração."
-                )
-            tabela = _montar_tabela_fila_persistida(fila)
-        except Exception as erro:
-            log(f"Falha ao atualizar status: {type(erro).__name__}: {erro}")
-            error(f"Não foi possível atualizar os status no Fraction: {erro}")
-
     etiquetas_ativas = "\n".join(
         tabela.get("Etiquetas do pedido", pd.Series(dtype=str)).astype(str)
     )
     identificador = sha256(etiquetas_ativas.encode("utf-8")).hexdigest()
-    resultado_atual = st.session_state.get(CHAVE_RESULTADO)
+    resultado_atual = st.session_state.get(chave_resultado)
     if not isinstance(resultado_atual, dict):
         resultado_atual = {}
-        st.session_state[CHAVE_RESULTADO] = resultado_atual
-    mensagem_sincronizacao = st.session_state.get(CHAVE_MENSAGEM_SINCRONIZACAO)
-    if mensagem_sincronizacao:
-        st.info(mensagem_sincronizacao)
+        st.session_state[chave_resultado] = resultado_atual
     if resultado_atual.get("resumo_envio"):
         success(resultado_atual["resumo_envio"])
 
@@ -519,6 +570,24 @@ def renderizar_gerar_romaneios_emissao() -> None:
         st.info("Ainda não há etiquetas pendentes. Sincronize o Drive após enviar um TXT.")
     else:
         st.dataframe(resumo_abertos, hide_index=True, width="stretch")
+    etiquetas_conflito = fila.carregar_etiquetas_conflito()
+    if not etiquetas_conflito.empty:
+        pedidos_conflito = etiquetas_conflito["ShipmentId"].nunique()
+        warning(
+            f"{etiquetas_conflito['Etiqueta'].nunique()} etiqueta(s) estão "
+            "isoladas por aparecerem em mais de uma rua/triagem; "
+            f"{pedidos_conflito} pedido(s) completo(s) foram retirados das filas "
+            "abertas para revisão manual."
+        )
+        with st.expander(
+            "Etiquetas em mais de uma rua/triagem",
+            expanded=False,
+        ):
+            st.dataframe(
+                etiquetas_conflito,
+                hide_index=True,
+                width="stretch",
+            )
     with st.expander("Detalhes dos pedidos em filas abertas", expanded=False):
         if tabela.empty:
             st.info("Sem pedidos pendentes.")
@@ -544,7 +613,7 @@ def renderizar_gerar_romaneios_emissao() -> None:
             "etiquetas. Confirme os pedidos que devem entrar na fila de envio."
         )
         with st.form(
-            key=f"gerar_romaneios_emissao_confirmar_{identificador[:16]}"
+            key=f"{chave_widget}_confirmar_{identificador[:16]}"
         ):
             selecionados: list[str] = []
             for _, linha in divergencias.iterrows():
@@ -568,7 +637,7 @@ def renderizar_gerar_romaneios_emissao() -> None:
                     f"{int(linha['Volumes Etiquetas'])}; "
                     f"{quantidade_faltantes} etiqueta(s) faltante(s).",
                     key=(
-                        f"gerar_romaneios_emissao_confirmar_{identificador[:16]}_"
+                        f"{chave_widget}_confirmar_{identificador[:16]}_"
                         f"{chave_checkbox}"
                     ),
                 )
@@ -583,7 +652,7 @@ def renderizar_gerar_romaneios_emissao() -> None:
 
         if confirmar:
             resultado_atual["confirmacoes"] = selecionados
-            st.session_state[CHAVE_RESULTADO] = resultado_atual
+            st.session_state[chave_resultado] = resultado_atual
             success(
                 f"Confirmação registrada: {len(selecionados)} de "
                 f"{len(divergencias)} pedido(s) divergente(s) liberado(s)."
@@ -601,14 +670,14 @@ def renderizar_gerar_romaneios_emissao() -> None:
         if _volume_divergente(linha) and token_confirmacao not in confirmacoes:
             tabela_envio.at[indice, "CTEs para dar entrada"] = ""
 
-    status_emissao = tabela_envio["Status"].fillna("").map(
-        lambda valor: _normalizar_rota(valor) == "EMISSAO"
+    status_alvo = tabela_envio["Status"].fillna("").map(
+        lambda valor: _normalizar_rota(valor) == status_fila
     )
-    pedidos_fora_emissao = tabela_envio.loc[~status_emissao]
-    if not pedidos_fora_emissao.empty:
+    pedidos_fora_status_alvo = tabela_envio.loc[~status_alvo]
+    if not pedidos_fora_status_alvo.empty:
         warning(
-            f"{len(pedidos_fora_emissao)} pedido(s) com status diferente de "
-            "EMISSAO estão bloqueados para geração de romaneio."
+            f"{len(pedidos_fora_status_alvo)} pedido(s) com status diferente de "
+            f"{status_fila} estão bloqueados para geração de romaneio."
         )
 
     tem_ctes_envio = tabela_envio["CTEs para dar entrada"].fillna("").map(
@@ -617,13 +686,13 @@ def renderizar_gerar_romaneios_emissao() -> None:
             for linha in str(valor).splitlines()
         )
     )
-    tem_ctes_envio &= status_emissao
+    tem_ctes_envio &= status_alvo
     rota_original = tabela["Rota"].fillna("").astype(str).str.strip()
     sem_rota_ou_ambigua = tabela.loc[
         rota_original.isin({"", "Sem rota", "Rota ambígua"})
     ].copy()
     grupos, grupos_ignorados = mapear_rotas_para_grupos(
-        tabela_envio.loc[status_emissao],
+        tabela_envio.loc[status_alvo],
         separar_por_rua_triagem=True,
     )
     codigos_preferenciais = carregar_codigos_preferenciais_unidades_emissao()
@@ -740,7 +809,7 @@ def renderizar_gerar_romaneios_emissao() -> None:
         opcao_selecionada = st.selectbox(
             "Fila que será fechada e enviada ao Fraction",
             list(grupo_por_opcao),
-            key="gerar_romaneios_emissao_grupo_selecionado",
+            key=f"{chave_widget}_grupo_selecionado",
         )
         selecao_grupo = grupo_por_opcao[opcao_selecionada]
         chave_selecionada = (
@@ -764,20 +833,19 @@ def renderizar_gerar_romaneios_emissao() -> None:
             "As outras filas permanecem abertas."
         )
 
-    faltantes = avisar_variaveis_faltantes("gerar_romaneios")
     enviar = st.button(
         "Gerar romaneio desta rua / triagem",
         type="primary",
-        key="gerar_romaneios_emissao_enviar",
+        key=f"{chave_widget}_enviar",
         width=LARGURA_BOTAO,
-        disabled=(selecao_grupo is None or bool(faltantes)),
+        disabled=(selecao_grupo is None or not geracao_disponivel),
     )
 
     if enviar and selecao_grupo is not None:
         log, _ = criar_logger_execucao(
             "gerar_romaneios",
-            st.session_state[CHAVE_LOGS].append,
-            rotulo="processar_emissao",
+            st.session_state[chave_logs].append,
+            rotulo=f"processar_{sufixo_chave}",
         )
         try:
             rua_selecionada = str(selecao_grupo.get("RUA") or "")
@@ -832,6 +900,7 @@ def renderizar_gerar_romaneios_emissao() -> None:
                         f"{triagem_selecionada}, rota '{rota_selecionada}', "
                         f"PDF '{caminho_pdf}'"
                     ),
+                    status_fila=status_fila,
                     log=log,
                 )
                 log(
@@ -840,7 +909,8 @@ def renderizar_gerar_romaneios_emissao() -> None:
                 )
 
             pasta_execucao_pdf = RESULTADOS_ROMANEIOS / (
-                f"Execucao_Emissao_{datetime.now():%Y-%m-%d_%H-%M-%S-%f}"
+                f"Execucao_{status_fila.title()}_"
+                f"{datetime.now():%Y-%m-%d_%H-%M-%S-%f}"
             )
             with st.spinner(
                 f"Gerando romaneio de {rua_selecionada} / {triagem_selecionada}..."
@@ -870,7 +940,7 @@ def renderizar_gerar_romaneios_emissao() -> None:
                     "impressao_solicitada": False,
                 }
             )
-            st.session_state[CHAVE_RESULTADO] = resultado_atual
+            st.session_state[chave_resultado] = resultado_atual
             log(mensagem)
             st.rerun()
         except CredenciaisFractionInvalidasError as erro_credenciais:
@@ -888,6 +958,11 @@ def renderizar_gerar_romaneios_emissao() -> None:
         )
         if resultado_atual.get("pasta_pdf"):
             st.caption(f"Pasta desta execução: {resultado_atual['pasta_pdf']}")
+        if resultado_atual.get("arquivo_lote_impressao"):
+            st.caption(
+                "PDF combinado salvo em: "
+                f"{resultado_atual['arquivo_lote_impressao']}"
+            )
         with st.expander("PDFs salvos", expanded=False):
             st.code("\n".join(arquivos_pdf), language=None, wrap_lines=True)
 
@@ -895,14 +970,18 @@ def renderizar_gerar_romaneios_emissao() -> None:
             success("O lote foi enviado pelo SumatraPDF à fila da impressora.")
         else:
             with st.form(
-                key=f"gerar_romaneios_emissao_imprimir_{identificador[:16]}"
+                key=f"{chave_widget}_imprimir_{identificador[:16]}"
             ):
                 st.info(
                     "Os PDFs individuais continuarão salvos. O lote combinado será "
                     "enviado à impressora padrão somente após sua confirmação."
                 )
                 confirmar_impressao = st.checkbox(
-                    f"Confirmo imprimir os {len(arquivos_pdf)} romaneio(s) do lote."
+                    f"Confirmo imprimir os {len(arquivos_pdf)} romaneio(s) do lote.",
+                    key=(
+                        f"{chave_widget}_confirmar_impressao_"
+                        f"{identificador[:16]}"
+                    ),
                 )
                 imprimir = st.form_submit_button(
                     "Imprimir todos os PDFs de uma vez",
@@ -916,26 +995,31 @@ def renderizar_gerar_romaneios_emissao() -> None:
                 else:
                     log, _ = criar_logger_execucao(
                         "gerar_romaneios",
-                        st.session_state[CHAVE_LOGS].append,
-                        rotulo="imprimir_emissao",
+                        st.session_state[chave_logs].append,
+                        rotulo=f"imprimir_{sufixo_chave}",
                     )
                     try:
                         with st.spinner("Validando e enviando o lote para impressão..."):
-                            with tempfile.TemporaryDirectory(
-                                prefix="botevelog_impressao_"
-                            ) as diretorio_temporario:
-                                caminho_lote = preparar_lote_impressao_romaneios(
-                                    arquivos_pdf,
-                                    pasta_temporaria=Path(diretorio_temporario),
-                                    log=log,
-                                )
-                                enviar_pdf_para_impressora_padrao(
-                                    caminho_lote,
-                                    log=log,
-                                )
-                        resultado_atual["arquivo_lote_impressao"] = None
+                            pasta_lote = Path(
+                                resultado_atual.get("pasta_pdf")
+                                or RESULTADOS_ROMANEIOS
+                            )
+                            caminho_lote = preparar_lote_impressao_romaneios(
+                                arquivos_pdf,
+                                pasta_destino=pasta_lote,
+                                log=log,
+                            )
+                            resultado_atual["arquivo_lote_impressao"] = str(
+                                caminho_lote
+                            )
+                            st.session_state[chave_resultado] = resultado_atual
+                            st.info(f"PDF combinado salvo em: {caminho_lote}")
+                            enviar_pdf_para_impressora_padrao(
+                                caminho_lote,
+                                log=log,
+                            )
                         resultado_atual["impressao_solicitada"] = True
-                        st.session_state[CHAVE_RESULTADO] = resultado_atual
+                        st.session_state[chave_resultado] = resultado_atual
                         success(
                             "Lote enviado pelo SumatraPDF. Confira a fila "
                             "da impressora para acompanhar a impressão."
@@ -950,9 +1034,9 @@ def renderizar_gerar_romaneios_emissao() -> None:
                             f"{erro_impressao}"
                         )
 
-    if not st.session_state.pop(CHAVE_LOG_PAINEL_RENDERIZADO, False):
+    if not st.session_state.pop(chave_log_painel, False):
         renderizar_logs(
-            st.session_state.get(CHAVE_LOGS, []),
+            st.session_state.get(chave_logs, []),
             max_linhas=None,
             expandido=True,
         )

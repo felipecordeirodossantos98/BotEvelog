@@ -2,15 +2,18 @@ from __future__ import annotations
 
 from contextlib import closing
 from datetime import datetime, timezone
+from hashlib import sha256
 from pathlib import Path
+from pathlib import PurePosixPath
 import sqlite3
 from typing import Iterable
+import unicodedata
 
 import pandas as pd
 
 
 class FilaRomaneiosEmissao:
-    """Persistência local da fila incremental de etiquetas de emissão."""
+    """Persistência local e isolada de uma fila incremental de romaneios."""
 
     def __init__(self, caminho: Path) -> None:
         self.caminho = Path(caminho)
@@ -31,6 +34,14 @@ class FilaRomaneiosEmissao:
             conexao.executescript(
                 """
                 CREATE TABLE IF NOT EXISTS arquivos_drive (
+                    chave TEXT PRIMARY KEY,
+                    nome TEXT NOT NULL,
+                    caminho_no_zip TEXT NOT NULL,
+                    sha256 TEXT NOT NULL,
+                    importado_em TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS arquivos_drive_dar_entrada (
                     chave TEXT PRIMARY KEY,
                     nome TEXT NOT NULL,
                     caminho_no_zip TEXT NOT NULL,
@@ -74,15 +85,39 @@ class FilaRomaneiosEmissao:
                     caminho_pdf TEXT NOT NULL,
                     fechado_em TEXT NOT NULL
                 );
+
+                CREATE TABLE IF NOT EXISTS etiquetas_conflito (
+                    etiqueta TEXT NOT NULL,
+                    shipment_id TEXT NOT NULL,
+                    rua TEXT NOT NULL,
+                    triagem TEXT NOT NULL,
+                    palete_origem TEXT NOT NULL,
+                    rota TEXT NOT NULL,
+                    destino TEXT NOT NULL,
+                    arquivo_origem TEXT NOT NULL,
+                    detectado_em TEXT NOT NULL,
+                    PRIMARY KEY (
+                        etiqueta, rua, triagem, palete_origem, arquivo_origem
+                    )
+                );
                 """
             )
 
     def arquivos_importados(self) -> set[str]:
         with closing(self._conectar()) as conexao:
             linhas = conexao.execute(
-                "SELECT chave FROM arquivos_drive"
+                "SELECT chave, nome, sha256 FROM arquivos_drive"
             ).fetchall()
-        return {str(linha["chave"]) for linha in linhas}
+        chaves: set[str] = set()
+        for linha in linhas:
+            chave = str(linha["chave"] or "")
+            nome = _nome_normalizado(str(linha["nome"] or ""))
+            digest = str(linha["sha256"] or "")
+            if chave:
+                chaves.add(chave)
+            if nome and digest:
+                chaves.add(_chave_nome_conteudo(nome, digest))
+        return chaves
 
     def nomes_arquivos_importados(self) -> set[str]:
         with closing(self._conectar()) as conexao:
@@ -91,19 +126,116 @@ class FilaRomaneiosEmissao:
             ).fetchall()
         return {str(linha["nome"]).strip().casefold() for linha in linhas}
 
+    def arquivos_dar_entrada_importados(self) -> set[str]:
+        """Retorna os TXT já processados pela automação Dar Entrada."""
+        with closing(self._conectar()) as conexao:
+            linhas = conexao.execute(
+                "SELECT chave, nome, sha256 FROM arquivos_drive_dar_entrada"
+            ).fetchall()
+        chaves: set[str] = set()
+        for linha in linhas:
+            chave = str(linha["chave"] or "")
+            nome = _nome_normalizado(str(linha["nome"] or ""))
+            digest = str(linha["sha256"] or "")
+            if chave:
+                chaves.add(chave)
+            if nome and digest:
+                chaves.add(_chave_nome_conteudo(nome, digest))
+        return chaves
+
+    def registrar_arquivos_dar_entrada(
+        self,
+        arquivos: Iterable[dict[str, str]],
+    ) -> int:
+        """Registra TXT após os CTEs correspondentes entrarem no Fraction."""
+        arquivos = list(arquivos)
+        if not arquivos:
+            return 0
+        agora = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        with closing(self._conectar()) as conexao:
+            cursor = conexao.executemany(
+                "INSERT OR IGNORE INTO arquivos_drive_dar_entrada "
+                "(chave, nome, caminho_no_zip, sha256, importado_em) "
+                "VALUES (?, ?, ?, ?, ?)",
+                [
+                    (
+                        arquivo["chave"],
+                        arquivo["nome"],
+                        arquivo["caminho_no_zip"],
+                        arquivo["sha256"],
+                        agora,
+                    )
+                    for arquivo in arquivos
+                ],
+            )
+            conexao.commit()
+            return max(cursor.rowcount, 0)
+
+    def etiquetas_conhecidas(self) -> set[str]:
+        """Retorna etiquetas já presentes na fila ou no histórico local."""
+        with closing(self._conectar()) as conexao:
+            linhas = conexao.execute(
+                "SELECT etiqueta FROM etiquetas "
+                "UNION SELECT etiqueta FROM etiquetas_conflito"
+            ).fetchall()
+        return {str(linha["etiqueta"]).strip() for linha in linhas if linha["etiqueta"]}
+
     def importar_fila(
         self,
         tabela: pd.DataFrame,
         arquivos: Iterable[dict[str, str]],
         *,
         log=None,
-    ) -> dict[str, int]:
-        """Grava uma sincronização inteira atomicamente e deduplica etiquetas."""
+    ) -> dict[str, object]:
+        """Grava a fila e isola etiquetas encontradas em ruas/triagens distintas."""
         agora = datetime.now(timezone.utc).isoformat(timespec="seconds")
         novos = 0
         repetidos = 0
+        conflitos: dict[str, set[tuple[str, str, str, str]]] = {}
+        shipments_conflito: set[str] = set()
+        inseridas_nesta_importacao: dict[str, str] = {}
         arquivos = list(arquivos)
         linhas = tabela.to_dict(orient="records") if not tabela.empty else []
+
+        def registrar_ocorrencia_conflito(
+            conexao: sqlite3.Connection,
+            dados: dict[str, object],
+        ) -> None:
+            conexao.execute(
+                "INSERT OR IGNORE INTO etiquetas_conflito "
+                "(etiqueta, shipment_id, rua, triagem, palete_origem, rota, "
+                "destino, arquivo_origem, detectado_em) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    _texto(dados.get("etiqueta")),
+                    _texto(dados.get("shipment_id")),
+                    _texto(dados.get("rua")),
+                    _texto(dados.get("triagem")),
+                    _texto(dados.get("palete_origem")),
+                    _texto(dados.get("rota")),
+                    _texto(dados.get("destino")),
+                    _texto(dados.get("arquivo_origem")),
+                    agora,
+                ),
+            )
+
+        def registrar_conflito(
+            conexao: sqlite3.Connection,
+            etiqueta: str,
+            dados: dict[str, object],
+        ) -> None:
+            registrar_ocorrencia_conflito(conexao, dados)
+            shipment_id = _texto(dados.get("shipment_id"))
+            if shipment_id:
+                shipments_conflito.add(shipment_id)
+            conflitos.setdefault(etiqueta, set()).add(
+                (
+                    _texto(dados.get("rua")),
+                    _texto(dados.get("triagem")),
+                    _texto(dados.get("palete_origem")),
+                    _texto(dados.get("arquivo_origem")),
+                )
+            )
 
         with closing(self._conectar()) as conexao:
             conexao.execute("BEGIN IMMEDIATE")
@@ -150,28 +282,66 @@ class FilaRomaneiosEmissao:
                             "importado_em": agora,
                         }
                         existente = conexao.execute(
-                            "SELECT rua, triagem, estado FROM etiquetas "
+                            "SELECT * FROM etiquetas "
                             "WHERE etiqueta = ?",
                             (etiqueta,),
                         ).fetchone()
                         if existente:
-                            if (
+                            conflito_de_local = (
                                 existente["estado"] == "ABERTO"
-                                and existente["rua"]
-                                and dados["rua"]
-                                and _chave(existente["rua"]) != _chave(dados["rua"])
-                            ) or (
-                                existente["estado"] == "ABERTO"
-                                and existente["triagem"]
-                                and dados["triagem"]
-                                and _chave(existente["triagem"])
-                                != _chave(dados["triagem"])
-                            ):
-                                raise ValueError(
-                                    f"A etiqueta {etiqueta} já está na fila aberta "
-                                    "com outra rua ou triagem. Confira os TXT e as "
-                                    "regras de rota antes de sincronizar."
+                                and (
+                                    (
+                                        existente["rua"]
+                                        and dados["rua"]
+                                        and _chave(existente["rua"])
+                                        != _chave(dados["rua"])
+                                    )
+                                    or (
+                                        existente["triagem"]
+                                        and dados["triagem"]
+                                        and _chave(existente["triagem"])
+                                        != _chave(dados["triagem"])
+                                    )
                                 )
+                            )
+                            if conflito_de_local:
+                                dados_existentes = dict(existente)
+                                conexao.execute(
+                                    "UPDATE etiquetas SET estado = 'CONFLITO' "
+                                    "WHERE etiqueta = ? AND estado = 'ABERTO'",
+                                    (etiqueta,),
+                                )
+                                if etiqueta in inseridas_nesta_importacao:
+                                    inseridas_nesta_importacao.pop(etiqueta)
+                                registrar_conflito(
+                                    conexao,
+                                    etiqueta,
+                                    dados_existentes,
+                                )
+                                registrar_conflito(conexao, etiqueta, dados)
+                                continue
+                            if existente["estado"] == "CONFLITO":
+                                shipment_existente = _texto(
+                                    existente["shipment_id"]
+                                )
+                                shipment_atual = _texto(dados["shipment_id"])
+                                if shipment_existente:
+                                    shipments_conflito.add(shipment_existente)
+                                if shipment_atual:
+                                    shipments_conflito.add(shipment_atual)
+                                ja_eh_etiqueta_conflitante = conexao.execute(
+                                    "SELECT 1 FROM etiquetas_conflito "
+                                    "WHERE etiqueta = ? LIMIT 1",
+                                    (etiqueta,),
+                                ).fetchone()
+                                if ja_eh_etiqueta_conflitante:
+                                    registrar_conflito(
+                                        conexao,
+                                        etiqueta,
+                                        dict(existente),
+                                    )
+                                    registrar_conflito(conexao, etiqueta, dados)
+                                continue
                             if existente["estado"] == "ABERTO":
                                 conexao.execute(
                                 "UPDATE etiquetas SET "
@@ -206,6 +376,30 @@ class FilaRomaneiosEmissao:
                             dados,
                         )
                         novos += 1
+                        inseridas_nesta_importacao[etiqueta] = dados["shipment_id"]
+
+                etiquetas_dos_shipments_isolados: set[str] = set()
+                for shipment_id in shipments_conflito:
+                    linhas_pedido = conexao.execute(
+                        "SELECT etiqueta FROM etiquetas "
+                        "WHERE shipment_id = ? AND estado = 'ABERTO'",
+                        (shipment_id,),
+                    ).fetchall()
+                    etiquetas_dos_shipments_isolados.update(
+                        str(linha["etiqueta"]) for linha in linhas_pedido
+                    )
+                    conexao.execute(
+                        "UPDATE etiquetas SET estado = 'CONFLITO' "
+                        "WHERE shipment_id = ? AND estado = 'ABERTO'",
+                        (shipment_id,),
+                    )
+                etiquetas_novas_ativas = sum(
+                    1
+                    for etiqueta, shipment_id in inseridas_nesta_importacao.items()
+                    if shipment_id not in shipments_conflito
+                    and etiqueta not in etiquetas_dos_shipments_isolados
+                )
+                novos = etiquetas_novas_ativas
 
                 for arquivo in arquivos:
                     conexao.execute(
@@ -229,9 +423,38 @@ class FilaRomaneiosEmissao:
             log(
                 f"Persistência incremental: {novos} etiqueta(s) nova(s), "
                 f"{repetidos} etiqueta(s) já conhecida(s), "
-                f"{len(list(arquivos))} arquivo(s) registrado(s)."
+                f"{len(arquivos)} arquivo(s) registrado(s), "
+                f"{len(conflitos)} etiqueta(s) isolada(s) por divergência de "
+                f"rua/triagem; {len(shipments_conflito)} pedido(s) isolado(s)."
             )
-        return {"novas": novos, "repetidas": repetidos}
+            for etiqueta, ocorrencias in sorted(conflitos.items()):
+                locais = "; ".join(
+                    f"Rua {rua or 'não identificada'} / triagem "
+                    f"{triagem or 'não identificada'} / palete {palete or 'não identificado'}"
+                    for rua, triagem, palete, _ in sorted(ocorrencias)
+                )
+                log(f"Etiqueta {etiqueta} isolada: encontrada em {locais}.")
+        return {
+            "novas": novos,
+            "repetidas": repetidos,
+            "conflitos": len(conflitos),
+            "etiquetas_conflito": sorted(conflitos),
+            "pedidos_isolados": len(shipments_conflito),
+            "shipments_isolados": sorted(shipments_conflito),
+        }
+
+    def carregar_etiquetas_conflito(self) -> pd.DataFrame:
+        """Lista etiquetas isoladas até revisão manual de rua/triagem."""
+        with closing(self._conectar()) as conexao:
+            linhas = conexao.execute(
+                "SELECT etiqueta AS Etiqueta, shipment_id AS ShipmentId, "
+                "rua AS Rua, triagem AS Triagem, "
+                "palete_origem AS 'Palete de origem', rota AS Rota, "
+                "destino AS Destino, detectado_em AS 'Detectado em' "
+                "FROM etiquetas_conflito "
+                "ORDER BY etiqueta, rua, triagem, palete_origem"
+            ).fetchall()
+        return pd.DataFrame([dict(linha) for linha in linhas])
 
     def carregar_etiquetas_abertas(self) -> pd.DataFrame:
         with closing(self._conectar()) as conexao:
@@ -394,3 +617,17 @@ def _inteiro_ou_none(valor: object) -> int | None:
 
 def _chave(valor: object) -> str:
     return " ".join(str(valor).strip().upper().split())
+
+
+def _nome_normalizado(valor: str) -> str:
+    nome = PurePosixPath(str(valor).replace("\\", "/")).name
+    normalizado = unicodedata.normalize("NFKD", nome)
+    return "".join(
+        caractere
+        for caractere in normalizado
+        if not unicodedata.combining(caractere)
+    ).casefold()
+
+
+def _chave_nome_conteudo(nome: str, digest: str) -> str:
+    return sha256(nome.encode("utf-8") + b"\0" + digest.encode("ascii")).hexdigest()
