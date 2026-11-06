@@ -25,6 +25,7 @@ from servicos.fraction import (
     carregar_codigos_preferenciais_unidades,
     carregar_regras_triagem_rotas,
     consultar_ctes_por_etiquetas_fraction,
+    consultar_shipments_no_fraction,
     resolver_rota_por_localidade,
 )
 from utils.config import (
@@ -972,38 +973,109 @@ def montar_fila_emissao(
     if shipment_ids_sem_cte:
         _log_performance_emissao(
             log,
-            f"Tentando recuperar isoladamente {len(shipment_ids_sem_cte)} "
-            "ShipmentId(s) sem Remessa/CTE na consulta em lote.",
+            f"Tentando recuperar em lote as etiquetas de "
+            f"{len(shipment_ids_sem_cte)} ShipmentId(s) sem Remessa/CTE.",
         )
-        for shipment_id in shipment_ids_sem_cte:
-            try:
-                ctes_isolados = consultar_ctes_por_etiquetas_fraction(
-                    [shipment_id],
+        etiquetas_para_reconsulta = [
+            etiqueta
+            for shipment_id in shipment_ids_sem_cte
+            for etiqueta in etiquetas_por_shipment_id.get(shipment_id, [])
+        ]
+        ctes_por_etiqueta_recuperados: dict[str, str] = {}
+        try:
+            ctes_por_etiqueta_recuperados = (
+                consultar_ctes_por_etiquetas_fraction(
+                    etiquetas_para_reconsulta,
                     log=log,
-                    por_shipment_id=True,
+                    por_shipment_id=False,
                 )
-            except Exception as erro_consulta_shipment:
-                _log_performance_emissao(
-                    log,
-                    f"Falha na consulta isolada do ShipmentId {shipment_id}: "
-                    f"{type(erro_consulta_shipment).__name__}: "
-                    f"{erro_consulta_shipment}.",
-                )
-                continue
-
-            cte_unico = _normalizar_valor(ctes_isolados.get(shipment_id, ""))
-            if not cte_unico:
-                _log_performance_emissao(
-                    log,
-                    f"A consulta isolada do ShipmentId {shipment_id} não retornou "
-                    "uma Remessa/CTE única.",
-                )
-                continue
-            cte_por_shipment[shipment_id] = cte_unico
+            )
+        except Exception as erro_consulta_etiquetas:
             _log_performance_emissao(
                 log,
-                f"Consulta isolada do ShipmentId {shipment_id}: Remessa/CTE "
-                f"{cte_unico} recuperada.",
+                "Falha na reconsulta em lote das etiquetas sem CTE: "
+                f"{type(erro_consulta_etiquetas).__name__}: "
+                f"{erro_consulta_etiquetas}.",
+            )
+
+        shipments_recuperados_em_lote = 0
+        shipments_ambiguos_em_lote = 0
+        for shipment_id in shipment_ids_sem_cte:
+            ctes_encontrados = list(dict.fromkeys(
+                _normalizar_valor(
+                    ctes_por_etiqueta_recuperados.get(etiqueta, "")
+                )
+                for etiqueta in etiquetas_por_shipment_id.get(shipment_id, [])
+                if _normalizar_valor(
+                    ctes_por_etiqueta_recuperados.get(etiqueta, "")
+                )
+            ))
+            if len(ctes_encontrados) == 1:
+                cte_por_shipment[shipment_id] = ctes_encontrados[0]
+                shipments_recuperados_em_lote += 1
+                _log_performance_emissao(
+                    log,
+                    f"Reconsulta em lote: ShipmentId {shipment_id} associado "
+                    f"ao CTE {ctes_encontrados[0]}.",
+                )
+            elif len(ctes_encontrados) > 1:
+                shipments_ambiguos_em_lote += 1
+                _log_performance_emissao(
+                    log,
+                    f"Reconsulta em lote: ShipmentId {shipment_id} retornou "
+                    "mais de um CTE e será ignorado por ambiguidade.",
+                )
+        _log_performance_emissao(
+            log,
+            f"Reconsulta em lote recuperou {shipments_recuperados_em_lote}/"
+            f"{len(shipment_ids_sem_cte)} ShipmentId(s); "
+            f"{shipments_ambiguos_em_lote} associação(ões) ambígua(s).",
+        )
+
+        shipment_ids_a_consultar = [
+            shipment_id
+            for shipment_id in shipment_ids_sem_cte
+            if shipment_id not in cte_por_shipment
+        ]
+        if shipment_ids_a_consultar:
+            _log_performance_emissao(
+                log,
+                f"A reconsulta em lote ainda deixou "
+                f"{len(shipment_ids_a_consultar)} ShipmentId(s) sem CTE; "
+                "acionando a consulta por ShipmentId e aproveitando somente o CTE.",
+            )
+            try:
+                dados_shipments = consultar_shipments_no_fraction(
+                    shipment_ids_a_consultar,
+                    log=lambda mensagem: _log_performance_emissao(log, mensagem),
+                )
+            except Exception as erro_consulta_shipments:
+                _log_performance_emissao(
+                    log,
+                    "Falha na consulta alternativa por ShipmentId: "
+                    f"{type(erro_consulta_shipments).__name__}: "
+                    f"{erro_consulta_shipments}.",
+                )
+                dados_shipments = {}
+
+            shipments_recuperados_por_consulta = 0
+            for shipment_id in shipment_ids_a_consultar:
+                dados = dados_shipments.get(shipment_id, {})
+                cte = _normalizar_valor(dados.get("CTE", ""))
+                if not cte:
+                    continue
+                cte_por_shipment[shipment_id] = cte
+                shipments_recuperados_por_consulta += 1
+                _log_performance_emissao(
+                    log,
+                    f"Consulta por ShipmentId recuperou o CTE {cte} para "
+                    f"{shipment_id}; os volumes desta consulta foram descartados.",
+                )
+            _log_performance_emissao(
+                log,
+                f"Consulta por ShipmentId recuperou CTE para "
+                f"{shipments_recuperados_por_consulta}/"
+                f"{len(shipment_ids_a_consultar)} pedido(s).",
             )
 
     cte_por_etiqueta = {

@@ -358,6 +358,33 @@ def _renderizar_atualizacao_fila(
         f"Registro compartilhado: {len(shipments_finalizados)} ShipmentId(s) "
         "já finalizados pela automação."
     )
+    finalizados_por_status = 0
+    if status_fila == "EMISSAO":
+        abertas_existentes = fila.carregar_etiquetas_abertas()
+        shipments_ja_fora_emissao = {
+            str(linha.get("shipment_id", "")).strip()
+            for linha in abertas_existentes.to_dict(orient="records")
+            if str(linha.get("shipment_id", "")).strip()
+            and _normalizar_rota(linha.get("status", ""))
+            not in {"", "EMISSAO"}
+        }
+        if shipments_ja_fora_emissao:
+            etiquetas_finalizadas = fila.finalizar_shipments(
+                shipments_ja_fora_emissao
+            )
+            registrar_shipments_finalizados(shipments_ja_fora_emissao)
+            finalizados_por_status = len(shipments_ja_fora_emissao)
+            shipments_finalizados = sincronizar_shipments_finalizados(
+                [
+                    ARQUIVO_FILA_ROMANEIOS_EMISSAO,
+                    ARQUIVO_FILA_ROMANEIOS_ENTRADA,
+                ]
+            )
+            log(
+                f"{finalizados_por_status} ShipmentId(s) com status diferente de "
+                f"EMISSAO foram finalizados antes da consulta; "
+                f"{etiquetas_finalizadas} etiqueta(s) saíram das filas abertas."
+            )
     novas_etiquetas = 0
     etiquetas_repetidas = 0
     ctes_com_status = 0
@@ -401,6 +428,46 @@ def _renderizar_atualizacao_fila(
                         status_por_cte
                     )
                     ctes_com_status = len(status_por_cte)
+                    if status_fila == "EMISSAO":
+                        shipments_por_cte: dict[str, set[str]] = {}
+                        for linha in etiquetas_abertas.to_dict(orient="records"):
+                            shipment_id = str(linha.get("shipment_id", "")).strip()
+                            if not shipment_id:
+                                continue
+                            for campo_cte in ("cte_base", "cte"):
+                                cte = str(linha.get(campo_cte, "")).strip()
+                                if cte:
+                                    shipments_por_cte.setdefault(cte, set()).add(
+                                        shipment_id
+                                    )
+                        shipments_fora_emissao = {
+                            shipment_id
+                            for cte, status in status_por_cte.items()
+                            if str(cte).strip()
+                            and _normalizar_rota(status) != "EMISSAO"
+                            for shipment_id in shipments_por_cte.get(
+                                str(cte).strip(), set()
+                            )
+                        }
+                        if shipments_fora_emissao:
+                            etiquetas_finalizadas = fila.finalizar_shipments(
+                                shipments_fora_emissao
+                            )
+                            registrar_shipments_finalizados(shipments_fora_emissao)
+                            finalizados_por_status += len(shipments_fora_emissao)
+                            shipments_finalizados = sincronizar_shipments_finalizados(
+                                [
+                                    ARQUIVO_FILA_ROMANEIOS_EMISSAO,
+                                    ARQUIVO_FILA_ROMANEIOS_ENTRADA,
+                                ]
+                            )
+                            log(
+                                f"{len(shipments_fora_emissao)} ShipmentId(s) "
+                                "finalizados porque a Performance retornou status "
+                                "diferente de EMISSAO; "
+                                f"{etiquetas_finalizadas} etiqueta(s) saíram das "
+                                "filas abertas."
+                            )
                     ctes_sem_status = [
                         cte for cte in ctes_abertos if cte not in status_por_cte
                     ]
@@ -546,7 +613,9 @@ def _renderizar_atualizacao_fila(
             resumo += (
                 f" Status retornado para {ctes_com_status}/{len(ctes_abertos)} "
                 f"CTE(s) aberto(s); {etiquetas_com_status_atualizado} etiqueta(s) "
-                "tiveram Status atualizado."
+                "tiveram Status atualizado. "
+                f"{finalizados_por_status} pedido(s) finalizados por status "
+                "diferente de EMISSAO."
             )
         else:
             resumo += (
@@ -857,21 +926,21 @@ def _renderizar_fila_romaneios(
     ]
     if status_fila == "ENTRADA":
         df_ctes_volume = _montar_df_ctes_volume_fila(tabela_status_aberto)
-        st.markdown("#### CTEs da fila Entrada")
-        st.dataframe(df_ctes_volume, hide_index=True, width="stretch")
-        csv_ctes_volume = df_ctes_volume.to_csv(
-            index=False,
-            sep=";",
-        ).encode("utf-8-sig")
-        st.download_button(
-            "Baixar CSV dos CTEs da fila",
-            data=csv_ctes_volume,
-            file_name=f"ctes_fila_entrada_{datetime.now():%Y%m%d_%H%M%S}.csv",
-            mime="text/csv",
-            key=f"{chave_widget}_baixar_ctes_volume",
-            width=LARGURA_BOTAO,
-            disabled=df_ctes_volume.empty,
-        )
+        if not df_ctes_volume.empty:
+            st.markdown("#### CTEs da fila Entrada")
+            st.dataframe(df_ctes_volume, hide_index=True, width="stretch")
+            csv_ctes_volume = df_ctes_volume.to_csv(
+                index=False,
+                sep=";",
+            ).encode("utf-8-sig")
+            st.download_button(
+                "Baixar CSV dos CTEs da fila",
+                data=csv_ctes_volume,
+                file_name=f"ctes_fila_entrada_{datetime.now():%Y%m%d_%H%M%S}.csv",
+                mime="text/csv",
+                key=f"{chave_widget}_baixar_ctes_volume",
+                width=LARGURA_BOTAO,
+            )
     ruas_disponiveis = sorted(
         {
             str(rua).strip()
@@ -1118,14 +1187,12 @@ def _renderizar_fila_romaneios(
             if not tabela_dashboard.empty
             else pd.DataFrame(columns=[*colunas_resumo, "Pedidos"])
         )
-    st.markdown(
-        "#### Pedidos disponíveis por triagem"
-        if status_fila == "ENTRADA"
-        else "#### Resumo das filas abertas"
-    )
-    if resumo_abertos.empty:
-        st.info("Não há pedidos em filas abertas disponíveis para geração.")
-    else:
+    if not resumo_abertos.empty:
+        st.markdown(
+            "#### Pedidos disponíveis por triagem"
+            if status_fila == "ENTRADA"
+            else "#### Resumo das filas abertas"
+        )
         st.dataframe(resumo_abertos, hide_index=True, width="stretch")
     divergencias = tabela[tabela.apply(_volume_divergente, axis=1)]
     if not divergencias.empty:
