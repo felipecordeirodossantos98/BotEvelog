@@ -53,6 +53,7 @@ class FilaRomaneiosEmissao:
                     etiqueta TEXT PRIMARY KEY,
                     shipment_id TEXT NOT NULL,
                     cte TEXT NOT NULL,
+                    cte_base TEXT NOT NULL DEFAULT '',
                     rua TEXT NOT NULL,
                     palete_origem TEXT NOT NULL,
                     triagem TEXT NOT NULL,
@@ -101,6 +102,25 @@ class FilaRomaneiosEmissao:
                     )
                 );
                 """
+            )
+            colunas_etiquetas = {
+                str(linha["name"])
+                for linha in conexao.execute(
+                    "PRAGMA table_info(etiquetas)"
+                ).fetchall()
+            }
+            if "cte_base" not in colunas_etiquetas:
+                conexao.execute(
+                    "ALTER TABLE etiquetas ADD COLUMN cte_base "
+                    "TEXT NOT NULL DEFAULT ''"
+                )
+                conexao.execute(
+                    "UPDATE etiquetas SET cte_base = cte "
+                    "WHERE cte_base = '' AND cte != ''"
+                )
+            conexao.execute(
+                "CREATE INDEX IF NOT EXISTS idx_etiquetas_cte_base_estado "
+                "ON etiquetas(cte_base, estado)"
             )
 
     def arquivos_importados(self) -> set[str]:
@@ -180,11 +200,25 @@ class FilaRomaneiosEmissao:
             ).fetchall()
         return {str(linha["etiqueta"]).strip() for linha in linhas if linha["etiqueta"]}
 
+    def shipments_finalizados_na_fila(self) -> set[str]:
+        """Retorna ShipmentIds com romaneios já concluídos nesta fila."""
+        with closing(self._conectar()) as conexao:
+            linhas = conexao.execute(
+                "SELECT DISTINCT shipment_id FROM etiquetas "
+                "WHERE estado IN ('FECHADO', 'FINALIZADO')"
+            ).fetchall()
+        return {
+            _texto(linha["shipment_id"])
+            for linha in linhas
+            if _texto(linha["shipment_id"])
+        }
+
     def importar_fila(
         self,
         tabela: pd.DataFrame,
         arquivos: Iterable[dict[str, str]],
         *,
+        shipments_finalizados: Iterable[str] = (),
         log=None,
     ) -> dict[str, object]:
         """Grava a fila e isola etiquetas encontradas em ruas/triagens distintas."""
@@ -196,6 +230,12 @@ class FilaRomaneiosEmissao:
         inseridas_nesta_importacao: dict[str, str] = {}
         arquivos = list(arquivos)
         linhas = tabela.to_dict(orient="records") if not tabela.empty else []
+        shipments_finalizados_set = {
+            _texto(shipment)
+            for shipment in shipments_finalizados
+            if _texto(shipment)
+        }
+        finalizados_ignorados = 0
 
         def registrar_ocorrencia_conflito(
             conexao: sqlite3.Connection,
@@ -241,6 +281,10 @@ class FilaRomaneiosEmissao:
             conexao.execute("BEGIN IMMEDIATE")
             try:
                 for linha in linhas:
+                    shipment_id_linha = _texto(linha.get("ShipmentId"))
+                    if shipment_id_linha in shipments_finalizados_set:
+                        finalizados_ignorados += 1
+                        continue
                     etiquetas = [
                         valor.strip()
                         for valor in str(linha.get("Etiquetas do pedido", "")).splitlines()
@@ -264,6 +308,7 @@ class FilaRomaneiosEmissao:
                             "etiqueta": etiqueta,
                             "shipment_id": _texto(linha.get("ShipmentId")),
                             "cte": cte_por_etiqueta.get(etiqueta, ""),
+                            "cte_base": _texto(linha.get("CTE")),
                             "rua": _texto(linha.get("Rua")),
                             "palete_origem": _texto(linha.get("Palete de origem")),
                             "triagem": _texto(linha.get("Triagem")),
@@ -346,6 +391,7 @@ class FilaRomaneiosEmissao:
                                 conexao.execute(
                                 "UPDATE etiquetas SET "
                                 "cte = COALESCE(NULLIF(?, ''), cte), "
+                                "cte_base = COALESCE(NULLIF(?, ''), cte_base), "
                                 "triagem = COALESCE(NULLIF(?, ''), triagem), "
                                 "rota = COALESCE(NULLIF(?, ''), rota), "
                                 "destino = COALESCE(NULLIF(?, ''), destino), "
@@ -355,7 +401,8 @@ class FilaRomaneiosEmissao:
                                     "status = COALESCE(NULLIF(?, ''), status) "
                                     "WHERE etiqueta = ?",
                                     (
-                                        dados["cte"], dados["triagem"], dados["rota"],
+                                        dados["cte"], dados["cte_base"],
+                                        dados["triagem"], dados["rota"],
                                         dados["destino"], dados["uf"], dados["cidade"],
                                         dados["volumes_sistema"], dados["status"], etiqueta,
                                     ),
@@ -365,11 +412,13 @@ class FilaRomaneiosEmissao:
 
                         conexao.execute(
                             "INSERT INTO etiquetas ("
-                            "etiqueta, shipment_id, cte, rua, palete_origem, triagem, "
+                            "etiqueta, shipment_id, cte, cte_base, rua, "
+                            "palete_origem, triagem, "
                             "rota, destino, uf, cidade, volumes_sistema, status, origem, "
                             "arquivo_origem, importado_em"
                             ") VALUES ("
-                            ":etiqueta, :shipment_id, :cte, :rua, :palete_origem, :triagem, "
+                            ":etiqueta, :shipment_id, :cte, :cte_base, :rua, "
+                            ":palete_origem, :triagem, "
                             ":rota, :destino, :uf, :cidade, :volumes_sistema, :status, :origem, "
                             ":arquivo_origem, :importado_em"
                             ")",
@@ -425,7 +474,8 @@ class FilaRomaneiosEmissao:
                 f"{repetidos} etiqueta(s) já conhecida(s), "
                 f"{len(arquivos)} arquivo(s) registrado(s), "
                 f"{len(conflitos)} etiqueta(s) isolada(s) por divergência de "
-                f"rua/triagem; {len(shipments_conflito)} pedido(s) isolado(s)."
+                f"rua/triagem; {len(shipments_conflito)} pedido(s) isolado(s); "
+                f"{finalizados_ignorados} pedido(s) finalizado(s) ignorado(s)."
             )
             for etiqueta, ocorrencias in sorted(conflitos.items()):
                 locais = "; ".join(
@@ -441,7 +491,38 @@ class FilaRomaneiosEmissao:
             "etiquetas_conflito": sorted(conflitos),
             "pedidos_isolados": len(shipments_conflito),
             "shipments_isolados": sorted(shipments_conflito),
+            "finalizados_ignorados": finalizados_ignorados,
         }
+
+    def finalizar_shipments(self, shipment_ids: Iterable[str]) -> int:
+        """Bloqueia cópias abertas de pedidos finalizados em outra fila."""
+        shipments = list(dict.fromkeys(
+            _texto(shipment_id)
+            for shipment_id in shipment_ids
+            if _texto(shipment_id)
+        ))
+        if not shipments:
+            return 0
+
+        alteradas = 0
+        with closing(self._conectar()) as conexao:
+            conexao.execute("BEGIN IMMEDIATE")
+            try:
+                for inicio in range(0, len(shipments), 500):
+                    lote = shipments[inicio : inicio + 500]
+                    placeholders = ", ".join("?" for _ in lote)
+                    cursor = conexao.execute(
+                        "UPDATE etiquetas SET estado = 'FINALIZADO' "
+                        "WHERE estado IN ('ABERTO', 'CONFLITO') "
+                        f"AND shipment_id IN ({placeholders})",
+                        lote,
+                    )
+                    alteradas += max(cursor.rowcount, 0)
+                conexao.commit()
+            except Exception:
+                conexao.rollback()
+                raise
+        return alteradas
 
     def carregar_etiquetas_conflito(self) -> pd.DataFrame:
         """Lista etiquetas isoladas até revisão manual de rua/triagem."""
@@ -597,6 +678,55 @@ class FilaRomaneiosEmissao:
                 raise
         return alteradas
 
+    def atualizar_dados_performance_abertas(
+        self,
+        dados_por_cte: dict[str, dict[str, object]],
+    ) -> int:
+        """Atualiza status e localidade pela Performance nas etiquetas abertas."""
+        atualizacoes = []
+        for cte, dados in dados_por_cte.items():
+            cte_normalizado = _texto(cte)
+            if not cte_normalizado:
+                continue
+            valores = (
+                _texto(dados.get("Status")),
+                _texto(dados.get("UF")),
+                _texto(dados.get("Cidade")),
+                _texto(dados.get("Destino")),
+            )
+            if not any(valores):
+                continue
+            atualizacoes.append(
+                (*valores, cte_normalizado, cte_normalizado, *valores)
+            )
+
+        if not atualizacoes:
+            return 0
+
+        with closing(self._conectar()) as conexao:
+            conexao.execute("BEGIN IMMEDIATE")
+            try:
+                cursor = conexao.executemany(
+                    "UPDATE etiquetas SET "
+                    "status = COALESCE(NULLIF(?, ''), status), "
+                    "uf = COALESCE(NULLIF(?, ''), uf), "
+                    "cidade = COALESCE(NULLIF(?, ''), cidade), "
+                    "destino = COALESCE(NULLIF(?, ''), destino) "
+                    "WHERE estado = 'ABERTO' AND "
+                    "(cte_base = ? OR (cte_base = '' AND cte = ?)) AND ("
+                    "status IS NOT COALESCE(NULLIF(?, ''), status) OR "
+                    "uf IS NOT COALESCE(NULLIF(?, ''), uf) OR "
+                    "cidade IS NOT COALESCE(NULLIF(?, ''), cidade) OR "
+                    "destino IS NOT COALESCE(NULLIF(?, ''), destino))",
+                    atualizacoes,
+                )
+                alteradas = max(cursor.rowcount, 0)
+                conexao.commit()
+            except Exception:
+                conexao.rollback()
+                raise
+        return alteradas
+
     def fechar_romaneio(
         self,
         *,
@@ -605,6 +735,7 @@ class FilaRomaneiosEmissao:
         rota: str,
         etiquetas: Iterable[str],
         caminho_pdf: Path | str,
+        triagens: Iterable[str] | None = None,
     ) -> int:
         etiquetas_unicas = list(dict.fromkeys(
             etiqueta.strip() for etiqueta in etiquetas if etiqueta.strip()
@@ -616,11 +747,23 @@ class FilaRomaneiosEmissao:
         with closing(self._conectar()) as conexao:
             conexao.execute("BEGIN IMMEDIATE")
             try:
-                existentes = conexao.execute(
-                    "SELECT etiqueta, shipment_id FROM etiquetas "
-                    "WHERE estado = 'ABERTO' AND rua = ? AND triagem = ? AND rota = ?",
-                    (rua, triagem, rota),
-                ).fetchall()
+                triagens_unicas = list(dict.fromkeys(
+                    str(valor).strip()
+                    for valor in (triagens or [])
+                    if str(valor).strip()
+                ))
+                if triagens_unicas:
+                    existentes = conexao.execute(
+                        "SELECT etiqueta, shipment_id FROM etiquetas "
+                        "WHERE estado = 'ABERTO' AND rua = ? AND rota = ?",
+                        (rua, rota),
+                    ).fetchall()
+                else:
+                    existentes = conexao.execute(
+                        "SELECT etiqueta, shipment_id FROM etiquetas "
+                        "WHERE estado = 'ABERTO' AND rua = ? AND triagem = ? AND rota = ?",
+                        (rua, triagem, rota),
+                    ).fetchall()
                 selecionadas = set(etiquetas_unicas)
                 etiquetas_fechadas = [
                     str(linha["etiqueta"])

@@ -132,6 +132,10 @@ PERFIL_ZENDESK = PASTA_PERFIS / "gerar_tickets_zendesk" / "chromium"
 ESTADO_ZENDESK = PASTA_ESTADO / "gerar_tickets_zendesk"
 ESTADO_GERAR_ROMANEIOS_EMISSAO = PASTA_ESTADO / "gerar_romaneios_emissao"
 ESTADO_GERAR_ROMANEIOS_ENTRADA = PASTA_ESTADO / "gerar_romaneios_entrada"
+ESTADO_GERAR_ROMANEIOS_FINALIZADOS = PASTA_ESTADO / "gerar_romaneios_finalizados"
+ARQUIVO_SHIPMENTS_ROMANEIOS_FINALIZADOS = (
+    ESTADO_GERAR_ROMANEIOS_FINALIZADOS / "shipments_finalizados.txt"
+)
 ARQUIVO_ETIQUETAS_ROMANEIOS_EMISSAO = (
     ESTADO_GERAR_ROMANEIOS_EMISSAO / "etiquetas_processadas.txt"
 )

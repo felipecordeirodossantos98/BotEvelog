@@ -12,7 +12,7 @@ import unicodedata
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from threading import Event
-from typing import Callable
+from typing import Callable, Iterable
 from urllib.parse import unquote_to_bytes
 
 import pandas as pd
@@ -1938,6 +1938,54 @@ def resolver_rota_por_localidade(
     return unidade, next(iter(triagens_unicas.values()))
 
 
+def listar_triagens_por_localidade(
+    regras: list[dict[str, object]],
+    *,
+    uf: object = "",
+    cidade: object = "",
+    destino: object = "",
+    triagem: object = "",
+) -> list[str]:
+    """Lista as triagens compatíveis na prioridade mais alta da localidade."""
+    uf_normalizada = _normalizar_uf(uf)
+    cidade_normalizada = _normalizar_rota(cidade)
+    destino_normalizado = _normalizar_rota(destino)
+    triagem_normalizada = _normalizar_rota(triagem)
+    candidatas: list[tuple[int, str]] = []
+
+    for regra in regras:
+        nome_triagem = " ".join(str(regra.get("triagem") or "").split())
+        componentes_triagem = {
+            _normalizar_rota(parte)
+            for parte in nome_triagem.split(",")
+            if _normalizar_rota(parte)
+        }
+        if triagem_normalizada and (
+            _normalizar_rota(nome_triagem) != triagem_normalizada
+            and triagem_normalizada not in componentes_triagem
+        ):
+            continue
+
+        prioridades = []
+        if destino_normalizado in regra.get("destinos", []):
+            prioridades.append(3)
+        if cidade_normalizada in regra.get("cidades", []):
+            prioridades.append(2)
+        if uf_normalizada in regra.get("ufs", []):
+            prioridades.append(1)
+        if prioridades:
+            candidatas.append((max(prioridades), nome_triagem))
+
+    if not candidatas:
+        return []
+    maior_prioridade = max(prioridade for prioridade, _ in candidatas)
+    triagens: dict[str, str] = {}
+    for prioridade, nome_triagem in candidatas:
+        if prioridade == maior_prioridade and nome_triagem:
+            triagens.setdefault(_normalizar_rota(nome_triagem), nome_triagem)
+    return list(triagens.values())
+
+
 def carregar_regras_rotas_com_destino_e_triagem(
     caminho: Path = ARQUIVO_ROTAS_ROMANEIOS,
 ) -> tuple[
@@ -3170,6 +3218,7 @@ def mapear_rotas_para_grupos(
     separar_por_palete: bool = False,
     separar_por_rua_triagem: bool = False,
     separar_por_triagem: bool = False,
+    agrupar_triagens_por_rota: Iterable[str] = (),
 ) -> tuple[list[dict], list[str]]:
     coluna_cte = next(
         (coluna for coluna in tabela_base if _normalizar_rota(coluna) == "CTE"),
@@ -3177,14 +3226,21 @@ def mapear_rotas_para_grupos(
     )
     if coluna_cte is None or "Rota" not in tabela_base:
         raise ValueError("A base precisa conter as colunas CTE, Destino e Rota.")
-    coluna_ctes_entrada = next(
-        (
-            coluna
-            for coluna in tabela_base
-            if _normalizar_rota(coluna) == "CTES PARA DAR ENTRADA"
-        ),
-        None,
-    )
+    colunas_ctes = {
+        _normalizar_rota(coluna): coluna
+        for coluna in tabela_base
+    }
+    coluna_ctes_entrada = colunas_ctes.get("CTES PARA ROMANEIO")
+    if (
+        coluna_ctes_entrada is None
+        or not tabela_base[coluna_ctes_entrada]
+        .fillna("")
+        .astype(str)
+        .str.strip()
+        .ne("")
+        .any()
+    ):
+        coluna_ctes_entrada = colunas_ctes.get("CTES PARA DAR ENTRADA")
     coluna_palete = next(
         (
             coluna
@@ -3299,7 +3355,44 @@ def mapear_rotas_para_grupos(
             _, rota = chave
             grupo = {"ROTA": rota, "LISTA_CTES": ctes}
         grupos.append(grupo)
-    return grupos, ignorados
+    rotas_agregadas = {
+        _normalizar_rota(rota)
+        for rota in agrupar_triagens_por_rota
+        if str(rota).strip()
+    }
+    if not separar_por_triagem or not rotas_agregadas:
+        return grupos, ignorados
+
+    grupos_finais: list[dict] = []
+    grupos_por_rota: dict[str, dict] = {}
+    for grupo in grupos:
+        rota = str(grupo.get("ROTA", "")).strip()
+        chave_rota = _normalizar_rota(rota)
+        if chave_rota not in rotas_agregadas:
+            grupos_finais.append(grupo)
+            continue
+
+        grupo_agregado = grupos_por_rota.get(chave_rota)
+        if grupo_agregado is None:
+            grupo_agregado = {
+                "ROTA": rota,
+                "TRIAGENS": [],
+                "LISTA_CTES": [],
+            }
+            grupos_por_rota[chave_rota] = grupo_agregado
+            grupos_finais.append(grupo_agregado)
+        triagem = str(grupo.get("TRIAGEM", "")).strip()
+        if triagem and triagem not in grupo_agregado["TRIAGENS"]:
+            grupo_agregado["TRIAGENS"].append(triagem)
+        for cte in grupo["LISTA_CTES"]:
+            if cte not in grupo_agregado["LISTA_CTES"]:
+                grupo_agregado["LISTA_CTES"].append(cte)
+
+    for grupo in grupos_por_rota.values():
+        triagens = grupo["TRIAGENS"]
+        grupo["TRIAGEM"] = ", ".join(triagens)
+
+    return grupos_finais, ignorados
 
 
 def processar_manifestos(

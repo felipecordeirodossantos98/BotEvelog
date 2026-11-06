@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from hashlib import sha256
 from pathlib import Path
+import re
 import tempfile
 import unicodedata
 
@@ -16,6 +17,7 @@ from servicos.fraction import (
     carregar_destinos_fraction,
     carregar_regras_triagem_rotas,
     executar_manifestos_romaneios,
+    listar_triagens_por_localidade,
     enviar_pdf_para_impressora_padrao,
     mapear_rotas_para_grupos,
     preparar_lote_impressao_romaneios,
@@ -24,6 +26,7 @@ from automacoes.gerar_romaneios import (
     COLUNAS_RESULTADO,
     baixar_etiquetas_drive,
     carregar_codigos_preferenciais_unidades_emissao,
+    consultar_dados_performance_ctes,
     consultar_status_performance_ctes,
     montar_fila_emissao,
     preparar_estado_etiquetas_romaneio,
@@ -35,6 +38,10 @@ from automacoes.dar_entrada_pedidos import (
     PADRAO_ETIQUETA,
 )
 from servicos.fila_romaneios_emissao import FilaRomaneiosEmissao
+from servicos.romaneios_finalizados import (
+    registrar_shipments_finalizados,
+    sincronizar_shipments_finalizados,
+)
 from utils.interface import (
     LARGURA_BOTAO,
     avisar_variaveis_faltantes,
@@ -63,8 +70,13 @@ COLUNAS_OCULTAS_DF_ROMANEIOS = [
 
 
 def _preparar_df_exibicao_romaneios(tabela: pd.DataFrame) -> pd.DataFrame:
+    colunas_ocultas = ["CTEs por etiqueta", *COLUNAS_OCULTAS_DF_ROMANEIOS]
+    if "Status" not in tabela.columns or not tabela["Status"].fillna("").map(
+        lambda valor: _normalizar_rota(valor) == "ENTRADA"
+    ).any():
+        colunas_ocultas.append("CTEs para romaneio")
     return tabela.drop(
-        columns=["CTEs por etiqueta", *COLUNAS_OCULTAS_DF_ROMANEIOS],
+        columns=colunas_ocultas,
         errors="ignore",
     )
 
@@ -140,10 +152,18 @@ def _montar_tabela_fila_persistida(
     etiquetas_abertas = fila.carregar_etiquetas_abertas()
     colunas = (
         ["Rua", "Palete de origem"]
-        + COLUNAS_RESULTADO[:-2]
+        + COLUNAS_RESULTADO[:3]
+        + ["CTEs para romaneio"]
+        + COLUNAS_RESULTADO[3:-2]
         + ["UF", "Cidade"]
         + COLUNAS_RESULTADO[-2:]
-        + ["CTEs por etiqueta", "Triagem", "Rota", "Origem", "Status"]
+        + [
+            "CTEs por etiqueta",
+            "Triagem",
+            "Rota",
+            "Origem",
+            "Status",
+        ]
     )
     if etiquetas_abertas.empty:
         return pd.DataFrame(columns=colunas)
@@ -177,7 +197,15 @@ def _montar_tabela_fila_persistida(
         ctes_do_pedido = list(dict.fromkeys(cte for cte in ctes_por_etiqueta if cte))
         volume_sistema = None
         shipment_id = str(primeira_preenchida("shipment_id"))
-        cte = ctes_do_pedido[0] if ctes_do_pedido else ""
+        status_pedido = str(primeira_preenchida("status") or "")
+        ctes_base = [
+            str(valor).strip()
+            for valor in grupo.get("cte_base", pd.Series(dtype=str)).tolist()
+            if pd.notna(valor) and str(valor).strip()
+        ]
+        cte = ctes_base[0] if ctes_base else (
+            ctes_do_pedido[0] if ctes_do_pedido else ""
+        )
         linhas.append(
             {
                 "Rua": str(primeira_preenchida("rua") or ""),
@@ -196,6 +224,11 @@ def _montar_tabela_fila_persistida(
                 "Etiquetas faltantes": "",
                 "CTEs para dar entrada": "\n".join(ctes_do_pedido),
                 "CTEs por etiqueta": "\n".join(ctes_por_etiqueta),
+                "CTEs para romaneio": (
+                    "\n".join(ctes_do_pedido)
+                    if _normalizar_rota(status_pedido) == "ENTRADA"
+                    else ""
+                ),
                 "UF": str(primeira_preenchida("uf") or ""),
                 "Cidade": str(primeira_preenchida("cidade") or ""),
                 "Destino": str(primeira_preenchida("destino") or ""),
@@ -203,11 +236,97 @@ def _montar_tabela_fila_persistida(
                 "Triagem": str(primeira_preenchida("triagem") or ""),
                 "Rota": str(primeira_preenchida("rota") or ""),
                 "Origem": str(primeira_preenchida("origem") or ""),
-                "Status": str(primeira_preenchida("status") or ""),
+                "Status": status_pedido,
             }
         )
 
     return pd.DataFrame(linhas, columns=colunas)
+
+
+def _recalcular_rotas_fila_aberta(
+    fila: FilaRomaneiosEmissao,
+    status_fila: str,
+    *,
+    log,
+) -> int:
+    tabela = _montar_tabela_fila_persistida(fila)
+    if tabela.empty or "Status" not in tabela.columns:
+        log(f"Fila {status_fila} sem pedidos abertos para recalcular rotas.")
+        return 0
+    tabela = tabela.loc[
+        tabela["Status"].fillna("").map(
+            lambda valor: _normalizar_rota(valor) == status_fila
+        )
+    ].copy()
+    if tabela.empty:
+        log(f"Fila {status_fila} sem pedidos abertos para recalcular rotas.")
+        return 0
+
+    recalculada = recalcular_rotas_fila_emissao(tabela, log=log)
+    atualizadas = fila.atualizar_rotas_abertas(recalculada)
+    log(
+        f"Rotas da fila {status_fila} reavaliadas pela configuração atual; "
+        f"{atualizadas} etiqueta(s) tiveram rota/triagem atualizadas."
+    )
+    return atualizadas
+
+
+def _montar_df_ctes_volume_fila(tabela: pd.DataFrame) -> pd.DataFrame:
+    linhas = []
+    for _, pedido in tabela.iterrows():
+        cte_base = str(pedido.get("CTE", "") or "").strip()
+        uf = str(pedido.get("UF", "") or "").strip()
+        cidade = str(pedido.get("Cidade", "") or "").strip()
+        ctes_volume = [
+            cte.strip()
+            for cte in str(pedido.get("CTEs para romaneio", "") or "").splitlines()
+            if cte.strip()
+        ]
+        for cte_volume in ctes_volume:
+            linhas.append(
+                {
+                    "CTE": cte_base,
+                    "CTE Volume": cte_volume,
+                    "UF": uf,
+                    "Cidade": cidade,
+                }
+            )
+    return pd.DataFrame(linhas, columns=["CTE", "CTE Volume", "UF", "Cidade"])
+
+
+def _normalizar_cte_base_volume(valor: object) -> str:
+    if pd.isna(valor):
+        return ""
+    cte = str(valor).strip()
+    return cte[:-3] if cte.isdigit() and len(cte) == 17 else cte
+
+
+def _resumir_ctes_e_volumes(ctes: list[str]) -> tuple[int, int]:
+    ctes_unicos = list(
+        dict.fromkeys(str(cte).strip() for cte in ctes if str(cte).strip())
+    )
+    ctes_base = {
+        base
+        for cte in ctes_unicos
+        if (base := _normalizar_cte_base_volume(cte))
+    }
+    return len(ctes_base), len(ctes_unicos)
+
+
+def _extrair_ctes_ignorados(grupos_ignorados: list[str]) -> list[str]:
+    ctes = []
+    for mensagem in grupos_ignorados:
+        correspondencia = re.match(
+            r"^CTE\(s\)\s+(.+?)(?:\s+em\s+|:\s)",
+            mensagem,
+        )
+        if correspondencia:
+            ctes.extend(
+                cte.strip()
+                for cte in correspondencia.group(1).split(",")
+                if cte.strip()
+            )
+    return list(dict.fromkeys(ctes))
 
 
 def _renderizar_atualizacao_fila(
@@ -232,10 +351,18 @@ def _renderizar_atualizacao_fila(
         rotulo=f"atualizar_fila_{sufixo_chave}",
     )
     fila = FilaRomaneiosEmissao(arquivo_fila)
+    shipments_finalizados = sincronizar_shipments_finalizados(
+        [ARQUIVO_FILA_ROMANEIOS_EMISSAO, ARQUIVO_FILA_ROMANEIOS_ENTRADA]
+    )
+    log(
+        f"Registro compartilhado: {len(shipments_finalizados)} ShipmentId(s) "
+        "já finalizados pela automação."
+    )
     novas_etiquetas = 0
     etiquetas_repetidas = 0
     ctes_com_status = 0
     etiquetas_com_status_atualizado = 0
+    etiquetas_com_rota_atualizada = 0
     erros: list[str] = []
     avisos: list[str] = []
 
@@ -334,6 +461,7 @@ def _renderizar_atualizacao_fila(
                             contagem = fila.importar_fila(
                                 dados["tabela"],
                                 arquivos_novos,
+                                shipments_finalizados=shipments_finalizados,
                                 log=log,
                             )
                         novas_etiquetas = contagem["novas"]
@@ -392,9 +520,27 @@ def _renderizar_atualizacao_fila(
                 log(mensagem)
                 erros.append(mensagem)
 
+        try:
+            etiquetas_com_rota_atualizada = _recalcular_rotas_fila_aberta(
+                fila,
+                status_fila,
+                log=log,
+            )
+        except (FileNotFoundError, OSError, ValueError) as erro_rotas:
+            mensagem = (
+                "Não foi possível recalcular as rotas pela configuração atual: "
+                f"{type(erro_rotas).__name__}: {erro_rotas}"
+            )
+            log(mensagem)
+            avisos.append(mensagem)
+
         resumo = (
             f"Atualização concluída: {novas_etiquetas} etiqueta(s) nova(s), "
             f"{etiquetas_repetidas} já conhecida(s)."
+        )
+        resumo += (
+            f" Rotas revisadas; {etiquetas_com_rota_atualizada} etiqueta(s) "
+            "tiveram rota/triagem atualizadas."
         )
         if ctes_abertos:
             resumo += (
@@ -418,6 +564,9 @@ def _renderizar_atualizacao_fila(
 
 
 def renderizar_gerar_romaneios() -> None:
+    sincronizar_shipments_finalizados(
+        [ARQUIVO_FILA_ROMANEIOS_EMISSAO, ARQUIVO_FILA_ROMANEIOS_ENTRADA]
+    )
     st.subheader("Gerar romaneios")
     faltantes = avisar_variaveis_faltantes("gerar_romaneios")
     geracao_disponivel = not bool(faltantes)
@@ -449,6 +598,195 @@ def renderizar_gerar_romaneios() -> None:
         )
 
 
+def _renderizar_atualizacao_fila_entrada(arquivo_fila: Path) -> None:
+    atualizar = st.button(
+        "Atualizar fila",
+        type="primary",
+        key="gerar_romaneios_entrada_atualizar_fila",
+        width=LARGURA_BOTAO,
+    )
+    if not atualizar:
+        return
+
+    log, _ = criar_logger_execucao(
+        "gerar_romaneios",
+        rotulo="atualizar_fila_entrada",
+    )
+    fila = FilaRomaneiosEmissao(arquivo_fila)
+    etiquetas_abertas = fila.carregar_etiquetas_abertas()
+    ctes_abertos = list(dict.fromkeys(
+        (
+            str(linha.get("cte_base")).strip()
+            if pd.notna(linha.get("cte_base"))
+            and str(linha.get("cte_base")).strip()
+            else str(linha.get("cte", "")).strip()
+        )
+        for linha in etiquetas_abertas.to_dict(orient="records")
+        if (
+            pd.notna(linha.get("cte_base"))
+            and str(linha.get("cte_base")).strip()
+        )
+        or (pd.notna(linha.get("cte")) and str(linha.get("cte")).strip())
+    ))
+    if not ctes_abertos:
+        log("Não há CTEs abertos na fila Entrada para atualizar.")
+        st.info("Não há pedidos abertos para atualizar na fila Entrada.")
+        return
+
+    log(
+        f"Atualizando UF, Cidade, Destino e Status de {len(ctes_abertos)} "
+        "CTE(s) da fila Entrada pela Performance."
+    )
+    linhas_abertas = etiquetas_abertas.to_dict(orient="records")
+    try:
+        with tempfile.TemporaryDirectory(
+            prefix="botevelog_performance_fila_entrada_"
+        ) as diretorio_temporario:
+            with st.spinner(
+                f"Atualizando dados de {len(ctes_abertos)} CTE(s) pela Performance..."
+            ):
+                dados_por_cte = consultar_dados_performance_ctes(
+                    ctes_abertos,
+                    log=log,
+                    pasta_temporaria=Path(diretorio_temporario),
+                )
+                ctes_transferidos = {
+                    str(cte).strip()
+                    for cte, dados in dados_por_cte.items()
+                    if _normalizar_rota(dados.get("Status", ""))
+                    == "TRANSFERENCIA"
+                }
+                shipments_transferidos = set()
+                for linha in linhas_abertas:
+                    status_atual = _normalizar_rota(linha.get("status", ""))
+                    cte_base = linha.get("cte_base", "")
+                    cte = linha.get("cte", "")
+                    if pd.isna(cte_base) or not str(cte_base).strip():
+                        cte_base = cte
+                    shipment_id = str(linha.get("shipment_id", "")).strip()
+                    if (
+                        status_atual in {"ENTRADA", "TRANSFERENCIA"}
+                        and str(cte_base).strip() in ctes_transferidos
+                        and shipment_id
+                    ):
+                        shipments_transferidos.add(shipment_id)
+                etiquetas_atualizadas = fila.atualizar_dados_performance_abertas(
+                    dados_por_cte
+                )
+    except Exception as erro:
+        log(
+            f"Falha ao atualizar a fila Entrada pela Performance: "
+            f"{type(erro).__name__}: {erro}"
+        )
+        error(f"Não foi possível atualizar a fila Entrada: {erro}")
+        return
+
+    shipments_finalizados = 0
+    etiquetas_finalizadas = 0
+    if shipments_transferidos:
+        # Finaliza primeiro no banco local. Se a sincronização compartilhada
+        # falhar, a próxima abertura da fila migra esse estado para o registro
+        # global antes de importar ou atualizar pedidos.
+        etiquetas_finalizadas = fila.finalizar_shipments(shipments_transferidos)
+        registrar_shipments_finalizados(shipments_transferidos)
+        shipments_finalizados = len(shipments_transferidos)
+        sincronizar_shipments_finalizados(
+            [ARQUIVO_FILA_ROMANEIOS_EMISSAO, ARQUIVO_FILA_ROMANEIOS_ENTRADA]
+        )
+        log(
+            f"{shipments_finalizados} ShipmentId(s) finalizados na automação: "
+            "status ENTRADA → TRANSFERENCIA confirmado na Performance. "
+            f"{etiquetas_finalizadas} etiqueta(s) foram retiradas das filas abertas."
+        )
+
+    etiquetas_com_rota_atualizada = 0
+    erro_recalculo_rotas = ""
+    try:
+        etiquetas_com_rota_atualizada = _recalcular_rotas_fila_aberta(
+            fila,
+            "ENTRADA",
+            log=log,
+        )
+    except (FileNotFoundError, OSError, ValueError) as erro_rotas:
+        erro_recalculo_rotas = (
+            "Não foi possível recalcular as rotas pela configuração atual: "
+            f"{type(erro_rotas).__name__}: {erro_rotas}"
+        )
+        log(erro_recalculo_rotas)
+
+    ctes_sem_retorno = [cte for cte in ctes_abertos if cte not in dados_por_cte]
+    ctes_sem_status = [
+        cte
+        for cte, dados in dados_por_cte.items()
+        if not str(dados.get("Status", "")).strip()
+    ]
+    ctes_sem_localidade = [
+        cte
+        for cte, dados in dados_por_cte.items()
+        if not str(dados.get("UF", "")).strip()
+        or not str(dados.get("Cidade", "")).strip()
+    ]
+    ctes_status_entrada = [
+        cte
+        for cte, dados in dados_por_cte.items()
+        if _normalizar_rota(dados.get("Status", "")) == "ENTRADA"
+    ]
+    ctes_outro_status = [
+        cte
+        for cte, dados in dados_por_cte.items()
+        if _normalizar_rota(dados.get("Status", ""))
+        not in {"", "ENTRADA", "TRANSFERENCIA"}
+    ]
+    status_fora_da_fila = sorted(
+        {
+            str(dados.get("Status", "")).strip()
+            for dados in dados_por_cte.values()
+            if _normalizar_rota(dados.get("Status", ""))
+            not in {"", "ENTRADA", "TRANSFERENCIA"}
+        },
+        key=_normalizar_rota,
+    )
+    resumo_status_fila = (
+        f"{len(ctes_status_entrada)} CTE(s) com status ENTRADA permanecem na aba; "
+        f"{len(ctes_outro_status)} com outro status ficam ocultos"
+        + (
+            f" ({', '.join(status_fora_da_fila)})"
+            if status_fora_da_fila
+            else ""
+        )
+        + "."
+    )
+    log(
+        f"Fila Entrada atualizada: {len(dados_por_cte)}/{len(ctes_abertos)} "
+        f"CTE(s) retornaram dados; {etiquetas_atualizadas} etiqueta(s) "
+        "tiveram dados alterados no SQLite. "
+        f"{resumo_status_fila}"
+    )
+    if ctes_sem_retorno or ctes_sem_status or ctes_sem_localidade:
+        warning(
+            "A Performance não retornou todos os dados da fila. "
+            f"Sem correspondência: {len(ctes_sem_retorno)} CTE(s); "
+            f"sem Status: {len(ctes_sem_status)}; "
+            f"sem UF ou Cidade: {len(ctes_sem_localidade)}. "
+            "Os valores anteriores foram mantidos quando não houve retorno. "
+            f"{resumo_status_fila} "
+            f"Finalizados por transferência: {shipments_finalizados} pedido(s). "
+            f"Rotas revisadas; {etiquetas_com_rota_atualizada} etiqueta(s) "
+            "tiveram rota/triagem atualizadas."
+        )
+    else:
+        success(
+            f"Performance consultada para {len(ctes_abertos)} CTE(s); "
+            f"{etiquetas_atualizadas} etiqueta(s) tiveram dados alterados. "
+            f"{resumo_status_fila} "
+            f"Finalizados por transferência: {shipments_finalizados} pedido(s). "
+            f"Rotas revisadas; {etiquetas_com_rota_atualizada} etiqueta(s) "
+            "tiveram rota/triagem atualizadas."
+        )
+    if erro_recalculo_rotas:
+        warning(erro_recalculo_rotas)
+
+
 def _renderizar_fila_romaneios(
     status_fila: str,
     arquivo_fila: Path,
@@ -471,6 +809,7 @@ def _renderizar_fila_romaneios(
             sincronizacao_disponivel,
         )
     else:
+        _renderizar_atualizacao_fila_entrada(arquivo_fila)
         st.caption(
             "Esta fila é preenchida automaticamente após a entrada dos pedidos."
         )
@@ -516,6 +855,23 @@ def _renderizar_fila_romaneios(
             lambda valor: _normalizar_rota(valor) == status_fila
         )
     ]
+    if status_fila == "ENTRADA":
+        df_ctes_volume = _montar_df_ctes_volume_fila(tabela_status_aberto)
+        st.markdown("#### CTEs da fila Entrada")
+        st.dataframe(df_ctes_volume, hide_index=True, width="stretch")
+        csv_ctes_volume = df_ctes_volume.to_csv(
+            index=False,
+            sep=";",
+        ).encode("utf-8-sig")
+        st.download_button(
+            "Baixar CSV dos CTEs da fila",
+            data=csv_ctes_volume,
+            file_name=f"ctes_fila_entrada_{datetime.now():%Y%m%d_%H%M%S}.csv",
+            mime="text/csv",
+            key=f"{chave_widget}_baixar_ctes_volume",
+            width=LARGURA_BOTAO,
+            disabled=df_ctes_volume.empty,
+        )
     ruas_disponiveis = sorted(
         {
             str(rua).strip()
@@ -682,6 +1038,9 @@ def _renderizar_fila_romaneios(
         "Etiquetas do pedido": st.column_config.TextColumn(
             "Etiquetas do pedido", width="large"
         ),
+        "CTEs para romaneio": st.column_config.TextColumn(
+            "CTEs para romaneio", width="large"
+        ),
         "UF": st.column_config.TextColumn("UF"),
         "Cidade": st.column_config.TextColumn("Cidade"),
         "Destino": st.column_config.TextColumn("Destino"),
@@ -693,19 +1052,72 @@ def _renderizar_fila_romaneios(
         tabela["Status"].fillna("").map(
             lambda valor: _normalizar_rota(valor) == status_fila
         )
-    ]
-    colunas_resumo = (
-        ["Triagem", "Rota"]
-        if status_fila == "ENTRADA"
-        else ["Rua", "Triagem", "Rota"]
-    )
-    resumo_abertos = (
-        tabela_dashboard.groupby(colunas_resumo, dropna=False)
-        .agg(Pedidos=("ShipmentId", "nunique"))
-        .reset_index()
-        if not tabela_dashboard.empty
-        else pd.DataFrame(columns=[*colunas_resumo, "Pedidos"])
-    )
+    ].copy()
+    if status_fila == "ENTRADA":
+        tabela_dashboard["_CTE base"] = tabela_dashboard["CTE"].map(
+            _normalizar_cte_base_volume
+        )
+        tabela_dashboard["_Triagem para resumo"] = tabela_dashboard[
+            "Triagem"
+        ].fillna("").astype(str)
+        tabela_dashboard["_Rota para resumo"] = tabela_dashboard[
+            "Rota"
+        ].fillna("").astype(str)
+        eh_teca_matriz = tabela_dashboard["Rota"].fillna("").map(
+            lambda valor: _normalizar_rota(valor) == "TC TECA MATRIZ"
+        )
+        tabela_dashboard.loc[eh_teca_matriz, "_Triagem para resumo"] = (
+            "__FILA_TC_TECA_MATRIZ__"
+        )
+        tabela_dashboard.loc[eh_teca_matriz, "_Rota para resumo"] = (
+            "TC TECA MATRIZ"
+        )
+        tabela_dashboard["_Volumes para romaneio"] = tabela_dashboard[
+            "CTEs para romaneio"
+        ].map(
+            lambda valor: len(
+                {
+                    cte.strip()
+                    for cte in str(valor).splitlines()
+                    if cte.strip()
+                }
+            )
+        )
+        resumo_abertos = (
+            tabela_dashboard.groupby(
+                ["_Triagem para resumo", "_Rota para resumo"], dropna=False
+            )
+            .agg(
+                Triagem=(
+                    "Triagem",
+                    lambda valores: ", ".join(
+                        dict.fromkeys(
+                            str(valor).strip()
+                            for valor in valores
+                            if str(valor).strip()
+                        )
+                    ),
+                ),
+                Rota=("_Rota para resumo", "first"),
+                Pedidos=("ShipmentId", "nunique"),
+                CTEs=("_CTE base", "nunique"),
+                Volumes=("_Volumes para romaneio", "sum"),
+            )
+            .reset_index()
+            .drop(columns=["_Triagem para resumo", "_Rota para resumo"])
+            [["Triagem", "Rota", "Pedidos", "CTEs", "Volumes"]]
+            if not tabela_dashboard.empty
+            else pd.DataFrame(columns=["Triagem", "Rota", "Pedidos", "CTEs", "Volumes"])
+        )
+    else:
+        colunas_resumo = ["Rua", "Triagem", "Rota"]
+        resumo_abertos = (
+            tabela_dashboard.groupby(colunas_resumo, dropna=False)
+            .agg(Pedidos=("ShipmentId", "nunique"))
+            .reset_index()
+            if not tabela_dashboard.empty
+            else pd.DataFrame(columns=[*colunas_resumo, "Pedidos"])
+        )
     st.markdown(
         "#### Pedidos disponíveis por triagem"
         if status_fila == "ENTRADA"
@@ -791,6 +1203,9 @@ def _renderizar_fila_romaneios(
         tabela_envio.loc[status_alvo],
         separar_por_rua_triagem=status_fila != "ENTRADA",
         separar_por_triagem=status_fila == "ENTRADA",
+        agrupar_triagens_por_rota=(
+            {"TC TECA MATRIZ"} if status_fila == "ENTRADA" else set()
+        ),
     )
     codigos_preferenciais = carregar_codigos_preferenciais_unidades_emissao()
     grupos_validos, destinos_pendentes = associar_destinos_fraction(
@@ -806,6 +1221,19 @@ def _renderizar_fila_romaneios(
         tabela_sem_rota = _preparar_df_exibicao_romaneios(
             sem_rota_ou_ambigua
         )
+        regras_rotas = carregar_regras_triagem_rotas(ARQUIVO_ROTAS_ROMANEIOS)
+        for indice, linha in tabela_sem_rota.iterrows():
+            if _normalizar_rota(linha.get("Rota", "")) != "ROTA AMBIGUA":
+                continue
+            triagens = listar_triagens_por_localidade(
+                regras_rotas,
+                uf=linha.get("UF", ""),
+                cidade=linha.get("Cidade", ""),
+                destino=linha.get("Destino", ""),
+                triagem=linha.get("Triagem", ""),
+            )
+            if triagens:
+                tabela_sem_rota.at[indice, "Triagem"] = " • ".join(triagens)
         if status_fila == "ENTRADA":
             tabela_sem_rota = tabela_sem_rota.drop(
                 columns=["Rua", "Palete de origem"],
@@ -834,9 +1262,16 @@ def _renderizar_fila_romaneios(
             if status_fila == "ENTRADA"
             else "faltou unidade, Rua, triagem ou CTE válido."
         )
+        ctes_ignorados = _extrair_ctes_ignorados(grupos_ignorados)
+        quantidade_ctes, quantidade_volumes = _resumir_ctes_e_volumes(
+            ctes_ignorados
+        )
+        if not ctes_ignorados:
+            quantidade_ctes = len(grupos_ignorados)
+            quantidade_volumes = len(grupos_ignorados)
         warning(
-            f"{len(grupos_ignorados)} CTE(s) não entraram em romaneios porque "
-            f"{motivo_ignorado}"
+            f"{quantidade_ctes} CTE(s), totalizando {quantidade_volumes} "
+            f"volume(s), não entraram em romaneios porque {motivo_ignorado}"
         )
     if rotas_sem_unidade:
         tabela_mapa_rotas = _montar_tabela_rotas_json(rotas_sem_unidade)
@@ -873,19 +1308,21 @@ def _renderizar_fila_romaneios(
                     str(grupo.get("TRIAGEM", "")),
                     str(grupo.get("ROTA", "")),
                 )
-            ctes_grupo = len(grupo["LISTA_CTES"])
+            quantidade_ctes, quantidade_volumes = _resumir_ctes_e_volumes(
+                grupo["LISTA_CTES"]
+            )
             if status_fila == "ENTRADA":
                 opcao = (
                     f"Triagem {chave_grupo[0]} · {chave_grupo[1]} "
-                    f"({ctes_grupo} CTE(s))"
+                    f"({quantidade_ctes} CTE(s), {quantidade_volumes} volume(s))"
                 )
             else:
                 opcao = (
                     f"{chave_grupo[0]} · {chave_grupo[1]} · {chave_grupo[2]} "
-                    f"({ctes_grupo} CTE(s))"
+                    f"({quantidade_ctes} CTE(s), {quantidade_volumes} volume(s))"
                 )
             grupo_por_opcao[opcao] = grupo
-        coluna_seletor_fila, _ = st.columns([2, 4])
+        coluna_seletor_fila, _ = st.columns([1, 1])
         with coluna_seletor_fila:
             opcao_selecionada = st.selectbox(
                 "Fila por triagem"
@@ -896,9 +1333,15 @@ def _renderizar_fila_romaneios(
             )
         selecao_grupo = grupo_por_opcao[opcao_selecionada]
         if status_fila == "ENTRADA":
-            chave_selecionada = (
-                str(selecao_grupo.get("TRIAGEM", "")),
-                str(selecao_grupo.get("ROTA", "")),
+            triagens_selecionadas = set(
+                _normalizar_rota(triagem)
+                for triagem in (
+                    selecao_grupo.get("TRIAGENS")
+                    or [str(selecao_grupo.get("TRIAGEM", ""))]
+                )
+            )
+            rota_selecionada = _normalizar_rota(
+                selecao_grupo.get("ROTA", "")
             )
         else:
             chave_selecionada = (
@@ -906,24 +1349,32 @@ def _renderizar_fila_romaneios(
                 str(selecao_grupo.get("TRIAGEM", "")),
                 str(selecao_grupo.get("ROTA", "")),
             )
-        tabela_grupo = tabela_envio.loc[
-            tabela_envio.apply(
-                lambda linha: (
-                    (
-                        str(linha.get("Triagem", "")),
-                        str(linha.get("Rota", "")),
-                    )
-                    if status_fila == "ENTRADA"
-                    else (
-                        str(linha.get("Rua", "")),
-                        str(linha.get("Triagem", "")),
-                        str(linha.get("Rota", "")),
-                    )
+        def pertence_ao_grupo(linha: pd.Series) -> bool:
+            if status_fila == "ENTRADA":
+                return (
+                    _normalizar_rota(linha.get("Triagem", ""))
+                    in triagens_selecionadas
+                    and _normalizar_rota(linha.get("Rota", ""))
+                    == rota_selecionada
                 )
-                == chave_selecionada,
-                axis=1,
-            )
+            return (
+                str(linha.get("Rua", "")),
+                str(linha.get("Triagem", "")),
+                str(linha.get("Rota", "")),
+            ) == chave_selecionada
+
+        tabela_grupo = tabela_envio.loc[
+            tabela_envio.apply(pertence_ao_grupo, axis=1)
         ].copy()
+
+        if status_fila == "ENTRADA" and not tabela_grupo.empty:
+            st.markdown("#### Pedidos da triagem selecionada")
+            st.dataframe(
+                _preparar_df_exibicao_romaneios(tabela_grupo),
+                hide_index=True,
+                width="stretch",
+                column_config=configuracao_colunas_fila,
+            )
 
     enviar = st.button(
         "Gerar romaneio",
@@ -942,13 +1393,18 @@ def _renderizar_fila_romaneios(
             rua_selecionada = str(selecao_grupo.get("RUA") or "")
             triagem_selecionada = str(selecao_grupo.get("TRIAGEM") or "")
             rota_selecionada = str(selecao_grupo.get("ROTA") or "")
+            coluna_ctes_romaneio = (
+                "CTEs para romaneio"
+                if status_fila == "ENTRADA"
+                else "CTEs para dar entrada"
+            )
             ctes_selecionados = {
                 str(cte).strip()
                 for cte in selecao_grupo.get("LISTA_CTES", [])
                 if str(cte).strip()
             }
             tabela_grupo = tabela_grupo.loc[
-                tabela_grupo["CTEs para dar entrada"].map(
+                tabela_grupo[coluna_ctes_romaneio].map(
                     lambda valor: bool(
                         ctes_selecionados.intersection(
                             item.strip()
@@ -990,6 +1446,19 @@ def _renderizar_fila_romaneios(
                     rota=rota_selecionada,
                     etiquetas=etiquetas_grupo,
                     caminho_pdf=caminho_pdf,
+                    triagens=selecao_grupo.get("TRIAGENS"),
+                )
+                shipments_grupo = list(dict.fromkeys(
+                    str(shipment_id).strip()
+                    for shipment_id in tabela_grupo["ShipmentId"].tolist()
+                    if pd.notna(shipment_id) and str(shipment_id).strip()
+                ))
+                novos_shipments_finalizados = registrar_shipments_finalizados(
+                    shipments_grupo
+                )
+                log(
+                    f"{len(novos_shipments_finalizados)} ShipmentId(s) registrados "
+                    "como finalizados globalmente para impedir reentrada em filas."
                 )
                 registrar_etiquetas_romaneio(
                     etiquetas_grupo,
@@ -1020,6 +1489,10 @@ def _renderizar_fila_romaneios(
                 f"Execucao_{status_fila.title()}_"
                 f"{datetime.now():%Y-%m-%d_%H-%M-%S-%f}"
             )
+            tabela_execucao = tabela_grupo
+            if status_fila == "ENTRADA" and selecao_grupo.get("TRIAGENS"):
+                tabela_execucao = tabela_grupo.copy()
+                tabela_execucao["Triagem"] = triagem_selecionada
             with st.spinner(
                 (
                     f"Gerando romaneio da triagem {triagem_selecionada}..."
@@ -1034,7 +1507,7 @@ def _renderizar_fila_romaneios(
                         if status_fila == "ENTRADA"
                         else f"Fila {rua_selecionada} / {triagem_selecionada}"
                     ),
-                    tabela_previa=tabela_grupo,
+                    tabela_previa=tabela_execucao,
                     codigos_preferenciais=codigos_preferenciais,
                     separar_por_rua_triagem=status_fila != "ENTRADA",
                     separar_por_triagem=status_fila == "ENTRADA",

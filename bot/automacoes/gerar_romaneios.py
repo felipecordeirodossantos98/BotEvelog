@@ -365,34 +365,43 @@ def preparar_tabela_entrada_para_fila(
         if not cte or not shipment_id or not etiquetas or not ctes_entrada:
             continue
 
-        if len(ctes_entrada) == len(etiquetas):
-            etiquetas_recebidas = [
-                etiqueta
-                for etiqueta, cte_entrada in zip(etiquetas, ctes_entrada)
-                if cte_entrada in recebidos
-            ]
-        elif set(ctes_entrada).issubset(recebidos):
-            etiquetas_recebidas = etiquetas
-        else:
-            etiquetas_recebidas = []
+        if len(ctes_entrada) != len(etiquetas):
+            if log is not None:
+                log(
+                    f"Pedido {shipment_id} não entrou na fila de romaneios: "
+                    f"{len(etiquetas)} etiqueta(s) para {len(ctes_entrada)} "
+                    "CTE(s) associados."
+                )
+            continue
 
-        if not etiquetas_recebidas:
+        etiquetas_ctes_recebidos = [
+            (etiqueta, cte_entrada)
+            for etiqueta, cte_entrada in zip(etiquetas, ctes_entrada)
+            if cte_entrada in recebidos
+        ]
+        if not etiquetas_ctes_recebidos:
             continue
 
         destino = _normalizar_valor(linha.get("Destino", ""))
+        ctes_para_romaneio = list(dict.fromkeys(
+            cte_entrada for _, cte_entrada in etiquetas_ctes_recebidos
+        ))
         linhas.append(
             {
                 "Rua": "",
                 "Palete de origem": "Dar entrada em pedidos",
                 "CTE": cte,
                 "ShipmentId": shipment_id,
-                "Etiquetas do pedido": "\n".join(etiquetas_recebidas),
+                "Etiquetas do pedido": "\n".join(
+                    etiqueta for etiqueta, _ in etiquetas_ctes_recebidos
+                ),
                 "Volumes Sistema": None,
-                "Volumes Etiquetas": len(etiquetas_recebidas),
+                "Volumes Etiquetas": len(etiquetas_ctes_recebidos),
                 "Etiquetas faltantes": "",
-                "CTEs para dar entrada": cte,
+                "CTEs para dar entrada": "\n".join(ctes_para_romaneio),
+                "CTEs para romaneio": "\n".join(ctes_para_romaneio),
                 "CTEs por etiqueta": "\n".join(
-                    cte for _ in etiquetas_recebidas
+                    cte_entrada for _, cte_entrada in etiquetas_ctes_recebidos
                 ),
                 "UF": _normalizar_uf(linha.get("UF", "")),
                 "Cidade": _normalizar_valor(linha.get("Cidade", "")),
@@ -415,6 +424,7 @@ def preparar_tabela_entrada_para_fila(
         "Volumes Etiquetas",
         "Etiquetas faltantes",
         "CTEs para dar entrada",
+        "CTEs para romaneio",
         "CTEs por etiqueta",
         "UF",
         "Cidade",
@@ -443,10 +453,17 @@ def preparar_tabela_entrada_para_fila(
             "A configuração será reavaliada ao abrir a fila Entrada.",
         )
     if log is not None:
+        ctes_romaneio = {
+            cte.strip()
+            for valor in preparada["CTEs para romaneio"].fillna("").astype(str)
+            for cte in valor.splitlines()
+            if cte.strip()
+        }
         log(
             f"Fila Entrada preparada: {len(preparada)} pedido(s), "
             f"{sum(len(str(valor).splitlines()) for valor in preparada['Etiquetas do pedido'])} "
-            "etiqueta(s), agrupamento posterior por triagem."
+            f"etiqueta(s) e {len(ctes_romaneio)} CTE(s) para romaneio, "
+            "agrupamento posterior por triagem."
         )
     return preparada
 
@@ -816,6 +833,20 @@ def consultar_status_performance_ctes(
         for cte, item in dados.items()
         if (status := _normalizar_valor(item.get("Status", "")))
     }
+
+
+def consultar_dados_performance_ctes(
+    ctes: list[str],
+    *,
+    log: Callable[[str], None] | None = None,
+    pasta_temporaria: Path | None = None,
+) -> dict[str, dict[str, str]]:
+    """Consulta Destino, Status, UF e Cidade atuais dos CTEs na Performance."""
+    return _consultar_dados_performance_ctes(
+        ctes,
+        log=log,
+        pasta_temporaria=pasta_temporaria,
+    )
 
 
 def montar_fila_emissao(

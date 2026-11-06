@@ -25,6 +25,7 @@ from automacoes.gerar_romaneios import (
 )
 from servicos.fraction import CredenciaisFractionInvalidasError
 from servicos.fila_romaneios_emissao import FilaRomaneiosEmissao
+from servicos.romaneios_finalizados import sincronizar_shipments_finalizados
 from utils.interface import (
     LARGURA_BOTAO,
     LARGURA_COMPONENTE,
@@ -33,7 +34,10 @@ from utils.interface import (
     success,
     warning,
 )
-from utils.config import ARQUIVO_FILA_ROMANEIOS_ENTRADA
+from utils.config import (
+    ARQUIVO_FILA_ROMANEIOS_EMISSAO,
+    ARQUIVO_FILA_ROMANEIOS_ENTRADA,
+)
 from utils.logs import criar_logger_execucao
 
 
@@ -103,6 +107,9 @@ def _filtrar_etiquetas_ja_na_fila(
 
 
 def renderizar_dar_entrada_pedidos() -> None:
+    shipments_finalizados = sincronizar_shipments_finalizados(
+        [ARQUIVO_FILA_ROMANEIOS_EMISSAO, ARQUIVO_FILA_ROMANEIOS_ENTRADA]
+    )
     st.subheader("Dar entrada em pedidos")
 
     faltantes = avisar_variaveis_faltantes("dar_entrada_pedidos")
@@ -166,10 +173,7 @@ def renderizar_dar_entrada_pedidos() -> None:
                             log=log,
                         )
                         if not arquivos_novos:
-                            warning(
-                                "Não há TXT novos com 'Entrada' no nome. Os arquivos "
-                                "já processados foram descartados localmente."
-                            )
+                            warning("Não há bases novas para sincronizar.")
                         else:
                             st.session_state[CHAVE_ETIQUETAS_DRIVE] = {
                                 "nome": caminho_zip.name,
@@ -241,6 +245,10 @@ def renderizar_dar_entrada_pedidos() -> None:
             log(
                 f"Iniciando consulta para {len(numeros_romaneio)} romaneio(s): "
                 + ", ".join(numeros_romaneio)
+            )
+            log(
+                f"Registro compartilhado: {len(shipments_finalizados)} "
+                "ShipmentId(s) já finalizados serão mantidos fora da fila de romaneios."
             )
             pedidos = agrupar_etiquetas_importadas(
                 conteudo_etiquetas,
@@ -468,10 +476,8 @@ def renderizar_dar_entrada_pedidos() -> None:
         f"{pendentes} CTE(s) fora da entrada por confirmação ou volume pendente."
     )
 
-    st.markdown("#### Pedidos fora dos romaneios consultados")
-    if pedidos_fora_para_entrada.empty:
-        st.caption("Todos os ShipmentIds do TXT foram encontrados nos Unitizados consultados.")
-    else:
+    if not pedidos_fora_para_entrada.empty:
+        st.markdown("#### Pedidos fora dos romaneios consultados")
         tabela_fora_romaneios_exibicao = pedidos_fora_para_entrada[
             ["ShipmentId", "Etiquetas do pedido"]
         ]
@@ -559,11 +565,21 @@ def renderizar_dar_entrada_pedidos() -> None:
                     resultado_fila = fila_entrada.importar_fila(
                         tabela_fila_entrada,
                         [],
+                        shipments_finalizados=shipments_finalizados,
                         log=log,
                     )
+                    ctes_romaneio = {
+                        cte.strip()
+                        for valor in tabela_fila_entrada[
+                            "CTEs para romaneio"
+                        ].fillna("").astype(str)
+                        for cte in valor.splitlines()
+                        if cte.strip()
+                    }
                     log(
                         f"Fila Entrada atualizada: {resultado_fila['novas']} "
-                        f"etiqueta(s) adicionada(s), "
+                        f"etiqueta(s) adicionada(s), {len(ctes_romaneio)} "
+                        "CTE(s) para romaneio, "
                         f"{resultado_fila['repetidas']} já existente(s)."
                     )
             except Exception as erro_fila:

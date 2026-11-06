@@ -49,6 +49,7 @@ MAPEAMENTO_STATUS_ZENDESK = {
     "AUSENTE 2": "Ausente",
     "AUSENTE 3": "Ausente",
     "ENDERECO NAO LOCALIZADO": "Endereço não localizado",
+    "ENDERECO INSUFICIENTE": "Endereço não localizado",
     "CEP ERRADO": "Cep não atendido",
     "RESTRICAO DE ACESSO / MOVIMENTACAO": "Área de risco",
     "ENDERECO EM ZONA RURAL": "Área rural",
@@ -62,6 +63,7 @@ MAPEAMENTO_STATUS_ASSUNTO = {
     "AUSENTE 2": "AUSENTE 2",
     "AUSENTE 3": "AUSENTE 3",
     "ENDERECO NAO LOCALIZADO": "ENDEREÇO NÃO LOCALIZADO",
+    "ENDERECO INSUFICIENTE": "ENDEREÇO INSUFICIENTE",
     "CEP ERRADO": "CEP ERRADO",
     "RESTRICAO DE ACESSO / MOVIMENTACAO": "RESTRIÇÃO DE ACESSO / MOVIMENTAÇÃO",
     "ENDERECO EM ZONA RURAL": "ENDEREÇO EM ZONA RURAL",
@@ -83,6 +85,12 @@ MAPEAMENTO_TEXTO_TICKET = {
 
     "NUMERO NAO LOCALIZADO": (
         '"Prezados, remessa teve ocorrência de "NÚMERO NÃO LOCALIZADO", '
+        'favor confirmar os dados de endereço de entrega, mais ponto de '
+        'referência e telefone ativo para contato."'
+    ),
+
+    "ENDERECO INSUFICIENTE": (
+        '"Prezados, remessa teve ocorrência de "ENDERECO INSUFICIENTE", '
         'favor confirmar os dados de endereço de entrega, mais ponto de '
         'referência e telefone ativo para contato."'
     ),

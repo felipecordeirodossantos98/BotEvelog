@@ -67,6 +67,7 @@
       ],
       "destinos": [
         "CO CRICIUMA 01",
+        "CO CRICIUMA 02",
         "CO ARARANGUA 01",
         "CO TUBARAO 01"
       ],
@@ -212,7 +213,7 @@
         "LJ SUMARE 01",
         "PA FERRAZ DE VASCONSELOS 01"
       ],
-      "unidade": "TC EMISSAO TECA"
+      "unidade": "TC TECA MATRIZ"
     },
     {
       "triagem": "E",
@@ -260,7 +261,7 @@
         "CO VINHEDO 01",
         "PA LOUVEIRA 01"
       ],
-      "unidade": "TC EMISSAO TECA"
+      "unidade": "TC TECA MATRIZ"
     },
     {
       "triagem": "G",
@@ -318,7 +319,7 @@
         "PA DOIS CORREGOS 01",
         "PA NAZARE PAULISTA 01"
       ],
-      "unidade": "TC EMISSAO TECA"
+      "unidade": "TC TECA MATRIZ"
     },
     {
       "triagem": "J",
@@ -403,7 +404,7 @@
         "PA SAO PAULO 27",
         "PA SAO PAULO 30"
       ],
-      "unidade": "TC EMISSAO TECA"
+      "unidade": "TC TECA MATRIZ"
     },
     {
       "triagem": "U",
@@ -458,7 +459,7 @@
         "PA INDAIATUBA 01",
         "PA JUNDIAI 01"
       ],
-      "unidade": "TC EMISSAO TECA"
+      "unidade": "TC TECA MATRIZ"
     },
     {
       "triagem": "C06, C07, C08, C09",
@@ -500,7 +501,7 @@
         "HB MOGI DAS CRUZES 01",
         "ML MOGI DAS CRUZES 01"
       ],
-      "unidade": "TC EMISSAO TECA"
+      "unidade": "TC TECA MATRIZ"
     },
     {
       "triagem": "Misto - A, B, I, M, N, O, Q, T, W, Z",
@@ -595,7 +596,22 @@
         "Videira",
         "Ourinhos",
         "Chapecó",
-        "São José dos Pinhais"
+        "São José dos Pinhais",
+        "Natal",
+        "Mossoró",
+        "Natividade",
+        "Aracaju",
+        "Concórdia",
+        "Maceió",
+        "Paço do Lumiar",
+        "Mamanguape",
+        "Teresina",
+        "Santa Luzia do Norte",
+        "Araputanga",
+        "Barra do Bugres",
+        "Pirambu",
+        "Santo Antônio do Sudoeste",
+        "Boa Ventura"
       ],
       "destinos": [
         "A",
@@ -660,7 +676,6 @@
         "CO ARARANGUA 01",
         "CO BLUMENAU 01",
         "CO BRUSQUE 02",
-        "CO CRICIUMA 01",
         "CO INDAIAL 01",
         "CO ITAJAI 02",
         "CO JARAGUA DO SUL 01",
@@ -759,9 +774,22 @@
         "ML PIRAQUARA 01",
         "2B / LM / CB / TL CHAPECO 01",
         "LM CHAPECO 02",
-        "ML / LM / CB / TL CURITIBANOS 01"
+        "ML / LM / CB / TL CURITIBANOS 01",
+        "CO NATAL 01 FL",
+        "CO MOSSORO 02",
+        "CO GURUPI 02",
+        "CO ARACAJU 02 FL",
+        "CO CONCORDIA 01",
+        "CO MACEIO 01 FL",
+        "CO SAO LUIS 03",
+        "CO JOAO PESSOA 02 FL",
+        "CO TERESINA 01 FL",
+        "LM CUIABA 05",
+        "CO CUIABA 02",
+        "4B CO FRANCISCO BELTRAO 02",
+        "CO CAJAZEIRAS 01"
       ],
-      "unidade": "MT NEXUS 87 - EMISSAO"
+      "unidade": "MT NEXUS 87 PERUS"
     },
     {
       "triagem": "P05, P31, P32, P33, P34, P36, P37, P38, P39",
