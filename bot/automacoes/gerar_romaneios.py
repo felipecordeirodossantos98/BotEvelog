@@ -23,8 +23,9 @@ from automacoes.dar_entrada_pedidos import (
 )
 from servicos.fraction import (
     carregar_codigos_preferenciais_unidades,
-    carregar_regras_rotas_com_destino_e_triagem,
+    carregar_regras_triagem_rotas,
     consultar_ctes_por_etiquetas_fraction,
+    resolver_rota_por_localidade,
 )
 from utils.config import (
     ARQUIVO_ETIQUETAS_ROMANEIOS_ENTRADA,
@@ -273,36 +274,181 @@ def carregar_codigos_preferenciais_unidades_emissao() -> dict[str, str]:
     return carregar_codigos_preferenciais_unidades()
 
 
-def _adicionar_rota(tabela: pd.DataFrame) -> pd.DataFrame:
-    (
-        rotas_por_uf,
-        rotas_por_cidade,
-        rotas_por_destino,
-        triagens_por_uf,
-        triagens_por_cidade,
-        triagens_por_destino,
-    ) = carregar_regras_rotas_com_destino_e_triagem()
+def _adicionar_rota(
+    tabela: pd.DataFrame,
+    *,
+    log: Callable[[str], None] | None = None,
+) -> pd.DataFrame:
+    regras_rotas = carregar_regras_triagem_rotas()
     resultado = tabela.copy()
 
     def resolver(linha: pd.Series) -> tuple[str, str]:
         uf = _normalizar_uf(linha.get("UF", ""))
         cidade = _normalizar_rota(_normalizar_valor(linha.get("Cidade", "")))
-        rota_cidade = rotas_por_cidade.get(cidade, "")
-        if rota_cidade:
-            return rota_cidade, triagens_por_cidade.get(cidade, "")
-        rota_uf = rotas_por_uf.get(uf, "")
-        if rota_uf:
-            return rota_uf, triagens_por_uf.get(uf, "")
         destino = _normalizar_rota(_normalizar_valor(linha.get("Destino", "")))
-        rota_destino = rotas_por_destino.get(destino, "")
-        if rota_destino:
-            return rota_destino, triagens_por_destino.get(destino, "")
-        return "Sem rota", ""
+        origem_palete = _normalizar_valor(linha.get("Palete de origem", ""))
+        encontrado_palete = re.search(
+            r"(?:^|[·•])\s*Palete\s+(.+?)\s*$",
+            origem_palete,
+            flags=re.IGNORECASE,
+        )
+        triagem_persistida = _normalizar_valor(linha.get("Triagem", ""))
+        triagem_palete = triagem_persistida or (
+            encontrado_palete.group(1).strip() if encontrado_palete else ""
+        )
+        rota, triagem = resolver_rota_por_localidade(
+            regras_rotas,
+            uf=uf,
+            cidade=cidade,
+            destino=destino,
+            triagem=triagem_palete,
+        )
+        if triagem_palete and _normalizar_rota(rota) == "SEM ROTA":
+            rota_atualizada, triagem_atualizada = resolver_rota_por_localidade(
+                regras_rotas,
+                uf=uf,
+                cidade=cidade,
+                destino=destino,
+            )
+            if (
+                _normalizar_rota(rota_atualizada) not in {"SEM ROTA", "ROTA AMBIGUA"}
+                and triagem_atualizada
+            ):
+                _log_performance_emissao(
+                    log,
+                    f"Triagem antiga '{triagem_palete}' não consta mais na base de "
+                    f"rotas; pedido {linha.get('ShipmentId', '')} atualizado para "
+                    f"'{triagem_atualizada}' pela cidade/destino.",
+                )
+                rota, triagem = rota_atualizada, triagem_atualizada
+        if (
+            not triagem_palete
+            and not triagem
+            and _normalizar_rota(rota) != "SEM ROTA"
+        ):
+            return "Rota ambígua", ""
+        return rota, triagem
 
     resolvidos = resultado.apply(resolver, axis=1)
     resultado["Rota"] = resolvidos.map(lambda item: item[0])
     resultado["Triagem"] = resolvidos.map(lambda item: item[1])
     return resultado
+
+
+def preparar_tabela_entrada_para_fila(
+    tabela: pd.DataFrame,
+    ctes_recebidos: list[str] | set[str],
+    *,
+    log: Callable[[str], None] | None = None,
+) -> pd.DataFrame:
+    """Prepara somente os pedidos recebidos para a fila de romaneios Entrada."""
+    recebidos = {
+        _normalizar_valor(cte)
+        for cte in ctes_recebidos
+        if _normalizar_valor(cte)
+    }
+    linhas: list[dict[str, object]] = []
+
+    for _, linha in tabela.iterrows():
+        cte = _normalizar_valor(linha.get("CTE", ""))
+        shipment_id = _normalizar_shipment_id(linha.get("ShipmentId", ""))
+        etiquetas = [
+            valor.strip()
+            for valor in str(linha.get("Etiquetas do pedido", "")).splitlines()
+            if valor.strip() and valor.strip().lower() != "nan"
+        ]
+        ctes_entrada = [
+            _normalizar_valor(valor)
+            for valor in str(linha.get("CTEs para dar entrada", "")).splitlines()
+            if _normalizar_valor(valor)
+        ]
+        if not cte or not shipment_id or not etiquetas or not ctes_entrada:
+            continue
+
+        if len(ctes_entrada) == len(etiquetas):
+            etiquetas_recebidas = [
+                etiqueta
+                for etiqueta, cte_entrada in zip(etiquetas, ctes_entrada)
+                if cte_entrada in recebidos
+            ]
+        elif set(ctes_entrada).issubset(recebidos):
+            etiquetas_recebidas = etiquetas
+        else:
+            etiquetas_recebidas = []
+
+        if not etiquetas_recebidas:
+            continue
+
+        destino = _normalizar_valor(linha.get("Destino", ""))
+        linhas.append(
+            {
+                "Rua": "",
+                "Palete de origem": "Dar entrada em pedidos",
+                "CTE": cte,
+                "ShipmentId": shipment_id,
+                "Etiquetas do pedido": "\n".join(etiquetas_recebidas),
+                "Volumes Sistema": None,
+                "Volumes Etiquetas": len(etiquetas_recebidas),
+                "Etiquetas faltantes": "",
+                "CTEs para dar entrada": cte,
+                "CTEs por etiqueta": "\n".join(
+                    cte for _ in etiquetas_recebidas
+                ),
+                "UF": _normalizar_uf(linha.get("UF", "")),
+                "Cidade": _normalizar_valor(linha.get("Cidade", "")),
+                "Destino": destino,
+                "Manifesto": _normalizar_valor(linha.get("Manifesto", "")),
+                "Triagem": "",
+                "Rota": "",
+                "Origem": "Dar entrada em pedidos",
+                "Status": "ENTRADA",
+            }
+        )
+
+    colunas = [
+        "Rua",
+        "Palete de origem",
+        "CTE",
+        "ShipmentId",
+        "Etiquetas do pedido",
+        "Volumes Sistema",
+        "Volumes Etiquetas",
+        "Etiquetas faltantes",
+        "CTEs para dar entrada",
+        "CTEs por etiqueta",
+        "UF",
+        "Cidade",
+        "Destino",
+        "Manifesto",
+        "Triagem",
+        "Rota",
+        "Origem",
+        "Status",
+    ]
+    preparada = pd.DataFrame(linhas, columns=colunas)
+    if preparada.empty:
+        if log is not None:
+            log("Nenhum pedido confirmado foi preparado para a fila Entrada.")
+        return preparada
+
+    try:
+        preparada = _adicionar_rota(preparada, log=log)
+    except (FileNotFoundError, OSError, ValueError) as erro_rota:
+        preparada["Rota"] = "Sem rota"
+        preparada["Triagem"] = ""
+        _log_performance_emissao(
+            log,
+            "A entrada foi mantida na fila, mas não foi possível resolver as rotas "
+            f"agora: {type(erro_rota).__name__}: {erro_rota}. "
+            "A configuração será reavaliada ao abrir a fila Entrada.",
+        )
+    if log is not None:
+        log(
+            f"Fila Entrada preparada: {len(preparada)} pedido(s), "
+            f"{sum(len(str(valor).splitlines()) for valor in preparada['Etiquetas do pedido'])} "
+            "etiqueta(s), agrupamento posterior por triagem."
+        )
+    return preparada
 
 
 def _completar_rotas_por_rua_triagem(
@@ -368,7 +514,7 @@ def recalcular_rotas_fila_emissao(
     """Resolve novamente rota e triagem usando a versão atual do JSON de rotas."""
     if tabela.empty:
         return tabela.copy()
-    resultado = _adicionar_rota(tabela)
+    resultado = _adicionar_rota(tabela, log=log)
     return _completar_rotas_por_rua_triagem(resultado, log=log)
 
 
@@ -1833,9 +1979,15 @@ def selecionar_txt_novos_do_zip(
                         + b"\0"
                         + digest.encode("ascii")
                     ).hexdigest()
+                    chave_nome_conteudo = sha256(
+                        _normalizar_nome_arquivo(PurePosixPath(caminho_normalizado).name).encode("utf-8")
+                        + b"\0"
+                        + digest.encode("ascii")
+                    ).hexdigest()
                     if (
                         chave in vistos_nesta_sincronizacao
                         or chave_estavel in vistos_nesta_sincronizacao
+                        or chave_nome_conteudo in vistos_nesta_sincronizacao
                     ):
                         _log_performance_emissao(
                             log,
@@ -1847,6 +1999,7 @@ def selecionar_txt_novos_do_zip(
                     ja_importado = (
                         chave in arquivos_importados
                         or chave_estavel in arquivos_importados
+                        or chave_nome_conteudo in arquivos_importados
                     )
                     reavaliado = False
                     if ja_importado:
@@ -1881,6 +2034,7 @@ def selecionar_txt_novos_do_zip(
                     zip_novos.writestr(membro, conteudo)
                     vistos_nesta_sincronizacao.add(chave)
                     vistos_nesta_sincronizacao.add(chave_estavel)
+                    vistos_nesta_sincronizacao.add(chave_nome_conteudo)
                     novos.append(
                         {
                             "chave": chave,

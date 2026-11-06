@@ -4,13 +4,8 @@ from automacoes.baixar_relatorios_performance import executar_extracao
 from utils.interface import (
     LARGURA_BOTAO,
     avisar_variaveis_faltantes,
-    criar_painel_execucao,
 )
 from utils.logs import criar_logger_execucao
-
-
-CHAVE_LOGS = "visual_relatorios_performance_logs"
-
 
 def renderizar_baixar_relatorios_performance(
     arquivo,
@@ -34,14 +29,9 @@ def renderizar_baixar_relatorios_performance(
     if not iniciar:
         return
 
-    feedback, log_visual = criar_painel_execucao(
-        CHAVE_LOGS
-    )
+    feedback = st.empty()
 
-    log, caminho_log = criar_logger_execucao(
-        "baixar_relatorios_performance",
-        log_visual,
-    )
+    log, _ = criar_logger_execucao("baixar_relatorios_performance")
 
     try:
         log("Iniciando extração do relatório de performance.")

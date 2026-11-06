@@ -11,17 +11,12 @@ from utils.interface import (
     LARGURA_BOTAO,
     LARGURA_COMPONENTE,
     avisar_variaveis_faltantes,
-    criar_painel_execucao,
     error,
     info,
-    renderizar_logs,
     success,
 )
 from utils.logs import criar_logger_execucao
 
-
-CHAVE_LOGS_EXTRACAO = "visual_analitico_logs_extracao"
-CHAVE_LOGS_UNIFICACAO = "visual_analitico_logs_unificacao"
 
 CHAVE_ACAO = "visual_analitico_acao_em_execucao"
 CHAVE_STATUS_EXTRACAO = "visual_analitico_status_extracao"
@@ -214,12 +209,6 @@ def renderizar_baixar_relatorios_analitico() -> None:
                 CHAVE_STATUS_EXTRACAO
             )
 
-            renderizar_logs(
-                st.session_state.get(
-                    CHAVE_LOGS_EXTRACAO,
-                    [],
-                )
-            )
 
     st.divider(
         width="stretch"
@@ -375,27 +364,14 @@ def renderizar_baixar_relatorios_analitico() -> None:
                 CHAVE_STATUS_UNIFICACAO
             )
 
-            renderizar_logs(
-                st.session_state.get(
-                    CHAVE_LOGS_UNIFICACAO,
-                    [],
-                )
-            )
 
     # Os dois botões já foram desenhados desabilitados
     # antes de iniciar qualquer operação pesada.
 
     if acao_em_execucao == ACAO_EXTRACAO:
         with area_extracao:
-            feedback, log_visual = (
-                criar_painel_execucao(
-                    CHAVE_LOGS_EXTRACAO
-                )
-            )
-
-            log, caminho_log = criar_logger_execucao(
+            log, _ = criar_logger_execucao(
                 "baixar_relatorios_analitico",
-                log_visual,
                 rotulo="extracao",
             )
 
@@ -496,15 +472,8 @@ def renderizar_baixar_relatorios_analitico() -> None:
         ]
 
         with area_unificacao:
-            feedback, log_visual = (
-                criar_painel_execucao(
-                    CHAVE_LOGS_UNIFICACAO
-                )
-            )
-
-            log, caminho_log = criar_logger_execucao(
+            log, _ = criar_logger_execucao(
                 "baixar_relatorios_analitico",
-                log_visual,
                 rotulo="unificacao",
             )
 

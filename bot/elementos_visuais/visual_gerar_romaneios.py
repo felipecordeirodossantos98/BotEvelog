@@ -14,13 +14,13 @@ from servicos.fraction import (
     associar_destinos_fraction,
     carregar_codigos_preferenciais_unidades,
     carregar_destinos_fraction,
-    carregar_regras_rotas_com_destino_e_triagem,
+    carregar_regras_triagem_rotas,
     executar_manifestos_romaneios,
     enviar_pdf_para_impressora_padrao,
     mapear_rotas_para_grupos,
     preparar_lote_impressao_romaneios,
 )
-from automacoes.gerar_romaneios_emissao import (
+from automacoes.gerar_romaneios import (
     COLUNAS_RESULTADO,
     baixar_etiquetas_drive,
     carregar_codigos_preferenciais_unidades_emissao,
@@ -38,24 +38,35 @@ from servicos.fila_romaneios_emissao import FilaRomaneiosEmissao
 from utils.interface import (
     LARGURA_BOTAO,
     avisar_variaveis_faltantes,
-    criar_painel_execucao,
     error,
-    renderizar_logs,
     success,
     warning,
 )
 from utils.config import (
-    ARQUIVO_FILA_ROMANEIOS_ENTRADA,
     ARQUIVO_FILA_ROMANEIOS_EMISSAO,
+    ARQUIVO_FILA_ROMANEIOS_ENTRADA,
     ARQUIVO_ROTAS_ROMANEIOS,
     RESULTADOS_ROMANEIOS,
 )
 from utils.logs import criar_logger_execucao
 
 
-CHAVE_RESULTADO = "visual_gerar_romaneios_emissao_resultado"
-CHAVE_LOGS = "visual_gerar_romaneios_emissao_logs"
-CHAVE_LOG_PAINEL_RENDERIZADO = "visual_gerar_romaneios_emissao_log_painel_renderizado"
+CHAVE_RESULTADO = "visual_gerar_romaneios_resultado"
+COLUNAS_OCULTAS_DF_ROMANEIOS = [
+    "Volumes Sistema",
+    "Volumes Etiquetas",
+    "Etiquetas faltantes",
+    "CTEs para dar entrada",
+    "Manifesto",
+    "Origem",
+]
+
+
+def _preparar_df_exibicao_romaneios(tabela: pd.DataFrame) -> pd.DataFrame:
+    return tabela.drop(
+        columns=["CTEs por etiqueta", *COLUNAS_OCULTAS_DF_ROMANEIOS],
+        errors="ignore",
+    )
 
 
 def _normalizar_rota(valor: object) -> str:
@@ -71,59 +82,23 @@ def _normalizar_rota(valor: object) -> str:
 def _montar_tabela_rotas_json(
     unidades_relevantes: set[str],
 ) -> pd.DataFrame:
-    (
-        rotas_por_uf,
-        rotas_por_cidade,
-        rotas_por_destino,
-        triagens_por_uf,
-        triagens_por_cidade,
-        triagens_por_destino,
-    ) = carregar_regras_rotas_com_destino_e_triagem(ARQUIVO_ROTAS_ROMANEIOS)
+    regras = carregar_regras_triagem_rotas(ARQUIVO_ROTAS_ROMANEIOS)
     codigos_preferenciais = carregar_codigos_preferenciais_unidades()
     relevantes = {_normalizar_rota(unidade) for unidade in unidades_relevantes}
     linhas = []
 
-    for uf, unidade in rotas_por_uf.items():
+    for regra in regras:
+        unidade = str(regra["unidade"])
         chave_unidade = _normalizar_rota(unidade)
         if chave_unidade not in relevantes:
             continue
         linhas.append(
             {
                 "Unidade": unidade,
-                "UF": uf,
-                "Cidade": "Todas",
-                "Destino": "",
-                "Triagem": triagens_por_uf.get(uf, ""),
-                "Código preferencial": codigos_preferenciais.get(chave_unidade, ""),
-            }
-        )
-
-    for cidade, unidade in rotas_por_cidade.items():
-        chave_unidade = _normalizar_rota(unidade)
-        if chave_unidade not in relevantes:
-            continue
-        linhas.append(
-            {
-                "Unidade": unidade,
-                "UF": "",
-                "Cidade": cidade,
-                "Destino": "",
-                "Triagem": triagens_por_cidade.get(cidade, ""),
-                "Código preferencial": codigos_preferenciais.get(chave_unidade, ""),
-            }
-        )
-
-    for destino, unidade in rotas_por_destino.items():
-        chave_unidade = _normalizar_rota(unidade)
-        if chave_unidade not in relevantes:
-            continue
-        linhas.append(
-            {
-                "Unidade": unidade,
-                "UF": "",
-                "Cidade": "",
-                "Destino": destino,
-                "Triagem": triagens_por_destino.get(destino, ""),
+                "UF": ", ".join(regra["ufs"]),
+                "Cidade": ", ".join(regra["cidades"]),
+                "Destino": ", ".join(regra["destinos"]),
+                "Triagem": str(regra["triagem"]),
                 "Código preferencial": codigos_preferenciais.get(chave_unidade, ""),
             }
         )
@@ -139,11 +114,11 @@ def _montar_tabela_rotas_json(
     return pd.DataFrame(
         linhas,
         columns=[
-            "Unidade",
+            "Triagem",
             "UF",
             "Cidade",
             "Destino",
-            "Triagem",
+            "Unidade",
             "Código preferencial",
         ],
     )
@@ -242,8 +217,6 @@ def _renderizar_atualizacao_fila(
     sufixo_chave: str,
     sincronizacao_disponivel: bool,
 ) -> None:
-    chave_logs = f"{CHAVE_LOGS}_{sufixo_chave}"
-    chave_log_painel = f"{CHAVE_LOG_PAINEL_RENDERIZADO}_{sufixo_chave}"
     atualizar = st.button(
         "Atualizar filas",
         type="primary",
@@ -254,17 +227,8 @@ def _renderizar_atualizacao_fila(
     if not atualizar:
         return
 
-    st.session_state[chave_logs] = []
-    _, log_visual = criar_painel_execucao(
-        chave_logs,
-        limpar=False,
-        max_linhas=None,
-        expandido=True,
-    )
-    st.session_state[chave_log_painel] = True
     log, _ = criar_logger_execucao(
         "gerar_romaneios",
-        log_visual,
         rotulo=f"atualizar_fila_{sufixo_chave}",
     )
     fila = FilaRomaneiosEmissao(arquivo_fila)
@@ -453,14 +417,17 @@ def _renderizar_atualizacao_fila(
         error(f"Não foi possível atualizar as filas: {erro}")
 
 
-def renderizar_gerar_romaneios_emissao() -> None:
-    st.subheader("Filas de romaneios")
+def renderizar_gerar_romaneios() -> None:
+    st.subheader("Gerar romaneios")
     faltantes = avisar_variaveis_faltantes("gerar_romaneios")
-    faltantes_drive = avisar_variaveis_faltantes("importar_etiquetas_drive")
     geracao_disponivel = not bool(faltantes)
-    sincronizacao_disponivel = geracao_disponivel and not bool(faltantes_drive)
-    aba_emissao, aba_entrada = st.tabs(["Emissão", "Entrada"])
-    with aba_emissao:
+    tab_emissao, tab_entrada = st.tabs(["Emissão", "Entrada"])
+
+    with tab_emissao:
+        faltantes_drive = avisar_variaveis_faltantes("importar_etiquetas_drive")
+        sincronizacao_disponivel = (
+            geracao_disponivel and not bool(faltantes_drive)
+        )
         _renderizar_fila_romaneios(
             "EMISSAO",
             ARQUIVO_FILA_ROMANEIOS_EMISSAO,
@@ -469,14 +436,16 @@ def renderizar_gerar_romaneios_emissao() -> None:
             sincronizacao_disponivel,
             geracao_disponivel,
         )
-    with aba_entrada:
+
+    with tab_entrada:
         _renderizar_fila_romaneios(
             "ENTRADA",
             ARQUIVO_FILA_ROMANEIOS_ENTRADA,
             "Entrada",
             "entrada",
-            sincronizacao_disponivel,
+            False,
             geracao_disponivel,
+            mostrar_sincronizacao=False,
         )
 
 
@@ -487,28 +456,44 @@ def _renderizar_fila_romaneios(
     sufixo_chave: str,
     sincronizacao_disponivel: bool,
     geracao_disponivel: bool,
+    *,
+    mostrar_sincronizacao: bool = True,
 ) -> None:
     chave_resultado = f"{CHAVE_RESULTADO}_{sufixo_chave}"
-    chave_logs = f"{CHAVE_LOGS}_{sufixo_chave}"
-    chave_log_painel = f"{CHAVE_LOG_PAINEL_RENDERIZADO}_{sufixo_chave}"
     chave_widget = f"gerar_romaneios_{sufixo_chave}"
-    st.session_state.setdefault(chave_logs, [])
 
-    _renderizar_atualizacao_fila(
-        status_fila,
-        arquivo_fila,
-        termo_nome,
-        sufixo_chave,
-        sincronizacao_disponivel,
-    )
+    if mostrar_sincronizacao:
+        _renderizar_atualizacao_fila(
+            status_fila,
+            arquivo_fila,
+            termo_nome,
+            sufixo_chave,
+            sincronizacao_disponivel,
+        )
+    else:
+        st.caption(
+            "Esta fila é preenchida automaticamente após a entrada dos pedidos."
+        )
     fila = FilaRomaneiosEmissao(arquivo_fila)
     tabela = _montar_tabela_fila_persistida(fila)
+    if not tabela.empty and "Status" in tabela.columns:
+        tabela = tabela.loc[
+            tabela["Status"].fillna("").map(
+                lambda valor: _normalizar_rota(valor) == status_fila
+            )
+        ].copy()
     if not tabela.empty:
         try:
             tabela_recalculada = recalcular_rotas_fila_emissao(tabela)
             etiquetas_atualizadas = fila.atualizar_rotas_abertas(tabela_recalculada)
             if etiquetas_atualizadas:
                 tabela = _montar_tabela_fila_persistida(fila)
+                if not tabela.empty and "Status" in tabela.columns:
+                    tabela = tabela.loc[
+                        tabela["Status"].fillna("").map(
+                            lambda valor: _normalizar_rota(valor) == status_fila
+                        )
+                    ].copy()
                 st.caption(
                     f"Rotas atualizadas pela configuração atual para "
                     f"{etiquetas_atualizadas} etiqueta(s) da fila aberta."
@@ -518,6 +503,165 @@ def _renderizar_fila_romaneios(
                 "Não foi possível recalcular as rotas das filas abertas; "
                 f"os dados salvos foram mantidos. Detalhe: {erro}"
             )
+
+    etiquetas_conflito = fila.carregar_etiquetas_conflito()
+    if not etiquetas_conflito.empty and "Status" in etiquetas_conflito.columns:
+        etiquetas_conflito = etiquetas_conflito.loc[
+            etiquetas_conflito["Status"].fillna("").map(
+                lambda valor: _normalizar_rota(valor) == status_fila
+            )
+        ].copy()
+    tabela_status_aberto = tabela.loc[
+        tabela["Status"].fillna("").map(
+            lambda valor: _normalizar_rota(valor) == status_fila
+        )
+    ]
+    ruas_disponiveis = sorted(
+        {
+            str(rua).strip()
+            for rua in tabela_status_aberto["Rua"].fillna("").astype(str)
+            if rua.strip()
+        },
+        key=_normalizar_rota,
+    )
+    opcao_conflitos = "Etiquetas em mais de uma rua"
+    if status_fila == "ENTRADA":
+        rua_selecionada_filtro = ""
+    else:
+        opcoes_filtro = list(ruas_disponiveis)
+        if not etiquetas_conflito.empty:
+            opcoes_filtro.append(opcao_conflitos)
+        if not opcoes_filtro:
+            opcoes_filtro = ["Nenhuma rua disponível"]
+        coluna_filtro_rua, _ = st.columns([1, 5])
+        with coluna_filtro_rua:
+            rua_selecionada_filtro = st.selectbox(
+                "Filtrar por rua",
+                opcoes_filtro,
+                key=f"{chave_widget}_filtro_rua",
+            )
+    if status_fila != "ENTRADA" and rua_selecionada_filtro == opcao_conflitos:
+        tabela = tabela.iloc[0:0].copy()
+    elif status_fila == "ENTRADA":
+        tabela = tabela_status_aberto.copy()
+    else:
+        tabela = tabela.loc[
+            tabela["Rua"].fillna("").astype(str) == rua_selecionada_filtro
+        ].copy()
+
+    if status_fila == "ENTRADA" and not etiquetas_conflito.empty:
+        st.markdown("#### Etiquetas isoladas por triagem")
+        st.dataframe(
+            etiquetas_conflito,
+            hide_index=True,
+            width="stretch",
+        )
+
+    if status_fila != "ENTRADA" and rua_selecionada_filtro == opcao_conflitos:
+        pedidos_conflito = etiquetas_conflito["ShipmentId"].nunique()
+        warning(
+            f"{etiquetas_conflito['Etiqueta'].nunique()} etiqueta(s) estão "
+            "isoladas por aparecerem em mais de uma rua/triagem; "
+            f"{pedidos_conflito} pedido(s) completo(s) foram retirados das filas "
+            "abertas para revisão manual."
+        )
+
+        def valores_unicos(valores: pd.Series) -> str:
+            unicos = dict.fromkeys(
+                str(valor).strip()
+                for valor in valores
+                if pd.notna(valor) and str(valor).strip()
+            )
+            return ", ".join(unicos)
+
+        tabela_conflitos = (
+            etiquetas_conflito.groupby(
+                ["Etiqueta", "ShipmentId"],
+                as_index=False,
+                sort=True,
+            )
+            .agg(
+                **{
+                    coluna: (coluna, valores_unicos)
+                    for coluna in (
+                        "Rua",
+                        "Triagem",
+                        "Palete de origem",
+                        "Rota",
+                        "Destino",
+                        "Detectado em",
+                    )
+                    if coluna in etiquetas_conflito.columns
+                }
+            )
+            .rename(columns={"Rua": "Ruas"})
+        )
+        st.dataframe(
+            tabela_conflitos,
+            hide_index=True,
+            width="stretch",
+        )
+        shipment_ids_conflito = sorted(
+            etiquetas_conflito["ShipmentId"]
+            .dropna()
+            .astype(str)
+            .str.strip()
+            .loc[lambda valores: valores.ne("")]
+            .unique()
+        )
+        if ruas_disponiveis and shipment_ids_conflito:
+            coluna_controles_conflito, _ = st.columns([1, 5])
+            with coluna_controles_conflito:
+                shipment_selecionado = st.selectbox(
+                    "Selecione um pedido (ShipmentId)",
+                    shipment_ids_conflito,
+                    key=f"{chave_widget}_shipment_conflito_selecionado",
+                )
+                ocorrencias_pedido = etiquetas_conflito.loc[
+                    etiquetas_conflito["ShipmentId"].astype(str).str.strip()
+                    == shipment_selecionado
+                ]
+                ruas_deste_pedido = sorted(
+                    {
+                        str(rua).strip()
+                        for rua in ocorrencias_pedido["Rua"].dropna()
+                        if str(rua).strip()
+                    },
+                    key=_normalizar_rota,
+                )
+                if ruas_deste_pedido:
+                    rua_destino_conflitos = st.radio(
+                        "Selecione a rua correta deste pedido",
+                        ruas_deste_pedido,
+                        index=None,
+                        horizontal=True,
+                        key=f"{chave_widget}_rua_conflito_{shipment_selecionado}",
+                    )
+                    mover_conflito = st.button(
+                        "Confirmar rua deste pedido",
+                        type="primary",
+                        disabled=not rua_destino_conflitos,
+                        key=f"{chave_widget}_confirmar_rua_{shipment_selecionado}",
+                    )
+                else:
+                    rua_destino_conflitos = ""
+                    mover_conflito = False
+            if mover_conflito:
+                try:
+                    resultado_movimentacao = fila.resolver_conflitos_para_rua(
+                        rua_destino_conflitos,
+                        [shipment_selecionado],
+                    )
+                except Exception as erro:
+                    error(f"Não foi possível mover os pedidos isolados: {erro}")
+                else:
+                    success(
+                        f"{resultado_movimentacao['etiquetas']} etiqueta(s) de "
+                        f"{resultado_movimentacao['pedidos']} pedido(s) foram "
+                        f"colocadas em {rua_destino_conflitos} e voltaram para a fila."
+                    )
+                    st.rerun()
+        return
 
     etiquetas_ativas = "\n".join(
         tabela.get("Etiquetas do pedido", pd.Series(dtype=str)).astype(str)
@@ -538,74 +682,39 @@ def _renderizar_fila_romaneios(
         "Etiquetas do pedido": st.column_config.TextColumn(
             "Etiquetas do pedido", width="large"
         ),
-        "Volumes Sistema": st.column_config.NumberColumn("Volumes Sistema"),
-        "Volumes Etiquetas": st.column_config.NumberColumn("Volumes Etiquetas"),
-        "Etiquetas faltantes": st.column_config.TextColumn(
-            "Etiquetas faltantes", width="large"
-        ),
-        "CTEs para dar entrada": st.column_config.TextColumn(
-            "CTEs para dar entrada", width="large"
-        ),
         "UF": st.column_config.TextColumn("UF"),
         "Cidade": st.column_config.TextColumn("Cidade"),
         "Destino": st.column_config.TextColumn("Destino"),
         "Triagem": st.column_config.TextColumn("Triagem", width="large"),
-        "Manifesto": st.column_config.TextColumn("Manifesto"),
         "Rota": st.column_config.TextColumn("Rota"),
-        "Origem": st.column_config.TextColumn("Origem"),
         "Status": st.column_config.TextColumn("Status"),
     }
-    resumo_abertos = (
-        tabela.groupby(["Rua", "Triagem", "Rota"], dropna=False)
-        .agg(
-            Pedidos=("ShipmentId", "nunique"),
-            Etiquetas=("Volumes Etiquetas", "sum"),
+    tabela_dashboard = tabela.loc[
+        tabela["Status"].fillna("").map(
+            lambda valor: _normalizar_rota(valor) == status_fila
         )
-        .reset_index()
-        if not tabela.empty
-        else pd.DataFrame(columns=["Rua", "Triagem", "Rota", "Pedidos", "Etiquetas"])
+    ]
+    colunas_resumo = (
+        ["Triagem", "Rota"]
+        if status_fila == "ENTRADA"
+        else ["Rua", "Triagem", "Rota"]
     )
-    st.markdown("#### Dashboard de filas abertas")
+    resumo_abertos = (
+        tabela_dashboard.groupby(colunas_resumo, dropna=False)
+        .agg(Pedidos=("ShipmentId", "nunique"))
+        .reset_index()
+        if not tabela_dashboard.empty
+        else pd.DataFrame(columns=[*colunas_resumo, "Pedidos"])
+    )
+    st.markdown(
+        "#### Pedidos disponíveis por triagem"
+        if status_fila == "ENTRADA"
+        else "#### Resumo das filas abertas"
+    )
     if resumo_abertos.empty:
-        st.info("Ainda não há etiquetas pendentes. Sincronize o Drive após enviar um TXT.")
+        st.info("Não há pedidos em filas abertas disponíveis para geração.")
     else:
         st.dataframe(resumo_abertos, hide_index=True, width="stretch")
-    etiquetas_conflito = fila.carregar_etiquetas_conflito()
-    if not etiquetas_conflito.empty:
-        pedidos_conflito = etiquetas_conflito["ShipmentId"].nunique()
-        warning(
-            f"{etiquetas_conflito['Etiqueta'].nunique()} etiqueta(s) estão "
-            "isoladas por aparecerem em mais de uma rua/triagem; "
-            f"{pedidos_conflito} pedido(s) completo(s) foram retirados das filas "
-            "abertas para revisão manual."
-        )
-        with st.expander(
-            "Etiquetas em mais de uma rua/triagem",
-            expanded=False,
-        ):
-            st.dataframe(
-                etiquetas_conflito,
-                hide_index=True,
-                width="stretch",
-            )
-    with st.expander("Detalhes dos pedidos em filas abertas", expanded=False):
-        if tabela.empty:
-            st.info("Sem pedidos pendentes.")
-        else:
-            st.dataframe(
-                tabela.drop(columns=["CTEs por etiqueta"], errors="ignore"),
-                hide_index=True,
-                width="stretch",
-                column_config=configuracao_colunas_fila,
-            )
-
-    historico = fila.carregar_historico()
-    with st.expander("Romaneios concluídos", expanded=False):
-        if historico.empty:
-            st.info("Nenhum romaneio foi concluído por esta fila ainda.")
-        else:
-            st.dataframe(historico, hide_index=True, width="stretch")
-
     divergencias = tabela[tabela.apply(_volume_divergente, axis=1)]
     if not divergencias.empty:
         warning(
@@ -673,27 +782,15 @@ def _renderizar_fila_romaneios(
     status_alvo = tabela_envio["Status"].fillna("").map(
         lambda valor: _normalizar_rota(valor) == status_fila
     )
-    pedidos_fora_status_alvo = tabela_envio.loc[~status_alvo]
-    if not pedidos_fora_status_alvo.empty:
-        warning(
-            f"{len(pedidos_fora_status_alvo)} pedido(s) com status diferente de "
-            f"{status_fila} estão bloqueados para geração de romaneio."
-        )
 
-    tem_ctes_envio = tabela_envio["CTEs para dar entrada"].fillna("").map(
-        lambda valor: any(
-            linha.strip() and linha.strip().lower() != "nan"
-            for linha in str(valor).splitlines()
-        )
-    )
-    tem_ctes_envio &= status_alvo
     rota_original = tabela["Rota"].fillna("").astype(str).str.strip()
     sem_rota_ou_ambigua = tabela.loc[
         rota_original.isin({"", "Sem rota", "Rota ambígua"})
     ].copy()
     grupos, grupos_ignorados = mapear_rotas_para_grupos(
         tabela_envio.loc[status_alvo],
-        separar_por_rua_triagem=True,
+        separar_por_rua_triagem=status_fila != "ENTRADA",
+        separar_por_triagem=status_fila == "ENTRADA",
     )
     codigos_preferenciais = carregar_codigos_preferenciais_unidades_emissao()
     grupos_validos, destinos_pendentes = associar_destinos_fraction(
@@ -702,52 +799,23 @@ def _renderizar_fila_romaneios(
         codigos_preferenciais=codigos_preferenciais,
     )
 
-    chaves_grupos_prontos = {
-        (
-            _normalizar_rota(grupo.get("RUA", "")),
-            _normalizar_rota(grupo.get("TRIAGEM", "")),
-            _normalizar_rota(grupo["ROTA"]),
-        )
-        for grupo in grupos_validos
-    }
     rotas_prontas = {grupo["ROTA"] for grupo in grupos_validos}
 
-    def linha_em_grupo_pronto(linha: pd.Series) -> bool:
-        chave = (
-            _normalizar_rota(linha.get("Rua", "")),
-            _normalizar_rota(linha.get("Triagem", "")),
-            _normalizar_rota(linha.get("Rota", "")),
+    if not sem_rota_ou_ambigua.empty:
+        st.markdown("#### Sem rota ou com mais de uma rota")
+        tabela_sem_rota = _preparar_df_exibicao_romaneios(
+            sem_rota_ou_ambigua
         )
-        return chave in chaves_grupos_prontos
-
-    prontos_para_envio = tabela_envio.loc[
-        tem_ctes_envio
-        & tabela_envio.apply(linha_em_grupo_pronto, axis=1)
-    ].copy()
-    st.markdown("#### Prontos para envio")
-    if prontos_para_envio.empty:
-        st.info("Nenhum pedido está pronto para envio.")
-    else:
+        if status_fila == "ENTRADA":
+            tabela_sem_rota = tabela_sem_rota.drop(
+                columns=["Rua", "Palete de origem"],
+                errors="ignore",
+            )
         st.dataframe(
-            prontos_para_envio.drop(columns=["CTEs por etiqueta"], errors="ignore"),
+            tabela_sem_rota,
             hide_index=True,
             width="stretch",
             column_config=configuracao_colunas_fila,
-        )
-
-    st.markdown("#### Sem rota ou com mais de uma rota")
-    if sem_rota_ou_ambigua.empty:
-        st.info("Não há pedidos sem rota ou com rota ambígua.")
-    else:
-        st.dataframe(
-            sem_rota_ou_ambigua.drop(columns=["CTEs por etiqueta"], errors="ignore"),
-            hide_index=True,
-            width="stretch",
-            column_config=configuracao_colunas_fila,
-        )
-        warning(
-            f"{len(sem_rota_ou_ambigua)} pedido(s) não têm rota única e ficarão "
-            "fora do envio."
         )
 
     rotas_sem_unidade = {
@@ -761,9 +829,14 @@ def _renderizar_fila_romaneios(
             "do Fraction e ficarão fora do envio."
         )
     if grupos_ignorados:
+        motivo_ignorado = (
+            "faltou unidade, triagem ou CTE válido."
+            if status_fila == "ENTRADA"
+            else "faltou unidade, Rua, triagem ou CTE válido."
+        )
         warning(
             f"{len(grupos_ignorados)} CTE(s) não entraram em romaneios porque "
-            "faltou unidade, Rua, triagem ou CTE válido."
+            f"{motivo_ignorado}"
         )
     if rotas_sem_unidade:
         tabela_mapa_rotas = _montar_tabela_rotas_json(rotas_sem_unidade)
@@ -774,67 +847,86 @@ def _renderizar_fila_romaneios(
                 hide_index=True,
                 width="stretch",
                 column_config={
+                    "Triagem": st.column_config.TextColumn("Triagem", width="small"),
                     "Unidade": st.column_config.TextColumn("Unidade"),
                     "UF": st.column_config.TextColumn("UF"),
                     "Cidade": st.column_config.TextColumn("Cidade"),
                     "Destino": st.column_config.TextColumn("Destino"),
-                    "Triagem": st.column_config.TextColumn("Triagem", width="large"),
                     "Código preferencial": st.column_config.TextColumn(
                         "Código preferencial"
                     ),
                 },
             )
-    quantidade_ctes = sum(len(grupo["LISTA_CTES"]) for grupo in grupos_validos)
-    st.caption(
-        f"Disponíveis: {quantidade_ctes} CTE(s) em "
-        f"{len(grupos_validos)} grupo(s) com unidade Fraction resolvida."
-    )
-
     selecao_grupo = None
     tabela_grupo = tabela_envio.iloc[0:0].copy()
     if grupos_validos:
         grupo_por_opcao: dict[str, dict] = {}
         for grupo in grupos_validos:
-            chave_grupo = (
-                str(grupo.get("RUA", "")),
-                str(grupo.get("TRIAGEM", "")),
-                str(grupo.get("ROTA", "")),
-            )
+            if status_fila == "ENTRADA":
+                chave_grupo = (
+                    str(grupo.get("TRIAGEM", "")),
+                    str(grupo.get("ROTA", "")),
+                )
+            else:
+                chave_grupo = (
+                    str(grupo.get("RUA", "")),
+                    str(grupo.get("TRIAGEM", "")),
+                    str(grupo.get("ROTA", "")),
+                )
             ctes_grupo = len(grupo["LISTA_CTES"])
-            opcao = (
-                f"{chave_grupo[0]} · {chave_grupo[1]} · {chave_grupo[2]} "
-                f"({ctes_grupo} CTE(s))"
-            )
+            if status_fila == "ENTRADA":
+                opcao = (
+                    f"Triagem {chave_grupo[0]} · {chave_grupo[1]} "
+                    f"({ctes_grupo} CTE(s))"
+                )
+            else:
+                opcao = (
+                    f"{chave_grupo[0]} · {chave_grupo[1]} · {chave_grupo[2]} "
+                    f"({ctes_grupo} CTE(s))"
+                )
             grupo_por_opcao[opcao] = grupo
-        opcao_selecionada = st.selectbox(
-            "Fila que será fechada e enviada ao Fraction",
-            list(grupo_por_opcao),
-            key=f"{chave_widget}_grupo_selecionado",
-        )
+        coluna_seletor_fila, _ = st.columns([2, 4])
+        with coluna_seletor_fila:
+            opcao_selecionada = st.selectbox(
+                "Fila por triagem"
+                if status_fila == "ENTRADA"
+                else "Fila de romaneio",
+                list(grupo_por_opcao),
+                key=f"{chave_widget}_grupo_selecionado",
+            )
         selecao_grupo = grupo_por_opcao[opcao_selecionada]
-        chave_selecionada = (
-            str(selecao_grupo.get("RUA", "")),
-            str(selecao_grupo.get("TRIAGEM", "")),
-            str(selecao_grupo.get("ROTA", "")),
-        )
+        if status_fila == "ENTRADA":
+            chave_selecionada = (
+                str(selecao_grupo.get("TRIAGEM", "")),
+                str(selecao_grupo.get("ROTA", "")),
+            )
+        else:
+            chave_selecionada = (
+                str(selecao_grupo.get("RUA", "")),
+                str(selecao_grupo.get("TRIAGEM", "")),
+                str(selecao_grupo.get("ROTA", "")),
+            )
         tabela_grupo = tabela_envio.loc[
             tabela_envio.apply(
                 lambda linha: (
-                    str(linha.get("Rua", "")),
-                    str(linha.get("Triagem", "")),
-                    str(linha.get("Rota", "")),
-                ) == chave_selecionada,
+                    (
+                        str(linha.get("Triagem", "")),
+                        str(linha.get("Rota", "")),
+                    )
+                    if status_fila == "ENTRADA"
+                    else (
+                        str(linha.get("Rua", "")),
+                        str(linha.get("Triagem", "")),
+                        str(linha.get("Rota", "")),
+                    )
+                )
+                == chave_selecionada,
                 axis=1,
             )
         ].copy()
-        st.caption(
-            f"Selecionado: {chave_selecionada[0]} / {chave_selecionada[1]} / "
-            f"{chave_selecionada[2]} — {len(selecao_grupo['LISTA_CTES'])} CTE(s). "
-            "As outras filas permanecem abertas."
-        )
 
     enviar = st.button(
-        "Gerar romaneio desta rua / triagem",
+        "Gerar romaneio",
         type="primary",
         key=f"{chave_widget}_enviar",
         width=LARGURA_BOTAO,
@@ -844,7 +936,6 @@ def _renderizar_fila_romaneios(
     if enviar and selecao_grupo is not None:
         log, _ = criar_logger_execucao(
             "gerar_romaneios",
-            st.session_state[chave_logs].append,
             rotulo=f"processar_{sufixo_chave}",
         )
         try:
@@ -867,11 +958,18 @@ def _renderizar_fila_romaneios(
                     )
                 )
             ].copy()
-            log(
-                f"Funcionário selecionou {rua_selecionada} / "
-                f"{triagem_selecionada} / {rota_selecionada}; "
-                f"{len(ctes_selecionados)} CTE(s) serão enviados."
-            )
+            if status_fila == "ENTRADA":
+                log(
+                    f"Funcionário selecionou triagem {triagem_selecionada} / "
+                    f"{rota_selecionada}; {len(ctes_selecionados)} CTE(s) "
+                    "serão enviados."
+                )
+            else:
+                log(
+                    f"Funcionário selecionou {rua_selecionada} / "
+                    f"{triagem_selecionada} / {rota_selecionada}; "
+                    f"{len(ctes_selecionados)} CTE(s) serão enviados."
+                )
 
             def registrar_grupo_concluido(grupo: dict, caminho_pdf: Path) -> None:
                 etiquetas_grupo = [
@@ -896,16 +994,26 @@ def _renderizar_fila_romaneios(
                 registrar_etiquetas_romaneio(
                     etiquetas_grupo,
                     contexto=(
-                        f"romaneio gerado — {rua_selecionada} / "
-                        f"{triagem_selecionada}, rota '{rota_selecionada}', "
+                        f"romaneio gerado — "
+                        + (
+                            f"triagem {triagem_selecionada}"
+                            if status_fila == "ENTRADA"
+                            else f"{rua_selecionada} / {triagem_selecionada}"
+                        )
+                        + f", rota '{rota_selecionada}', "
                         f"PDF '{caminho_pdf}'"
                     ),
                     status_fila=status_fila,
                     log=log,
                 )
+                identificacao_fila = (
+                    f"triagem {triagem_selecionada}"
+                    if status_fila == "ENTRADA"
+                    else f"{rua_selecionada} / {triagem_selecionada}"
+                )
                 log(
                     f"Fila fechada no SQLite: {quantidade_fechada} etiqueta(s) "
-                    f"em {rua_selecionada} / {triagem_selecionada}."
+                    f"em {identificacao_fila}."
                 )
 
             pasta_execucao_pdf = RESULTADOS_ROMANEIOS / (
@@ -913,23 +1021,42 @@ def _renderizar_fila_romaneios(
                 f"{datetime.now():%Y-%m-%d_%H-%M-%S-%f}"
             )
             with st.spinner(
-                f"Gerando romaneio de {rua_selecionada} / {triagem_selecionada}..."
+                (
+                    f"Gerando romaneio da triagem {triagem_selecionada}..."
+                    if status_fila == "ENTRADA"
+                    else f"Gerando romaneio de {rua_selecionada} / "
+                    f"{triagem_selecionada}..."
+                )
             ):
                 processamento = executar_manifestos_romaneios(
-                    f"Fila {rua_selecionada} / {triagem_selecionada}",
+                    (
+                        f"Fila Entrada — triagem {triagem_selecionada}"
+                        if status_fila == "ENTRADA"
+                        else f"Fila {rua_selecionada} / {triagem_selecionada}"
+                    ),
                     tabela_previa=tabela_grupo,
                     codigos_preferenciais=codigos_preferenciais,
-                    separar_por_rua_triagem=True,
+                    separar_por_rua_triagem=status_fila != "ENTRADA",
+                    separar_por_triagem=status_fila == "ENTRADA",
                     pasta_destino_pdf=pasta_execucao_pdf,
                     ao_concluir_grupo=registrar_grupo_concluido,
                     log=log,
                 )
-            mensagem = (
-                f"Romaneio concluído para {rua_selecionada} / {triagem_selecionada}: "
-                f"{processamento['ctes_manifesto']} CTE(s), "
-                f"{len(processamento['arquivos_pdf'])} PDF(s). "
-                f"A fila foi encerrada e as próximas etiquetas abrirão um novo lote."
-            )
+            if status_fila == "ENTRADA":
+                mensagem = (
+                    f"Romaneio concluído para triagem {triagem_selecionada} / "
+                    f"{rota_selecionada}: {processamento['ctes_manifesto']} CTE(s), "
+                    f"{len(processamento['arquivos_pdf'])} PDF(s). "
+                    "Os pedidos desta triagem foram retirados da fila aberta."
+                )
+            else:
+                mensagem = (
+                    f"Romaneio concluído para {rua_selecionada} / "
+                    f"{triagem_selecionada}: "
+                    f"{processamento['ctes_manifesto']} CTE(s), "
+                    f"{len(processamento['arquivos_pdf'])} PDF(s). "
+                    "A fila foi encerrada e as próximas etiquetas abrirão um novo lote."
+                )
             resultado_atual.update(
                 {
                     "enviado": True,
@@ -995,7 +1122,6 @@ def _renderizar_fila_romaneios(
                 else:
                     log, _ = criar_logger_execucao(
                         "gerar_romaneios",
-                        st.session_state[chave_logs].append,
                         rotulo=f"imprimir_{sufixo_chave}",
                     )
                     try:
@@ -1033,10 +1159,3 @@ def _renderizar_fila_romaneios(
                             f"Não foi possível enviar o lote para impressão: "
                             f"{erro_impressao}"
                         )
-
-    if not st.session_state.pop(chave_log_painel, False):
-        renderizar_logs(
-            st.session_state.get(chave_logs, []),
-            max_linhas=None,
-            expandido=True,
-        )

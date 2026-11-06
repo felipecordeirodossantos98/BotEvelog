@@ -5,14 +5,9 @@ from servicos.fraction import CredenciaisFractionInvalidasError
 from utils.interface import (
     LARGURA_BOTAO,
     avisar_variaveis_faltantes,
-    criar_painel_execucao,
     warning,
 )
 from utils.logs import criar_logger_execucao
-
-
-CHAVE_LOGS = "visual_buscar_tdes_logs"
-
 
 def renderizar_buscar_tdes(
     arquivo,
@@ -34,14 +29,9 @@ def renderizar_buscar_tdes(
     if not iniciar:
         return
 
-    feedback, log_visual = criar_painel_execucao(
-        CHAVE_LOGS
-    )
+    feedback = st.empty()
 
-    log, caminho_log = criar_logger_execucao(
-        "buscar_tdes",
-        log_visual,
-    )
+    log, _ = criar_logger_execucao("buscar_tdes")
 
     try:
         arquivo.seek(0)

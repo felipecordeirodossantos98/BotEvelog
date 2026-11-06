@@ -29,8 +29,8 @@ from elementos_visuais.visual_gerar_tickets_zendesk import (
 from elementos_visuais.visual_mega_cartela_lsm import (
     renderizar_mega_cartela_lsm,
 )
-from elementos_visuais.visual_gerar_romaneios_emissao import (
-    renderizar_gerar_romaneios_emissao,
+from elementos_visuais.visual_gerar_romaneios import (
+    renderizar_gerar_romaneios,
 )
 
 from utils.arquivos import identificar_fluxo_automacao_sac
@@ -147,11 +147,10 @@ def renderizar_menu_automacoes_sac() -> None:
 
 
 def renderizar_menu_automacoes_operacao() -> None:
-    tab_dar_entrada, tab_emissao, tab_analitico = st.tabs(
+    tab_dar_entrada, tab_emissao = st.tabs(
         [
-            "Dar entrada e gerar romaneios",
-            "Gerar romaneios de Emissão",
-            "Relatório Analítico",
+            "Dar entrada em pedidos",
+            "Gerar romaneios",
         ]
     )
 
@@ -159,8 +158,11 @@ def renderizar_menu_automacoes_operacao() -> None:
         renderizar_dar_entrada_pedidos()
 
     with tab_emissao:
-        renderizar_gerar_romaneios_emissao()
+        renderizar_gerar_romaneios()
 
+
+def renderizar_menu_automacoes_financeiro() -> None:
+    tab_analitico = st.tabs(["Relatório Analítico"])[0]
     with tab_analitico:
         renderizar_baixar_relatorios_analitico()
 
@@ -187,7 +189,7 @@ def main() -> None:
 
     with tab_financeiro:
         st.subheader("Automações Financeiro")
-        warning("Em desenvolvimento")
+        renderizar_menu_automacoes_financeiro()
 
 if __name__ == "__main__":
     main()

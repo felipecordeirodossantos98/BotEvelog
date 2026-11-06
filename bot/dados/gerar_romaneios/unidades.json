@@ -1274,11 +1274,13 @@
     },
     {
       "unidade": "CO SALVADOR",
-      "codigo": "000001930"
+      "codigo": "000001930",
+      "ativo": false
     },
     {
       "unidade": "CO SALVADOR",
-      "codigo": "000001638"
+      "codigo": "000001638",
+      "ativo": false
     },
     {
       "unidade": "CO SAMAMBAIA 01",
@@ -1946,7 +1948,8 @@
     },
     {
       "unidade": "FL BRASILIA",
-      "codigo": "000002638"
+      "codigo": "000002638",
+      "ativo": false
     },
     {
       "unidade": "FL BRASILIA",
@@ -2871,11 +2874,13 @@
     },
     {
       "unidade": "LJ SAO PAULO",
-      "codigo": "000000916"
+      "codigo": "000000916",
+      "ativo": false
     },
     {
       "unidade": "LJ SAO PAULO",
-      "codigo": "000001086"
+      "codigo": "000001086",
+      "ativo": false
     },
     {
       "unidade": "LJ SAO PAULO 01",
@@ -3439,11 +3444,13 @@
     },
     {
       "unidade": "MT JADLOG SEDE",
-      "codigo": "000002593"
+      "codigo": "000002593",
+      "ativo": false
     },
     {
       "unidade": "MT JADLOG SEDE",
-      "codigo": "000000001"
+      "codigo": "000000001",
+      "ativo": false
     },
     {
       "unidade": "MT NEXUS 87 – AEREO",
@@ -4079,11 +4086,13 @@
     },
     {
       "unidade": "TC VULNERAVEL",
-      "codigo": "000001797"
+      "codigo": "000001797",
+      "ativo": false
     },
     {
       "unidade": "TC VULNERAVEL",
-      "codigo": "000001795"
+      "codigo": "000001795",
+      "ativo": false
     },
     {
       "unidade": "TC VULNERAVEL TECA",

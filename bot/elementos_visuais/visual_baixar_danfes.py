@@ -4,13 +4,8 @@ from automacoes.baixar_danfes import executar_baixar_danfes
 from utils.interface import (
     LARGURA_BOTAO,
     avisar_variaveis_faltantes,
-    criar_painel_execucao,
 )
 from utils.logs import criar_logger_execucao
-
-
-CHAVE_LOGS = "visual_baixar_danfes_logs"
-
 
 def renderizar_baixar_danfes(
     arquivo,
@@ -32,14 +27,9 @@ def renderizar_baixar_danfes(
     if not iniciar:
         return
 
-    feedback, log_visual = criar_painel_execucao(
-        CHAVE_LOGS
-    )
+    feedback = st.empty()
 
-    log, caminho_log = criar_logger_execucao(
-        "baixar_danfes",
-        log_visual,
-    )
+    log, _ = criar_logger_execucao("baixar_danfes")
 
     try:
         with st.spinner(

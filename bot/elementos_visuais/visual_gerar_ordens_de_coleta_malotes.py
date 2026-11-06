@@ -9,14 +9,10 @@ from utils.config import HEADLESS
 from utils.interface import (
     LARGURA_BOTAO,
     avisar_variaveis_faltantes,
-    criar_painel_execucao,
     error,
     warning,
 )
 from utils.logs import criar_logger_execucao
-
-
-CHAVE_LOGS = "visual_gerar_ordens_logs"
 
 
 def renderizar_gerar_ordens_de_coleta(
@@ -86,16 +82,12 @@ def renderizar_gerar_ordens_de_coleta(
     if not iniciar:
         return
 
-    feedback, log_visual = criar_painel_execucao(
-        CHAVE_LOGS
-    )
+    feedback = st.empty()
 
-    log, caminho_log = criar_logger_execucao(
+    log, _ = criar_logger_execucao(
         "gerar_ordens_de_coleta_malotes",
-        log_visual,
         rotulo="execucao",
     )
-    st.caption(f"Log desta execução: {caminho_log}")
 
     try:
         with st.spinner(

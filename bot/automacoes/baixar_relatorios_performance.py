@@ -1,10 +1,11 @@
 import re
 from datetime import datetime
 from pathlib import Path
+import time
 
 import pandas as pd
 from playwright.sync_api import (
-    TimeoutError as PlaywrightTimeoutError,
+    Error as PlaywrightError,
     sync_playwright,
 )
 
@@ -26,6 +27,9 @@ from utils.config import (
 
 RESULTADOS_DIR = RESULTADOS_PERFORMANCE
 LIMITE_POR_CONSULTA = 1000
+MAX_TENTATIVAS_ABRIR_SESSAO = 3
+MAX_CICLOS_SESSAO_POR_LOTE = 3
+MAX_TENTATIVAS_LOTE_POR_SESSAO = 3
 
 
 def validar_env():
@@ -385,19 +389,51 @@ def executar_extracao(
         def abrir_sessao():
             nonlocal browser, context, page
 
-            fechar_sessao()
+            ultimo_erro = None
+            for tentativa in range(1, MAX_TENTATIVAS_ABRIR_SESSAO + 1):
+                fechar_sessao()
+                try:
+                    log(
+                        "Abrindo Chromium para o Fraction "
+                        f"({tentativa}/{MAX_TENTATIVAS_ABRIR_SESSAO})..."
+                    )
+                    browser = playwright.chromium.launch(headless=HEADLESS)
+                    context = browser.new_context(accept_downloads=True)
+                    page = context.new_page()
+                    log("Autenticando no Fraction...")
+                    fazer_login(page)
+                    log("Login no Fraction concluído.")
+                    return
+                except Exception as erro:
+                    ultimo_erro = erro
+                    log(
+                        "Falha ao abrir/autenticar no Fraction: "
+                        f"{type(erro).__name__}: {erro}"
+                    )
+                    fechar_sessao()
+                    if tentativa < MAX_TENTATIVAS_ABRIR_SESSAO:
+                        time.sleep(2)
 
-            browser = playwright.chromium.launch(
-                headless=HEADLESS
-            )
-            context = browser.new_context()
-            page = context.new_page()
-
-            log("Abrindo e autenticando no Fraction...")
-            fazer_login(page)
-            log("Login no Fraction concluído.")
+            raise RuntimeError(
+                "Não foi possível abrir uma sessão do Fraction após "
+                f"{MAX_TENTATIVAS_ABRIR_SESSAO} tentativas."
+            ) from ultimo_erro
 
         def recuperar_sessao():
+            if page is None or browser is None:
+                abrir_sessao()
+                return
+            try:
+                if not browser.is_connected():
+                    log(
+                        "O Chromium do Fraction foi encerrado; abrindo uma "
+                        "sessão nova para recuperar a consulta."
+                    )
+                    abrir_sessao()
+                    return
+            except PlaywrightError:
+                abrir_sessao()
+                return
             recuperar_sessao_fraction(
                 page,
                 log,
@@ -445,14 +481,62 @@ def executar_extracao(
                         pasta_bases,
                     )
 
-                try:
-                    arquivo_base = executar_com_retentativas_fraction(
-                        consultar_lote,
-                        recuperar_sessao,
-                        log,
-                        descricao=f"Lote {numero_lote}",
-                        tentativas=5,
+                def consultar_lote_resiliente():
+                    ultimo_erro = None
+                    for ciclo in range(1, MAX_CICLOS_SESSAO_POR_LOTE + 1):
+                        if page is None or browser is None:
+                            try:
+                                abrir_sessao()
+                            except Exception as erro_abertura:
+                                ultimo_erro = erro_abertura
+                                log(
+                                    f"Lote {numero_lote}: não foi possível abrir "
+                                    f"o Chromium no ciclo {ciclo}/"
+                                    f"{MAX_CICLOS_SESSAO_POR_LOTE}: "
+                                    f"{type(erro_abertura).__name__}: "
+                                    f"{erro_abertura}"
+                                )
+                                continue
+                        try:
+                            return executar_com_retentativas_fraction(
+                                consultar_lote,
+                                recuperar_sessao,
+                                log,
+                                descricao=f"Lote {numero_lote}",
+                                tentativas=MAX_TENTATIVAS_LOTE_POR_SESSAO,
+                            )
+                        except Exception as erro:
+                            ultimo_erro = erro
+                            log(
+                                f"Lote {numero_lote}: falha na consulta no "
+                                f"ciclo {ciclo}/{MAX_CICLOS_SESSAO_POR_LOTE}: "
+                                f"{type(erro).__name__}: {erro}"
+                            )
+                            if ciclo >= MAX_CICLOS_SESSAO_POR_LOTE:
+                                break
+                            log(
+                                f"Lote {numero_lote}: descartando a sessão atual "
+                                "e abrindo um Chromium novo antes de tentar de novo."
+                            )
+                            try:
+                                abrir_sessao()
+                            except Exception as erro_abertura:
+                                ultimo_erro = erro_abertura
+                                log(
+                                    f"Lote {numero_lote}: a sessão nova também "
+                                    "falhou ao abrir: "
+                                    f"{type(erro_abertura).__name__}: "
+                                    f"{erro_abertura}"
+                                )
+
+                    if ultimo_erro is not None:
+                        raise ultimo_erro
+                    raise RuntimeError(
+                        f"Lote {numero_lote}: consulta não concluída."
                     )
+
+                try:
+                    arquivo_base = consultar_lote_resiliente()
 
                     arquivos_bases.append(
                         arquivo_base
@@ -461,59 +545,25 @@ def executar_extracao(
                         f"Lote {numero_lote} salvo em: {arquivo_base}"
                     )
 
-                except PlaywrightTimeoutError:
-                    log(
-                        f"Lote {numero_lote}: retentativas com refresh "
-                        "esgotadas. Reiniciando o Chromium para uma "
-                        "última tentativa."
-                    )
-
-                    try:
-                        abrir_sessao()
-                        arquivo_base = consultar_lote()
-
-                        arquivos_bases.append(
-                            arquivo_base
-                        )
-                        log(
-                            f"Lote {numero_lote}: recuperado após "
-                            "reiniciar o Chromium."
-                        )
-
-                    except Exception as erro_final:
-                        codigos_falhos.update(lote)
-
-                        log(
-                            f"Lote {numero_lote}: erro definitivo. "
-                            f"{type(erro_final).__name__}: {erro_final}"
-                        )
-
-                        # Antes do lote seguinte, tenta deixar uma sessão nova.
-                        try:
-                            abrir_sessao()
-                        except Exception as erro_reabertura:
-                            restantes = codigos[
-                                inicio + LIMITE_POR_CONSULTA:
-                            ]
-                            codigos_falhos.update(
-                                restantes
-                            )
-
-                            log(
-                                "Não foi possível restabelecer o Fraction. "
-                                "Os lotes restantes irão diretamente para "
-                                "a planilha de reimportação. "
-                                f"Detalhe: {type(erro_reabertura).__name__}: "
-                                f"{erro_reabertura}"
-                            )
-                            break
-
                 except Exception as erro_lote:
                     codigos_falhos.update(lote)
                     log(
-                        f"Lote {numero_lote}: erro na consulta. "
+                        f"Lote {numero_lote}: falha definitiva após as "
+                        "recuperações de sessão. "
                         f"{type(erro_lote).__name__}: {erro_lote}"
                     )
+                    try:
+                        abrir_sessao()
+                    except Exception as erro_reabertura:
+                        restantes = codigos[inicio + LIMITE_POR_CONSULTA:]
+                        codigos_falhos.update(restantes)
+                        log(
+                            "Não foi possível restabelecer o Fraction. Os lotes "
+                            "restantes irão para a planilha de reimportação. "
+                            f"Detalhe: {type(erro_reabertura).__name__}: "
+                            f"{erro_reabertura}"
+                        )
+                        break
 
         finally:
             fechar_sessao()

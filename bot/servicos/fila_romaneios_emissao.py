@@ -450,11 +450,83 @@ class FilaRomaneiosEmissao:
                 "SELECT etiqueta AS Etiqueta, shipment_id AS ShipmentId, "
                 "rua AS Rua, triagem AS Triagem, "
                 "palete_origem AS 'Palete de origem', rota AS Rota, "
-                "destino AS Destino, detectado_em AS 'Detectado em' "
+                "destino AS Destino, detectado_em AS 'Detectado em', "
+                "(SELECT e.status FROM etiquetas e "
+                "WHERE e.etiqueta = etiquetas_conflito.etiqueta) AS Status "
                 "FROM etiquetas_conflito "
                 "ORDER BY etiqueta, rua, triagem, palete_origem"
             ).fetchall()
         return pd.DataFrame([dict(linha) for linha in linhas])
+
+    def resolver_conflitos_para_rua(
+        self,
+        rua: str,
+        shipment_ids: Iterable[str],
+    ) -> dict[str, int]:
+        """Reabre pedidos isolados, atribuindo todas as etiquetas a uma rua."""
+        rua_destino = _texto(rua)
+        shipments = list(dict.fromkeys(_texto(item) for item in shipment_ids))
+        shipments = [shipment for shipment in shipments if shipment]
+        if not rua_destino:
+            raise ValueError("Selecione a rua de destino dos pedidos isolados.")
+        if not shipments:
+            raise ValueError("Selecione ao menos um pedido isolado para mover.")
+
+        placeholders = ", ".join("?" for _ in shipments)
+        with closing(self._conectar()) as conexao:
+            conexao.execute("BEGIN IMMEDIATE")
+            try:
+                ocorrencias = conexao.execute(
+                    f"SELECT shipment_id, rua FROM etiquetas_conflito "
+                    f"WHERE shipment_id IN ({placeholders})",
+                    shipments,
+                ).fetchall()
+                ruas_por_pedido: dict[str, set[str]] = {}
+                for ocorrencia in ocorrencias:
+                    ruas_por_pedido.setdefault(
+                        _texto(ocorrencia["shipment_id"]), set()
+                    ).add(_chave(ocorrencia["rua"]))
+                invalidos = [
+                    shipment
+                    for shipment in shipments
+                    if _chave(rua_destino)
+                    not in ruas_por_pedido.get(shipment, set())
+                ]
+                if invalidos:
+                    raise ValueError(
+                        "A rua escolhida não está entre as ruas em que o pedido foi "
+                        f"bipado: {', '.join(invalidos[:10])}."
+                    )
+                pedidos_reabertos = conexao.execute(
+                    f"SELECT COUNT(DISTINCT shipment_id) AS total "
+                    f"FROM etiquetas WHERE estado = 'CONFLITO' "
+                    f"AND shipment_id IN ({placeholders})",
+                    shipments,
+                ).fetchone()["total"]
+                cursor = conexao.execute(
+                    f"UPDATE etiquetas SET rua = ?, estado = 'ABERTO' "
+                    f"WHERE estado = 'CONFLITO' AND shipment_id IN ({placeholders})",
+                    [rua_destino, *shipments],
+                )
+                etiquetas_reabertas = max(cursor.rowcount, 0)
+                if not etiquetas_reabertas:
+                    raise ValueError(
+                        "Os pedidos selecionados não têm etiquetas isoladas para mover."
+                    )
+                conexao.execute(
+                    f"DELETE FROM etiquetas_conflito "
+                    f"WHERE shipment_id IN ({placeholders})",
+                    shipments,
+                )
+                conexao.commit()
+            except Exception:
+                conexao.rollback()
+                raise
+
+        return {
+            "pedidos": int(pedidos_reabertos),
+            "etiquetas": etiquetas_reabertas,
+        }
 
     def carregar_etiquetas_abertas(self) -> pd.DataFrame:
         with closing(self._conectar()) as conexao:

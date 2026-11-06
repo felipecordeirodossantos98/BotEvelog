@@ -10,13 +10,10 @@ from utils.config import HEADLESS
 from utils.interface import (
     LARGURA_BOTAO,
     avisar_variaveis_faltantes,
-    criar_painel_execucao,
     error,
     warning,
 )
 from utils.logs import criar_logger_execucao
-
-CHAVE_LOGS = "visual_gerar_ordens_equipamentos_logs"
 
 COLUNAS_FRACTION = [
     "NUMERO_PEDIDO",
@@ -94,13 +91,11 @@ def renderizar_gerar_ordens_de_coleta_equipamentos(arquivos) -> None:
     if not iniciar:
         return
 
-    feedback, log_visual = criar_painel_execucao(CHAVE_LOGS)
-    log, caminho_log = criar_logger_execucao(
+    feedback = st.empty()
+    log, _ = criar_logger_execucao(
         "gerar_ordens_de_coleta_equipamentos",
-        log_visual,
         rotulo="execucao",
     )
-    st.caption(f"Log desta execução: {caminho_log}")
 
     try:
         with st.spinner("Gerando ordens de coleta..."):

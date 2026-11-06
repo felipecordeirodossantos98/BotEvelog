@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime
 from pathlib import Path
 
 import streamlit as st
@@ -15,27 +14,15 @@ from utils.interface import (
     LARGURA_BOTAO,
     LARGURA_UPLOAD,
 )
+from utils.logs import criar_logger_execucao
 
 
 CHAVE_RESULTADO = (
     "mega_cartela_lsm_resultado"
 )
 
-CHAVE_LOGS_UPDATE = (
-    "mega_cartela_lsm_logs_update"
-)
-
-CHAVE_ARQUIVO_LOG_UPDATE = (
-    "mega_cartela_lsm_arquivo_log_update"
-)
 CHAVE_AVISO_CREDENCIAIS = (
     "mega_cartela_lsm_aviso_credenciais_fraction"
-)
-
-PASTA_LOGS = (
-    Path(__file__).resolve().parents[2]
-    / "logs"
-    / "mega_cartela_lsm"
 )
 
 
@@ -151,16 +138,6 @@ def renderizar_mega_cartela_lsm() -> None:
         "#### Atualizador de dados"
     )
 
-    if CHAVE_LOGS_UPDATE not in st.session_state:
-        st.session_state[
-            CHAVE_LOGS_UPDATE
-        ] = []
-
-    if CHAVE_ARQUIVO_LOG_UPDATE not in st.session_state:
-        st.session_state[
-            CHAVE_ARQUIVO_LOG_UPDATE
-        ] = None
-
     iniciar_update = st.button(
         "Atualizar dados",
         type="primary",
@@ -174,96 +151,17 @@ def renderizar_mega_cartela_lsm() -> None:
         ),
     )
 
-    with st.expander(
-        "Log da atualização",
-        expanded=False,
-        width="stretch",
-    ):
-        area_log = st.empty()
-
-        if st.session_state[
-            CHAVE_LOGS_UPDATE
-        ]:
-            area_log.code(
-                "\n".join(
-                    st.session_state[
-                        CHAVE_LOGS_UPDATE
-                    ]
-                ),
-                language=None,
-            )
-
-    def registrar_update(
-        mensagem,
-    ):
-        mensagem = str(
-            mensagem
-        )
-
-        st.session_state[
-            CHAVE_LOGS_UPDATE
-        ].append(
-            mensagem
-        )
-
-        caminho_log = st.session_state.get(
-            CHAVE_ARQUIVO_LOG_UPDATE
-        )
-
-        if caminho_log:
-            with Path(
-                caminho_log
-            ).open(
-                "a",
-                encoding="utf-8",
-            ) as arquivo_log:
-                arquivo_log.write(
-                    mensagem
-                    + "\n"
-                )
-
-        area_log.code(
-            "\n".join(
-                st.session_state[
-                    CHAVE_LOGS_UPDATE
-                ]
-            ),
-            language=None,
-        )
-
     if iniciar_update:
         st.session_state[CHAVE_AVISO_CREDENCIAIS] = False
-        st.session_state[
-            CHAVE_LOGS_UPDATE
-        ] = []
 
-        PASTA_LOGS.mkdir(
-            parents=True,
-            exist_ok=True,
-        )
+        def registrar_evento_log(mensagem: str) -> None:
+            if "Warning: O Fraction informou 'Login ou senha inválidos.'" in mensagem:
+                st.session_state[CHAVE_AVISO_CREDENCIAIS] = True
 
-        caminho_log = (
-            PASTA_LOGS
-            / (
-                "execucao_"
-                f"{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.txt"
-            )
-        )
-
-        st.session_state[
-            CHAVE_ARQUIVO_LOG_UPDATE
-        ] = str(
-            caminho_log
-        )
-
-        caminho_log.write_text(
-            (
-                "Mega Cartela LSM - log da atualização\n"
-                f"Início: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n"
-                "=" * 80
-                + "\n"
-            ),
-            encoding="utf-8",
+        log, _ = criar_logger_execucao(
+            "mega_cartela_lsm",
+            registrar_evento_log,
+            rotulo="atualizacao",
         )
 
         try:
@@ -272,7 +170,7 @@ def renderizar_mega_cartela_lsm() -> None:
             ):
                 resultado_update = (
                     atualizar_dados_cartela(
-                        log=registrar_update
+                        log=log
                     )
                 )
 
@@ -286,19 +184,14 @@ def renderizar_mega_cartela_lsm() -> None:
                 "consultado(s) na atualização."
             )
 
-            registrar_update(
-                mensagem_sucesso
-            )
+            log(mensagem_sucesso)
 
             st.success(
                 mensagem_sucesso,
                 width="stretch",
             )
 
-            credenciais_recusadas = any(
-                "Warning: O Fraction informou 'Login ou senha inválidos.'" in str(linha)
-                for linha in st.session_state.get(CHAVE_LOGS_UPDATE, [])
-            )
+            credenciais_recusadas = st.session_state[CHAVE_AVISO_CREDENCIAIS]
             if resultado_update[
                 "rastreios_sem_retorno"
             ] and not credenciais_recusadas:
@@ -309,27 +202,17 @@ def renderizar_mega_cartela_lsm() -> None:
                     "tentados novamente na próxima atualização."
                 )
 
-                registrar_update(
-                    mensagem_sem_retorno
-                )
+                log(mensagem_sem_retorno)
 
                 st.warning(
                     mensagem_sem_retorno,
                     width="stretch",
                 )
 
-            registrar_update(
-                "Execução concluída com sucesso."
-            )
+            log("Execução concluída com sucesso.")
 
         except Exception as erro:
-            registrar_update(
-                (
-                    "Erro: "
-                    f"{type(erro).__name__}: "
-                    f"{erro}"
-                )
-            )
+            log(f"Erro: {type(erro).__name__}: {erro}")
 
             st.error(
                 (
@@ -338,11 +221,6 @@ def renderizar_mega_cartela_lsm() -> None:
                 ),
                 width=LARGURA_UPLOAD,
             )
-
-        st.session_state[CHAVE_AVISO_CREDENCIAIS] = any(
-            "Warning: O Fraction informou 'Login ou senha inválidos.'" in str(linha)
-            for linha in st.session_state.get(CHAVE_LOGS_UPDATE, [])
-        )
 
     if st.session_state.get(CHAVE_AVISO_CREDENCIAIS):
         st.warning(

@@ -18,6 +18,7 @@ from urllib.parse import unquote_to_bytes
 import pandas as pd
 
 from playwright.sync_api import (
+    Error as PlaywrightError,
     Page,
     TimeoutError as PlaywrightTimeoutError,
     sync_playwright,
@@ -36,6 +37,306 @@ from utils.config import (
     SLOW_MO_MS,
     URL_FRACTION,
 )
+
+MAX_TENTATIVAS_CONSULTA_SHIPMENT = 5
+MAX_TENTATIVAS_ABRIR_SESSAO_SHIPMENT = 3
+
+
+def _normalizar_cabecalho_consulta_fraction(valor: object) -> str:
+    texto = unicodedata.normalize("NFKD", str(valor).strip())
+    texto = "".join(caractere for caractere in texto if not unicodedata.combining(caractere))
+    return " ".join(texto.upper().split())
+
+
+def _aguardar_carregamento_consulta_fraction(page: Page, log: Callable[[str], None]) -> None:
+    page.wait_for_timeout(1000)
+    page.wait_for_function(
+        """() => {
+            const visivel = (e) => e.getClientRects().length > 0 &&
+                getComputedStyle(e).visibility !== "hidden" &&
+                getComputedStyle(e).display !== "none";
+            const carregando = Array.from(document.querySelectorAll("body *"))
+                .some((e) => e.children.length === 0 &&
+                    e.innerText?.trim().includes("Carregando") && visivel(e));
+            const ajax = window.jQuery && window.jQuery.active > 0;
+            const fila = window.PrimeFaces?.ajax?.Queue;
+            const filaVazia = !fila || typeof fila.isEmpty !== "function" || fila.isEmpty();
+            const ocupado = Array.from(document.querySelectorAll('[aria-busy="true"]')).some(visivel);
+            return !carregando && !ajax && filaVazia && !ocupado;
+        }""",
+        timeout=180_000,
+        polling=500,
+    )
+    log("A atualização do Fraction terminou.")
+
+
+def _normalizar_shipment_id_consulta(valor: object) -> str:
+    if pd.isna(valor):
+        return ""
+    shipment_id = str(valor).strip()
+    if re.fullmatch(r"\d+\.0", shipment_id):
+        shipment_id = shipment_id[:-2]
+    if shipment_id.isdigit() and len(shipment_id) < 14:
+        shipment_id = shipment_id.zfill(14)
+    return shipment_id
+
+
+def _capturar_valor_rotulo_fraction(page, rotulo: str) -> str:
+    """Lê o valor numérico associado a um rótulo do resultado de pesquisa."""
+    marcador = page.get_by_text(rotulo, exact=False).first
+    marcador.wait_for(state="visible", timeout=30_000)
+    padrao = re.compile(
+        rf"{re.escape(rotulo.rstrip(':'))}\s*:\s*(\d+)",
+        flags=re.IGNORECASE,
+    )
+
+    for nivel in range(7):
+        elemento = marcador if nivel == 0 else marcador.locator("xpath=" + "/.." * nivel)
+        try:
+            texto = elemento.inner_text().strip()
+        except PlaywrightError:
+            continue
+        encontrado = padrao.search(texto)
+        if encontrado:
+            return encontrado.group(1)
+
+    raise RuntimeError(f"O resultado do Fraction não trouxe um valor para '{rotulo}'.")
+
+
+def _pedido_nao_encontrado_fraction(page) -> bool:
+    try:
+        texto = _normalizar_cabecalho_consulta_fraction(page.locator("body").inner_text())
+    except PlaywrightError:
+        return False
+    return any(
+        frase in texto
+        for frase in (
+            "NENHUM REGISTRO",
+            "NENHUM RESULTADO",
+            "NAO ENCONTRADO",
+            "NAO LOCALIZADO",
+            "NAO FORAM ENCONTRADOS",
+            "NAO EXISTE",
+            "SEM REGISTRO",
+        )
+    )
+
+
+def _consultar_shipment_id_fraction(
+    page,
+    shipment_id: str,
+    log: Callable[[str], None],
+) -> dict[str, object]:
+    """Consulta um ShipmentId e captura Conhecimento e total de Volumes."""
+    page.get_by_role("link", name="Consultas").click()
+    page.get_by_role("link", name="Pesquisar").click()
+    page.get_by_text(
+        re.compile(r"Shipp?ment\s*ID", flags=re.IGNORECASE)
+    ).first.click()
+    _aguardar_carregamento_consulta_fraction(page, log)
+
+    campo_pesquisa = page.locator('[id="frmPesquisa:cte"]')
+    campo_pesquisa.wait_for(state="visible", timeout=60_000)
+    campo_pesquisa.fill(shipment_id)
+    page.get_by_role("button", name="Processar").click()
+    log(f"ShipmentId {shipment_id}: pesquisa enviada.")
+    _aguardar_carregamento_consulta_fraction(page, log)
+
+    try:
+        cte = _capturar_valor_rotulo_fraction(page, "Conhecimento:")
+        volumes = int(_capturar_valor_rotulo_fraction(page, "Volumes:"))
+    except PlaywrightTimeoutError:
+        if _pedido_nao_encontrado_fraction(page):
+            log(f"ShipmentId {shipment_id}: pedido não encontrado no Fraction.")
+            return {
+                "CTE": "",
+                "Volumes Sistema": None,
+                "Situação consulta": "Não encontrado no Fraction",
+            }
+        raise
+
+    if volumes < 1:
+        raise ValueError(
+            f"ShipmentId {shipment_id}: o Fraction retornou um total de volumes inválido ({volumes})."
+        )
+    log(f"ShipmentId {shipment_id}: CTE {cte}, {volumes} volume(s) no Fraction.")
+    return {
+        "CTE": cte,
+        "Volumes Sistema": volumes,
+        "Situação consulta": "Consultado",
+    }
+
+
+def consultar_shipments_no_fraction(
+    shipment_ids: list[str],
+    *,
+    log: Callable[[str], None] = print,
+) -> dict[str, dict[str, object]]:
+    """Consulta ShipmentIds individualmente com as recuperações do Fraction."""
+    shipment_ids_unicos = list(
+        dict.fromkeys(_normalizar_shipment_id_consulta(item) for item in shipment_ids)
+    )
+    if not shipment_ids_unicos:
+        return {}
+    if not URL_FRACTION or not FRACTION_USER or not FRACTION_PASSWORD:
+        raise ValueError(
+            "URL_FRACTION, FRACTION_USER e FRACTION_PASSWORD precisam estar configurados."
+        )
+
+    resultados: dict[str, dict[str, object]] = {}
+    with sync_playwright() as playwright:
+        browser = None
+        context = None
+        page = None
+
+        def fechar_sessao() -> None:
+            nonlocal browser, context, page
+            fechar_recurso_playwright_seguro(context, log)
+            fechar_recurso_playwright_seguro(browser, log)
+            browser = None
+            context = None
+            page = None
+
+        def abrir_sessao() -> None:
+            nonlocal browser, context, page
+            fechar_sessao()
+            ultimo_erro: Exception | None = None
+            for tentativa in range(1, MAX_TENTATIVAS_ABRIR_SESSAO_SHIPMENT + 1):
+                try:
+                    log(
+                        "Abrindo sessão do Fraction para consulta individual "
+                        f"({tentativa}/{MAX_TENTATIVAS_ABRIR_SESSAO_SHIPMENT})."
+                    )
+                    browser = playwright.chromium.launch(
+                        headless=HEADLESS,
+                        slow_mo=SLOW_MO_MS,
+                    )
+                    context = browser.new_context(accept_downloads=True)
+                    page = context.new_page()
+                    page.on(
+                        "pageerror",
+                        lambda erro: log(f"Erro JavaScript no Fraction: {erro}"),
+                    )
+                    login_fraction(page, FRACTION_USER, FRACTION_PASSWORD, log)
+                    return
+                except CredenciaisFractionInvalidasError:
+                    fechar_sessao()
+                    raise
+                except Exception as erro:
+                    ultimo_erro = erro
+                    log(
+                        "Falha ao abrir a sessão do Fraction: "
+                        f"{type(erro).__name__}: {erro}"
+                    )
+                    fechar_sessao()
+                    if tentativa == MAX_TENTATIVAS_ABRIR_SESSAO_SHIPMENT:
+                        break
+            raise RuntimeError(
+                "Não foi possível abrir uma sessão do Fraction para as consultas "
+                f"individuais após {MAX_TENTATIVAS_ABRIR_SESSAO_SHIPMENT} tentativas."
+            ) from ultimo_erro
+
+        def recuperar_sessao() -> None:
+            if page is None:
+                abrir_sessao()
+                return
+            recuperar_sessao_fraction(
+                page,
+                log,
+                login_callback=lambda: login_fraction(
+                    page,
+                    FRACTION_USER,
+                    FRACTION_PASSWORD,
+                    log,
+                ),
+            )
+
+        try:
+            try:
+                abrir_sessao()
+            except CredenciaisFractionInvalidasError:
+                raise
+            except Exception as erro:
+                log(
+                    "Consultas individuais não iniciadas: "
+                    f"{type(erro).__name__}: {erro}"
+                )
+                return {
+                    shipment_id: {
+                        "CTE": "",
+                        "Volumes Sistema": None,
+                        "Situação consulta": "Fraction indisponível",
+                    }
+                    for shipment_id in shipment_ids_unicos
+                }
+
+            for indice, shipment_id in enumerate(shipment_ids_unicos, start=1):
+                log(
+                    f"Consultando ShipmentId {shipment_id} "
+                    f"({indice}/{len(shipment_ids_unicos)})."
+                )
+
+                def consultar():
+                    return _consultar_shipment_id_fraction(page, shipment_id, log)
+
+                try:
+                    resultado = executar_com_retentativas_fraction(
+                        consultar,
+                        recuperar_sessao,
+                        log,
+                        descricao=f"ShipmentId {shipment_id}",
+                        tentativas=MAX_TENTATIVAS_CONSULTA_SHIPMENT,
+                    )
+                except CredenciaisFractionInvalidasError:
+                    raise
+                except Exception as erro:
+                    log(
+                        f"ShipmentId {shipment_id}: {type(erro).__name__}: {erro}. "
+                        "Retentativas com refresh "
+                        "esgotadas ou consulta interrompida. Abrindo Chromium novo "
+                        "para uma tentativa final."
+                    )
+                    try:
+                        abrir_sessao()
+                        resultado = consultar()
+                    except CredenciaisFractionInvalidasError:
+                        raise
+                    except Exception as erro_final:
+                        log(
+                            f"ShipmentId {shipment_id}: falha definitiva: "
+                            f"{type(erro_final).__name__}: {erro_final}"
+                        )
+                        resultados[shipment_id] = {
+                            "CTE": "",
+                            "Volumes Sistema": None,
+                            "Situação consulta": "Falha na consulta Fraction",
+                        }
+                        if indice < len(shipment_ids_unicos):
+                            try:
+                                abrir_sessao()
+                            except CredenciaisFractionInvalidasError:
+                                raise
+                            except Exception as erro_sessao:
+                                log(
+                                    "Sessão do Fraction indisponível; consultas restantes "
+                                    f"foram interrompidas: {type(erro_sessao).__name__}: "
+                                    f"{erro_sessao}"
+                                )
+                                for shipment_id_pendente in shipment_ids_unicos[indice:]:
+                                    resultados[shipment_id_pendente] = {
+                                        "CTE": "",
+                                        "Volumes Sistema": None,
+                                        "Situação consulta": "Consulta interrompida: Fraction indisponível",
+                                    }
+                                break
+                        continue
+
+                resultados[shipment_id] = resultado
+        finally:
+            fechar_sessao()
+
+    return resultados
+
 
 
 def validar_url_fraction() -> None:
@@ -1490,6 +1791,153 @@ def _normalizar_uf(valor: object) -> str:
     return nomes.get(uf, uf)
 
 
+def carregar_regras_triagem_rotas(
+    caminho: Path = ARQUIVO_ROTAS_ROMANEIOS,
+) -> list[dict[str, object]]:
+    """Carrega a configuração hierárquica: triagem, localidades e unidade."""
+    if not caminho.exists():
+        raise FileNotFoundError(f"Base de rotas não encontrada: '{caminho}'.")
+    with caminho.open("r", encoding="utf-8-sig") as arquivo:
+        dados = json.load(arquivo)
+    if not isinstance(dados, dict):
+        raise ValueError("A base de rotas precisa ser um objeto JSON.")
+    regras = dados.get("triagens")
+    if not isinstance(regras, list):
+        raise ValueError("A base de rotas precisa conter a lista 'triagens'.")
+
+    resultado: list[dict[str, object]] = []
+    for indice, regra in enumerate(regras, start=1):
+        if not isinstance(regra, dict):
+            raise ValueError(f"A triagem #{indice} precisa ser um objeto JSON.")
+        triagem = " ".join(str(regra.get("triagem") or "").split())
+        unidade = " ".join(str(regra.get("unidade") or "").split())
+        if not triagem or not unidade:
+            raise ValueError(
+                f"A triagem #{indice} precisa conter 'triagem' e 'unidade'."
+            )
+
+        localidades: dict[str, list[str]] = {}
+        marcadores_triagem = {
+            _normalizar_rota(parte)
+            for parte in triagem.split(",")
+            if _normalizar_rota(parte)
+        }
+        for campo in ("ufs", "cidades", "destinos"):
+            valores = regra.get(campo, [])
+            if not isinstance(valores, list):
+                raise ValueError(
+                    f"O campo '{campo}' da triagem '{triagem}' precisa ser uma lista."
+                )
+            normalizados = []
+            for valor in valores:
+                normalizado = (
+                    _normalizar_uf(valor)
+                    if campo == "ufs"
+                    else _normalizar_rota(valor)
+                )
+                if (
+                    campo != "ufs"
+                    and normalizado in marcadores_triagem
+                ):
+                    # In grouped-pallet rules, triage codes are visual section
+                    # markers (A, B, P05, ...), not locality names.
+                    continue
+                if normalizado and normalizado not in normalizados:
+                    normalizados.append(normalizado)
+            localidades[campo] = normalizados
+
+        if not any(localidades.values()):
+            raise ValueError(
+                f"A triagem '{triagem}' precisa ter ao menos uma UF, cidade ou destino."
+            )
+        resultado.append(
+            {
+                "triagem": triagem,
+                "unidade": unidade,
+                **localidades,
+            }
+        )
+    return resultado
+
+
+def resolver_rota_por_localidade(
+    regras: list[dict[str, object]],
+    *,
+    uf: object = "",
+    cidade: object = "",
+    destino: object = "",
+    triagem: object = "",
+) -> tuple[str, str]:
+    """Resolve destino com prioridade para destino, cidade e depois UF.
+
+    Quando informada, a triagem pode ser o grupo completo ou um de seus códigos.
+    Códigos separados por vírgula dentro da regra representam um único palete.
+    Sem triagem, só retorna a triagem quando um grupo configurado é único.
+    """
+    uf_normalizada = _normalizar_uf(uf)
+    cidade_normalizada = _normalizar_rota(cidade)
+    destino_normalizado = _normalizar_rota(destino)
+    triagem_normalizada = _normalizar_rota(triagem)
+    triagem_informada = " ".join(str(triagem or "").split())
+    triagens_compativeis: dict[str, str] = {}
+
+    def codigos_da_triagem(regra: dict[str, object]) -> tuple[str, set[str]]:
+        nome = " ".join(str(regra.get("triagem") or "").split())
+        componentes = {
+            _normalizar_rota(parte)
+            for parte in nome.split(",")
+            if _normalizar_rota(parte)
+        }
+        return nome, componentes
+
+    candidatas: list[tuple[int, str, str]] = []
+
+    for regra in regras:
+        nome_triagem, componentes_triagem = codigos_da_triagem(regra)
+        unidade = str(regra.get("unidade") or "").strip()
+        if triagem_normalizada:
+            if (
+                _normalizar_rota(nome_triagem) != triagem_normalizada
+                and triagem_normalizada not in componentes_triagem
+            ):
+                continue
+            triagens_compativeis.setdefault(_normalizar_rota(nome_triagem), nome_triagem)
+        prioridades = []
+        if destino_normalizado in regra.get("destinos", []):
+            prioridades.append(3)
+        if cidade_normalizada in regra.get("cidades", []):
+            prioridades.append(2)
+        if uf_normalizada in regra.get("ufs", []):
+            prioridades.append(1)
+        if prioridades:
+            candidatas.append((max(prioridades), unidade, nome_triagem))
+
+    triagem_canonica = (
+        next(iter(triagens_compativeis.values()))
+        if len(triagens_compativeis) == 1
+        else triagem_informada
+    )
+    if not candidatas:
+        return "Sem rota", triagem_canonica
+    maior_prioridade = max(candidata[0] for candidata in candidatas)
+    resultados = {
+        (_normalizar_rota(unidade), _normalizar_rota(nome_triagem)):
+        (unidade, nome_triagem)
+        for prioridade, unidade, nome_triagem in candidatas
+        if prioridade == maior_prioridade
+    }
+    unidades = {_normalizar_rota(unidade) for unidade, _ in resultados.values()}
+    triagens_unicas: dict[str, str] = {}
+    for _, nome_triagem in resultados.values():
+        triagens_unicas.setdefault(_normalizar_rota(nome_triagem), nome_triagem)
+    if len(unidades) != 1:
+        return "Rota ambígua", triagem_canonica
+    unidade = next(iter(resultados.values()))[0]
+    if len(triagens_unicas) != 1:
+        return unidade, ""
+    return unidade, next(iter(triagens_unicas.values()))
+
+
 def carregar_regras_rotas_com_destino_e_triagem(
     caminho: Path = ARQUIVO_ROTAS_ROMANEIOS,
 ) -> tuple[
@@ -1500,94 +1948,47 @@ def carregar_regras_rotas_com_destino_e_triagem(
     dict[str, str],
     dict[str, str],
 ]:
-    """Carrega unidade e triagem por UF, cidade e destino normalizados."""
-    if not caminho.exists():
-        raise FileNotFoundError(f"Base de rotas não encontrada: '{caminho}'.")
-    with caminho.open("r", encoding="utf-8-sig") as arquivo:
-        dados = json.load(arquivo)
-    if not isinstance(dados, dict):
-        raise ValueError("A base de rotas precisa ser um objeto JSON.")
-    if "por_uf" not in dados or "por_cidade" not in dados:
-        raise ValueError(
-            "A base de rotas precisa conter as listas 'por_uf' e 'por_cidade'."
-        )
+    """Projeção de compatibilidade para consumidores antigos das regras."""
+    regras = carregar_regras_triagem_rotas(caminho)
+    localidades: dict[str, dict[str, tuple[str, list[str]]]] = {
+        "ufs": {},
+        "cidades": {},
+        "destinos": {},
+    }
+    for regra in regras:
+        unidade = str(regra["unidade"])
+        triagem = str(regra["triagem"])
+        for campo, chave in (
+            ("ufs", "uf"),
+            ("cidades", "cidade"),
+            ("destinos", "destino"),
+        ):
+            for valor in regra[campo]:
+                existente = localidades[campo].get(valor)
+                if (
+                    existente
+                    and _normalizar_rota(existente[0]) != _normalizar_rota(unidade)
+                ):
+                    raise ValueError(
+                        f"A localidade '{valor}' está associada a mais de uma unidade; "
+                        "use o carregador hierárquico de triagens."
+                    )
+                unidade_existente, triagens = existente or (unidade, [])
+                if triagem not in triagens:
+                    triagens.append(triagem)
+                localidades[campo][valor] = (unidade_existente, triagens)
 
-    regras_uf = dados["por_uf"]
-    regras_cidade = dados["por_cidade"]
-    regras_destino = dados.get("por_destino", [])
-    if (
-        not isinstance(regras_uf, list)
-        or not isinstance(regras_cidade, list)
-        or not isinstance(regras_destino, list)
-    ):
-        raise ValueError("'por_uf', 'por_cidade' e 'por_destino' precisam ser listas.")
+    def projetar(campo: str) -> tuple[dict[str, str], dict[str, str]]:
+        rotas = {chave: valor[0] for chave, valor in localidades[campo].items()}
+        triagens = {
+            chave: ", ".join(valor[1])
+            for chave, valor in localidades[campo].items()
+        }
+        return rotas, triagens
 
-    rotas_por_uf: dict[str, str] = {}
-    rotas_por_cidade: dict[str, str] = {}
-    rotas_por_destino: dict[str, str] = {}
-    triagens_por_uf: dict[str, str] = {}
-    triagens_por_cidade: dict[str, str] = {}
-    triagens_por_destino: dict[str, str] = {}
-
-    for regra in regras_uf:
-        if not isinstance(regra, dict):
-            raise ValueError("Cada item de 'por_uf' precisa ser um objeto JSON.")
-        uf = _normalizar_uf(regra.get("uf") or "")
-        unidade = str(regra.get("unidade") or "").strip()
-        triagem = " ".join(str(regra.get("triagem") or "").split())
-        if not uf or not unidade:
-            raise ValueError("Cada regra de 'por_uf' precisa de 'uf' e 'unidade'.")
-        existente = rotas_por_uf.get(uf)
-        if existente and _normalizar_rota(existente) != _normalizar_rota(unidade):
-            raise ValueError(f"Mais de uma unidade foi definida para a UF {uf}.")
-        triagem_existente = triagens_por_uf.get(uf)
-        if triagem_existente is not None and triagem_existente != triagem:
-            raise ValueError(f"Mais de uma triagem foi definida para a UF {uf}.")
-        rotas_por_uf[uf] = unidade
-        triagens_por_uf[uf] = triagem
-
-    for regra in regras_cidade:
-        if not isinstance(regra, dict):
-            raise ValueError("Cada item de 'por_cidade' precisa ser um objeto JSON.")
-        cidade = _normalizar_rota(regra.get("cidade") or "")
-        unidade = str(regra.get("unidade") or "").strip()
-        triagem = " ".join(str(regra.get("triagem") or "").split())
-        if not cidade or not unidade:
-            raise ValueError(
-                "Cada regra de 'por_cidade' precisa de 'cidade' e 'unidade'."
-            )
-        existente = rotas_por_cidade.get(cidade)
-        if existente and _normalizar_rota(existente) != _normalizar_rota(unidade):
-            raise ValueError(f"Mais de uma unidade foi definida para a cidade {cidade}.")
-        triagem_existente = triagens_por_cidade.get(cidade)
-        if triagem_existente is not None and triagem_existente != triagem:
-            raise ValueError(f"Mais de uma triagem foi definida para a cidade {cidade}.")
-        rotas_por_cidade[cidade] = unidade
-        triagens_por_cidade[cidade] = triagem
-
-    for regra in regras_destino:
-        if not isinstance(regra, dict):
-            raise ValueError("Cada item de 'por_destino' precisa ser um objeto JSON.")
-        destino = _normalizar_rota(regra.get("destino") or "")
-        unidade = str(regra.get("unidade") or "").strip()
-        triagem = " ".join(str(regra.get("triagem") or "").split())
-        if not destino or not unidade:
-            raise ValueError(
-                "Cada regra de 'por_destino' precisa de 'destino' e 'unidade'."
-            )
-        existente = rotas_por_destino.get(destino)
-        if existente and _normalizar_rota(existente) != _normalizar_rota(unidade):
-            raise ValueError(
-                f"Mais de uma unidade foi definida para o destino {destino}."
-            )
-        triagem_existente = triagens_por_destino.get(destino)
-        if triagem_existente is not None and triagem_existente != triagem:
-            raise ValueError(
-                f"Mais de uma triagem foi definida para o destino {destino}."
-            )
-        rotas_por_destino[destino] = unidade
-        triagens_por_destino[destino] = triagem
-
+    rotas_por_uf, triagens_por_uf = projetar("ufs")
+    rotas_por_cidade, triagens_por_cidade = projetar("cidades")
+    rotas_por_destino, triagens_por_destino = projetar("destinos")
     return (
         rotas_por_uf,
         rotas_por_cidade,
@@ -2675,7 +3076,7 @@ def associar_destinos_fraction(
 
 
 def adicionar_rotas_a_previa(tabela_base: pd.DataFrame, *, log=None) -> pd.DataFrame:
-    """Resolve a unidade atendente primeiro por cidade e depois por UF."""
+    """Resolve a unidade por destino específico, cidade e depois UF."""
     tabela = tabela_base.copy()
     coluna_destino = next(
         (coluna for coluna in tabela if _normalizar_rota(coluna) == "DESTINO"),
@@ -2702,14 +3103,7 @@ def adicionar_rotas_a_previa(tabela_base: pd.DataFrame, *, log=None) -> pd.DataF
     )
 
     try:
-        (
-            rotas_por_uf,
-            rotas_por_cidade,
-            rotas_por_destino,
-            _,
-            _,
-            _,
-        ) = carregar_regras_rotas_com_destino_e_triagem()
+        regras_rotas = carregar_regras_triagem_rotas()
         codigos_preferenciais = carregar_codigos_preferenciais_unidades()
         unidades = carregar_destinos_fraction()
     except (FileNotFoundError, ValueError, json.JSONDecodeError) as erro:
@@ -2723,24 +3117,19 @@ def adicionar_rotas_a_previa(tabela_base: pd.DataFrame, *, log=None) -> pd.DataF
             if pd.notna(cidade_valor)
             else ""
         )
-        rota_cidade = rotas_por_cidade.get(cidade, "")
-        if rota_cidade:
-            return rota_cidade
-        rota_uf = rotas_por_uf.get(uf, "")
-        if rota_uf:
-            return rota_uf
-
         destino_valor = linha[coluna_destino]
         destino = (
             _normalizar_rota(str(destino_valor))
             if pd.notna(destino_valor)
             else ""
         )
-        rota_destino = rotas_por_destino.get(destino, "")
-        if rota_destino:
-            return rota_destino
-
-        return "Sem rota"
+        rota, _ = resolver_rota_por_localidade(
+            regras_rotas,
+            uf=uf,
+            cidade=cidade,
+            destino=destino,
+        )
+        return rota
 
     tabela["Rota"] = tabela.apply(resolver, axis=1)
     unidades_por_nome: dict[str, list[dict[str, str]]] = {}
@@ -2780,6 +3169,7 @@ def mapear_rotas_para_grupos(
     *,
     separar_por_palete: bool = False,
     separar_por_rua_triagem: bool = False,
+    separar_por_triagem: bool = False,
 ) -> tuple[list[dict], list[str]]:
     coluna_cte = next(
         (coluna for coluna in tabela_base if _normalizar_rota(coluna) == "CTE"),
@@ -2869,6 +3259,14 @@ def mapear_rotas_para_grupos(
             continue
         if separar_por_rua_triagem:
             chave = (rua, triagem, rota)
+        elif separar_por_triagem:
+            if not triagem:
+                ignorados.append(
+                    f"CTE(s) {', '.join(ctes_linha)}: sem triagem; "
+                    "não é possível montar a fila de Entrada."
+                )
+                continue
+            chave = (triagem, rota)
         elif separar_por_palete:
             chave = (palete, rota)
         else:
@@ -2883,6 +3281,13 @@ def mapear_rotas_para_grupos(
             rua, triagem, rota = chave
             grupo = {
                 "RUA": rua,
+                "TRIAGEM": triagem,
+                "ROTA": rota,
+                "LISTA_CTES": ctes,
+            }
+        elif separar_por_triagem:
+            triagem, rota = chave
+            grupo = {
                 "TRIAGEM": triagem,
                 "ROTA": rota,
                 "LISTA_CTES": ctes,
@@ -3110,6 +3515,7 @@ def executar_manifestos_romaneios(
     codigos_preferenciais: dict[str, str] | None = None,
     separar_por_palete: bool = False,
     separar_por_rua_triagem: bool = False,
+    separar_por_triagem: bool = False,
     pasta_destino_pdf: str | Path | None = None,
     ao_concluir_grupo: Callable[[dict, Path], None] | None = None,
     log=None,
@@ -3137,6 +3543,7 @@ def executar_manifestos_romaneios(
         tabela,
         separar_por_palete=separar_por_palete,
         separar_por_rua_triagem=separar_por_rua_triagem,
+        separar_por_triagem=separar_por_triagem,
     )
     if rotas_ausentes:
         _log(

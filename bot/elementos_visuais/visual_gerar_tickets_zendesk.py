@@ -12,7 +12,6 @@ from utils.interface import (
     LARGURA_BOTAO,
     avisar_variaveis_faltantes,
     error,
-    renderizar_logs,
     success,
     warning,
 )
@@ -45,16 +44,13 @@ def worker(
     estado,
     token_queue,
 ) -> None:
-    def log_visual(msg):
-        estado["logs"].append(msg)
+    def registrar_evento_log(mensagem: str) -> None:
+        if "Login ou senha inválidos." in mensagem:
+            estado["credenciais_recusadas"] = True
 
-    log, caminho_log = criar_logger_execucao(
+    log, _ = criar_logger_execucao(
         "gerar_tickets_zendesk",
-        log_visual,
-    )
-
-    estado["arquivo_log"] = str(
-        caminho_log
+        registrar_evento_log,
     )
 
     def token():
@@ -108,6 +104,7 @@ def worker(
     except CredenciaisFractionInvalidasError as erro_credenciais:
         estado["erro"] = str(erro_credenciais)
         estado["fase"] = "AVISO"
+        estado["credenciais_recusadas"] = True
     except Exception as erro:
         mensagem = (
             f"{type(erro).__name__}: {erro}"
@@ -130,10 +127,7 @@ def painel_gerar_tickets_zendesk() -> None:
         return
 
     fase = estado["fase"]
-    credenciais_recusadas = any(
-        "Warning: O Fraction informou 'Login ou senha inválidos.'" in str(linha)
-        for linha in estado.get("logs", [])
-    )
+    credenciais_recusadas = estado.get("credenciais_recusadas", False)
 
     if fase == "AGUARDANDO_MFA":
         with st.form(
@@ -183,11 +177,6 @@ def painel_gerar_tickets_zendesk() -> None:
             "mas a etapa do Fraction ficou pendente. "
             f"Resultado salvo em: {estado['caminho']}"
         )
-
-    renderizar_logs(
-        estado["logs"]
-    )
-
 
 def renderizar_gerar_tickets_zendesk(
     arquivo,
@@ -242,13 +231,12 @@ def renderizar_gerar_tickets_zendesk(
     ):
         estado = {
             "fase": "INICIANDO",
-            "logs": [],
             "atual": 0,
             "total": 0,
             "resultado": None,
             "caminho": None,
             "erro": None,
-            "arquivo_log": None,
+            "credenciais_recusadas": False,
         }
 
         token_queue = queue.Queue()
