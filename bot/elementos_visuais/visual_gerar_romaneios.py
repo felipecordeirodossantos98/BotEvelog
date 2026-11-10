@@ -1194,6 +1194,41 @@ def _renderizar_fila_romaneios(
             else "#### Resumo das filas abertas"
         )
         st.dataframe(resumo_abertos, hide_index=True, width="stretch")
+
+    # Detalhamento da rua já selecionada no filtro acima: aqui só se escolhe
+    # a triagem e se exibem os pedidos no mesmo formato da tabela sem rota.
+    if status_fila != "ENTRADA" and not tabela.empty:
+        with st.expander("Detalhes", expanded=False):
+            triagens_disponiveis = sorted(
+                {
+                    str(valor).strip()
+                    for valor in tabela["Triagem"].fillna("").astype(str)
+                    if str(valor).strip()
+                },
+                key=_normalizar_rota,
+            )
+            if not triagens_disponiveis:
+                st.info("Não há triagens disponíveis nesta rua.")
+            else:
+                triagem_selecionada_detalhes = st.selectbox(
+                    "Triagem",
+                    triagens_disponiveis,
+                    key=f"{chave_widget}_detalhes_triagem",
+                )
+                pedidos_triagem = tabela.loc[
+                    tabela["Triagem"].fillna("").astype(str).str.strip()
+                    == triagem_selecionada_detalhes
+                ].copy()
+                tabela_detalhes = _preparar_df_exibicao_romaneios(
+                    pedidos_triagem
+                )
+                st.dataframe(
+                    tabela_detalhes,
+                    hide_index=True,
+                    width="stretch",
+                    column_config=configuracao_colunas_fila,
+                )
+
     divergencias = tabela[tabela.apply(_volume_divergente, axis=1)]
     if not divergencias.empty:
         warning(
